@@ -1,0 +1,332 @@
+/* Prefix: rp- — Roam Publish
+   Prefer Blueprint.js (bp3-*) classes; keep light positioning overrides here.
+   Block status: dynamic stylesheet rings the bullet; scope=self tints the row,
+   scope=tree outlines the whole container (parent + children).
+   Page status / block chips: floating controls in #rp-publish-layer.
+   Share settings: #rp-share-popover.
+   Published list: Blueprint Dialog portal (Discourse Graph / Workbench style). */
+
+#rp-publish-layer {
+  position: fixed;
+  inset: 0;
+  /* Below Blueprint overlays/popovers (~20+) so find-or-create etc. cover badges. */
+  z-index: 10;
+  pointer-events: none;
+  overflow: hidden;
+  /* Share badges/chips live here — never hide this layer via debug settings. */
+  display: block;
+  visibility: visible;
+  opacity: 1;
+}
+
+.rp-publish-badge,
+.rp-block-share-chip {
+  pointer-events: auto;
+  cursor: pointer;
+  border: 0;
+  font: inherit;
+}
+
+.rp-publish-badge {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: min(260px, calc(100vw - 24px));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  user-select: none;
+  z-index: 2;
+  visibility: visible;
+  opacity: 1;
+}
+
+.rp-publish-badge.bp3-tag {
+  margin: 0;
+}
+
+.rp-publish-badge .rp-publish-badge-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rp-block-share-chip {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-size: 10px;
+  font-weight: 600;
+  z-index: 2;
+  /* Trailing on .rm-block-main — Workbench decorated-blocks style */
+  transform: translate(-100%, -50%);
+  opacity: 0.92;
+}
+
+.rp-block-share-chip:hover {
+  opacity: 1;
+}
+
+#rp-publish-hud {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 11;
+  max-width: 280px;
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.4;
+  pointer-events: auto;
+  background: var(--color-background, #fff);
+  color: var(--color-text, #182026);
+}
+
+#rp-publish-hud .rp-hud-title {
+  font-weight: 600;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#rp-publish-hud .rp-hud-row {
+  display: block;
+  width: 100%;
+  text-align: left;
+  margin: 0;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+#rp-publish-hud .rp-hud-action {
+  cursor: pointer;
+  border-radius: 3px;
+  padding: 3px 4px;
+  margin: 1px -4px;
+}
+
+#rp-publish-hud .rp-hud-action:hover {
+  background: rgba(167, 182, 194, 0.3);
+}
+
+#rp-publish-hud .rp-hud-muted {
+  opacity: 0.65;
+}
+
+/* —— Share settings popover (Blueprint card) —— */
+#rp-share-popover,
+.rp-share-popover {
+  position: fixed;
+  z-index: 10020;
+  box-sizing: border-box;
+  padding: 12px 14px 14px;
+  max-height: calc(100vh - 24px);
+  overflow: auto;
+}
+
+.rp-share-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.rp-share-kicker {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.rp-share-title {
+  margin: 2px 0 0;
+  font-size: 15px;
+  word-break: break-word;
+}
+
+.rp-share-section {
+  padding: 10px 0;
+  border-top: 1px solid rgba(16, 22, 26, 0.15);
+}
+
+.rp-share-heading {
+  margin: 0 0 6px !important;
+  font-size: 12px !important;
+}
+
+.rp-share-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.rp-share-callout {
+  margin-top: 8px;
+  padding: 8px 10px 8px 36px;
+  font-size: 12px;
+}
+
+.rp-share-hint {
+  margin: 6px 0 0;
+  font-size: 12px;
+}
+
+.rp-share-dest {
+  margin: 6px 0 0;
+  font-size: 11px;
+  word-break: break-all;
+}
+
+.rp-share-team-label {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  line-height: 1.3;
+}
+
+.rp-share-team-label .bp3-text-muted {
+  font-size: 11px;
+}
+
+.rp-share-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.rp-share-radios {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.rp-share-radio {
+  margin-bottom: 2px !important;
+}
+
+.rp-share-footer {
+  padding-top: 10px;
+  border-top: 1px solid rgba(16, 22, 26, 0.15);
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+}
+
+/* —— Published items dialog (renderOverlay + Blueprint Dialog pattern) —— */
+.rp-published-portal {
+  z-index: 10010;
+}
+
+.rp-published-overlay {
+  z-index: 10010;
+}
+
+.rp-published-backdrop {
+  /* Blueprint provides dimming; keep clickable */
+  cursor: default;
+}
+
+.rp-published-dialog-container {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  min-height: 100%;
+  padding: 10vh 12px 24px;
+  pointer-events: none;
+}
+
+.rp-published-dialog {
+  pointer-events: auto;
+  width: min(640px, calc(100vw - 24px));
+  max-height: 80vh;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.rp-published-dialog .bp3-dialog-body {
+  overflow: auto;
+  max-height: calc(80vh - 120px);
+  margin: 0;
+}
+
+.rp-published-dialog .bp3-dialog-footer-actions {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.rp-published-count {
+  font-size: 12px;
+}
+
+.rp-published-empty {
+  margin: 8px 0;
+}
+
+.rp-published-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rp-published-item {
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.rp-published-item:focus {
+  outline: 2px solid rgba(19, 124, 189, 0.45);
+  outline-offset: 1px;
+}
+
+.rp-published-item-top {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.rp-published-item-actions {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 2px;
+}
+
+.rp-published-item-title {
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.rp-published-item-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11px;
+  margin-top: 4px;
+}
+
+.rp-published-item-url {
+  font-size: 11px;
+  margin-top: 4px;
+  word-break: break-all;
+}
+
+.rp-published-item-link {
+  color: inherit;
+}
