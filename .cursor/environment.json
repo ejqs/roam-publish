@@ -1,0 +1,4 @@
+{
+  "name": "roam-publish",
+  "install": "node --check extension.js && echo 'extension.js OK'"
+}
