@@ -1,14 +1,9 @@
-# roam-publish docs
-
-Roam Depot / roam/js extension that publishes pages and blocks to **roam-publish-web**.
+# Extension docs (simple prototype)
 
 | Doc | Description |
 | --- | --- |
-| [architecture.md](./architecture.md) | Modules, overlays, hot-path rules |
-| [publish-flow.md](./publish-flow.md) | Auth exchange + publish/unpublish |
-| [api-and-auth.md](./api-and-auth.md) | Settings fields, HTTP client, contract pointer |
-| [build-and-dev.md](./build-and-dev.md) | Build, load in Roam, local smoke |
-| [testing.md](./testing.md) | Checklist; graph **`ejqs-develop` only** |
-| [gaps.md](./gaps.md) | Known limitations |
+| [api-and-auth.md](./api-and-auth.md) | Token exchange + publish HTTP |
+| [build-and-dev.md](./build-and-dev.md) | Build / load |
+| [gaps.md](./gaps.md) | What’s intentionally missing |
 
-Cross-repo contract: Project store `docs/api-contract.md`.
+Contract: Project store `docs/api-contract.md`. Default server: `https://roampub.up.railway.app`.

@@ -1,21 +1,25 @@
-# roam-publish
+# roam-publish (simple prototype)
 
-Publish and share Roam pages and blocks to [roam-publish-web](https://github.com/ejqs/roam-publish-web).
+Publish Roam pages/blocks to [roam-publish-web](https://github.com/ejqs/roam-publish-web).
 
-## Quick start
+## What it does
+
+1. Settings: paste Roam append-only token → **Connect** → stores API key
+2. Publish / Unpublish via command palette, slash, or context menu
+3. Alerts show the live URL (`https://roampub.up.railway.app/<graph>/<uid>`)
+
+No teams, overlays, share popover, or outdated scanner.
+
+## Build
 
 ```bash
 npm install && npm run build
 ```
 
-Load `extension.js` + `extension.css` in Roam (Depot or roam/js).
+Load `extension.js` + `extension.css` in Roam (Depot or roam/js). **Only use graph `ejqs-develop` for testing.**
 
-1. Settings → **Server URL** (default `https://roampub.up.railway.app`)
-2. Paste a Roam **temporary append-only** token → **Connect**
-3. Publish Page / Block from the command palette
+## Commands
 
-Public URLs: `/{graph-name}/{page-or-block-uid}`.
-
-## Docs
-
-See [docs/README.md](./docs/README.md).
+- `Roam Publish: Connect (exchange token)`
+- `Roam Publish: Publish Page` / `Publish Block` / `Unpublish open`
+- Context menus on page / block

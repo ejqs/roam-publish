@@ -1,6 +1,6 @@
 /**
- * HTTP client for roam-publish-web.
- * Contract: Project store docs/api-contract.md
+ * HTTP client for roam-publish-web (simple prototype).
+ * Contract: docs/api-contract.md
  */
 
 import {
@@ -10,7 +10,6 @@ import {
 import { getGraphName } from "./graph.js";
 import { contentFingerprintFor } from "./roam.js";
 import { getApiBase, getApiKey } from "./settings-store.js";
-import { normalizeScope, normalizeVisibility } from "./theme.js";
 
 /**
  * @param {string} path
@@ -26,7 +25,7 @@ async function request(path, { method = "GET", body, auth = true } = {}) {
     const key = getApiKey();
     if (!key) {
       throw new Error(
-        "No API key. Open Settings → paste a Roam temporary token → Connect.",
+        "Not connected. Settings → paste Roam token → Connect.",
       );
     }
     headers.Authorization = `Bearer ${key}`;
@@ -49,19 +48,17 @@ async function request(path, { method = "GET", body, auth = true } = {}) {
   }
 
   if (!res.ok) {
-    const code = data?.error || data?.message;
-    const msg = code
-      ? `${code}${data?.detail ? `: ${data.detail}` : ""}`
-      : `${res.status} ${res.statusText}`;
+    const msg =
+      data?.error || data?.message
+        ? `${data.error || data.message}${data?.detail ? `: ${data.detail}` : ""}`
+        : `${res.status} ${res.statusText}`;
     throw new Error(String(msg));
   }
   return data;
 }
 
 /**
- * Exchange a Roam temporary append-only token for a server API key.
  * @param {{ roamToken: string, graphName: string }} input
- * @returns {Promise<{ apiKey: string, graphName?: string, baseUrl?: string }>}
  */
 export async function exchangeRoamToken({ roamToken, graphName }) {
   const data = await request("/api/auth/exchange", {
@@ -69,31 +66,12 @@ export async function exchangeRoamToken({ roamToken, graphName }) {
     auth: false,
     body: { roamToken, graphName },
   });
-  const apiKey =
-    typeof data?.apiKey === "string"
-      ? data.apiKey
-      : typeof data?.key === "string"
-        ? data.key
-        : "";
+  const apiKey = typeof data?.apiKey === "string" ? data.apiKey : "";
   if (!apiKey) throw new Error("Server did not return an API key.");
   return {
     apiKey,
     graphName: data.graphName || graphName,
     baseUrl: data.baseUrl,
-  };
-}
-
-/** @returns {Promise<{ ok: boolean, fetchedAt: string, items: Array<object> }>} */
-export async function fetchPublishedIndex() {
-  if (!getApiKey()) {
-    return { ok: true, fetchedAt: new Date().toISOString(), items: [] };
-  }
-  const data = await request("/api/publish");
-  const items = Array.isArray(data?.items) ? data.items : [];
-  return {
-    ok: true,
-    fetchedAt: new Date().toISOString(),
-    items: items.map(normalizeRecord),
   };
 }
 
@@ -107,8 +85,7 @@ export async function fetchPublishedIndex() {
  * }} target
  */
 export async function postPublish(target) {
-  const scope =
-    target.kind === "block" ? normalizeScope(target.scope) : undefined;
+  const scope = target.kind === "block" ? target.scope || "tree" : undefined;
   const content = serializeForPublish(target.uid, {
     kind: target.kind,
     scope: scope || "self",
@@ -127,64 +104,25 @@ export async function postPublish(target) {
     kind: target.kind,
     title: target.title,
     content,
-    visibility: normalizeVisibility(target.visibility),
+    visibility: target.visibility || "unlisted",
     contentFingerprint: fingerprint,
   };
   if (target.kind === "block") body.scope = scope;
 
-  const data = await request("/api/publish", {
-    method: "POST",
-    body,
-  });
-
-  return normalizeRecord({
-    ...data,
+  const data = await request("/api/publish", { method: "POST", body });
+  const graphName = getGraphName();
+  const url =
+    data?.url ||
+    (graphName
+      ? `${getApiBase()}/${encodeURIComponent(graphName)}/${encodeURIComponent(target.uid)}`
+      : "");
+  return {
     uid: data?.uid || target.uid,
     kind: data?.kind || target.kind,
     title: data?.title || target.title,
-    scope: data?.scope ?? scope,
-    visibility: data?.visibility || target.visibility,
-    contentFingerprint: data?.contentFingerprint || fingerprint,
-  });
-}
-
-/**
- * @param {string} uid
- * @param {{ visibility?: string, scope?: string, title?: string }} patch
- * @param {object} current
- */
-export async function postShareSettings(uid, patch, current) {
-  /** @type {Record<string, unknown>} */
-  const body = {};
-  if (patch.visibility != null) body.visibility = patch.visibility;
-  if (current.kind === "block" && patch.scope != null) body.scope = patch.scope;
-  if (patch.title != null) body.title = patch.title;
-
-  const data = await request(`/api/publish/${encodeURIComponent(uid)}`, {
-    method: "PATCH",
-    body,
-  });
-  return normalizeRecord({
-    ...current,
-    ...data,
-    uid,
-    kind: data?.kind || current.kind,
-  });
-}
-
-/**
- * Republish = upsert again (no separate /republish route).
- * @param {string} uid
- * @param {object} current
- */
-export async function postRepublish(uid, current) {
-  return postPublish({
-    uid,
-    kind: current.kind === "block" ? "block" : "page",
-    title: current.title || uid,
-    scope: current.scope,
-    visibility: current.visibility,
-  });
+    url,
+    visibility: data?.visibility || "unlisted",
+  };
 }
 
 /** @param {string} uid */
@@ -193,31 +131,4 @@ export async function postUnpublish(uid) {
     method: "DELETE",
   });
   return { ok: true, uid };
-}
-
-/**
- * @param {object} raw
- */
-function normalizeRecord(raw) {
-  if (!raw) return raw;
-  const graphName = raw.graphName || getGraphName();
-  const uid = raw.uid;
-  let url = raw.url;
-  if (!url && graphName && uid) {
-    url = `${getApiBase()}/${encodeURIComponent(graphName)}/${encodeURIComponent(uid)}`;
-  } else if (typeof url === "string" && url.startsWith("/")) {
-    url = `${getApiBase()}${url}`;
-  }
-  return {
-    uid,
-    kind: raw.kind === "block" ? "block" : "page",
-    status: raw.status || "published",
-    scope: raw.scope || undefined,
-    visibility: raw.visibility || "unlisted",
-    title: raw.title,
-    url,
-    publishedAt: raw.publishedAt || raw.updatedAt,
-    contentFingerprint: raw.contentFingerprint,
-    graphName,
-  };
 }
