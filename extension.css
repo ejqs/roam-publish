@@ -180,23 +180,6 @@
   font-size: 12px;
 }
 
-.rp-share-dest {
-  margin: 6px 0 0;
-  font-size: 11px;
-  word-break: break-all;
-}
-
-.rp-share-team-label {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  line-height: 1.3;
-}
-
-.rp-share-team-label .bp3-text-muted {
-  font-size: 11px;
-}
-
 .rp-share-actions {
   display: flex;
   flex-wrap: wrap;

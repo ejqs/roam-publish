@@ -1,8 +1,3 @@
-import {
-  formatTeamsDestinations,
-  listTeams,
-  normalizeGroupIds,
-} from "./groups.js";
 import { notify } from "./notify.js";
 import {
   republish,
@@ -118,27 +113,6 @@ export function refreshSharePopoverIfOpen() {
  * @param {import("./theme.js").PublishEntry} entry
  */
 function renderPopoverHtml(uid, entry) {
-  const teams = listTeams();
-  const selectedIds = new Set(
-    normalizeGroupIds(entry.groupIds ?? entry.groupId),
-  );
-  const teamCheckboxes = teams
-    .map((t) => {
-      const checked = selectedIds.has(t.id) ? "checked" : "";
-      return `<label class="bp3-control bp3-checkbox rp-share-radio">
-        <input type="checkbox" name="rp-team" value="${escapeAttr(t.id)}" ${checked} />
-        <span class="bp3-control-indicator"></span>
-        <span class="rp-share-team-label">
-          <strong>${escapeHtml(t.name)}</strong>
-          <span class="bp3-text-muted">${escapeHtml(t.destination)}</span>
-        </span>
-      </label>`;
-    })
-    .join("");
-
-  const selectedDest =
-    formatTeamsDestinations([...selectedIds]) || "";
-
   const visibilityOptions = ["private", "unlisted", "public"]
     .map(
       (v) =>
@@ -218,21 +192,6 @@ function renderPopoverHtml(uid, entry) {
     </section>
 
     <section class="rp-share-section">
-      <h4 class="bp3-heading rp-share-heading">Teams</h4>
-      <p class="bp3-text-muted rp-share-hint">Share to one or more team sites.</p>
-      <div class="rp-share-radios" data-rp-share-teams>
-        ${teamCheckboxes}
-      </div>
-      <p class="bp3-text-muted rp-share-dest" data-rp-share-dest>
-        ${
-          selectedDest
-            ? escapeHtml(selectedDest)
-            : "No teams selected"
-        }
-      </p>
-    </section>
-
-    <section class="rp-share-section">
       <h4 class="bp3-heading rp-share-heading">Visibility</h4>
       <div class="rp-share-radios" data-rp-share-visibility>
         ${visibilityOptions}
@@ -268,28 +227,11 @@ function bindPopover(pop, uid) {
     void unpublishUid(uid);
   });
 
-  const destEl = pop.querySelector("[data-rp-share-dest]");
-  const syncDestPreview = () => {
-    const ids = [
-      ...pop.querySelectorAll('input[name="rp-team"]:checked'),
-    ].map((el) => /** @type {HTMLInputElement} */ (el).value);
-    const dest = formatTeamsDestinations(ids);
-    if (destEl) {
-      destEl.textContent = dest || "No teams selected";
-    }
-  };
-  pop.querySelectorAll('input[name="rp-team"]').forEach((el) => {
-    el.addEventListener("change", syncDestPreview);
-  });
-
   pop.querySelector("[data-rp-share-save]")?.addEventListener("click", () => {
     const visibility =
       /** @type {HTMLInputElement | null} */ (
         pop.querySelector('input[name="rp-visibility"]:checked')
       )?.value;
-    const groupIds = [
-      ...pop.querySelectorAll('input[name="rp-team"]:checked'),
-    ].map((el) => /** @type {HTMLInputElement} */ (el).value);
     const scope =
       /** @type {HTMLInputElement | null} */ (
         pop.querySelector('input[name="rp-scope"]:checked')
@@ -297,11 +239,11 @@ function bindPopover(pop, uid) {
 
     void updateShareSettings(uid, {
       visibility,
-      groupIds,
       scope,
-    }).then(() => {
+    }).then((result) => {
+      if (!result) return;
       refreshSharePopoverIfOpen();
-      notify("Share settings saved (dummy).");
+      notify("Share settings saved.");
     });
   });
 }

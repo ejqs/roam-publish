@@ -8,8 +8,10 @@ import { checkPublishState } from "./cache.js";
 import { notify } from "./notify.js";
 import { publish, refreshPublishCache, unpublish } from "./publish.js";
 import { openPublishedItemsDialog } from "./published-list.js";
+import { getGraphName } from "./graph.js";
 import { refreshCachedOpenUid } from "./roam.js";
-import { buildSettings as createSettingsPanel } from "./settings.js";
+import { buildSettings as createSettingsPanel, runTokenExchange } from "./settings.js";
+import { getApiBase, getApiKey } from "./settings-store.js";
 import { openSharePopover } from "./share-popover.js";
 import { publishCache } from "./state.js";
 import { resolvePublishTarget } from "./target.js";
@@ -25,20 +27,10 @@ async function alertPublishState(uid, label) {
   if (state) {
     const scope =
       state.kind === "block" ? `\nScope: ${scopeLabel(state.scope)}` : "";
-    const teamNames =
-      (state.groupNames && state.groupNames.length
-        ? state.groupNames.join(", ")
-        : null) || state.groupName;
-    const team = teamNames ? `\nTeams: ${teamNames}` : "";
-    const dest =
-      (state.teamDestinations && state.teamDestinations.length
-        ? `\nDestinations: ${state.teamDestinations.join(", ")}`
-        : null) ||
-      (state.teamDestination ? `\nDestination: ${state.teamDestination}` : "");
     notify(
       `${label} ${uid}\n${state.kind} · ${statusLabel(state.status)} · ${visibilityLabel(
         state.visibility,
-      )}${scope}${team}${dest}${state.url ? `\n${state.url}` : ""}`,
+      )}${scope}${state.url ? `\n${state.url}` : ""}`,
     );
   } else {
     notify(`No publish record for ${uid || `(no ${label})`}`);
@@ -112,9 +104,27 @@ const COMMANDS = [
     run: () => openPublishedItemsDialog(),
   },
   {
-    label: "Roam Publish: Refresh status cache (dummy)",
+    label: "Roam Publish: Connect (exchange token)",
+    palette: true,
+    run: () => runTokenExchange(),
+  },
+  {
+    label: "Roam Publish: Refresh status cache",
     palette: true,
     run: () => refreshPublishCache(),
+  },
+  {
+    label: "Roam Publish: Connection status",
+    palette: true,
+    run: () => {
+      const key = getApiKey();
+      const graph = getGraphName() || "(unknown)";
+      notify(
+        key
+          ? `Connected to ${getApiBase()}\nGraph: ${graph}\nAPI key: ${key.length} chars`
+          : `Not connected.\nServer: ${getApiBase()}\nGraph: ${graph}\nPaste a Roam token in Settings, then Connect.`,
+      );
+    },
   },
   {
     label: "Roam Publish: Log status cache",

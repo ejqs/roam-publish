@@ -92,7 +92,7 @@ export function openPublishedItemsDialog() {
  */
 export function renderItemsHtml(items) {
   if (!items.length) {
-    return `<p class="bp3-text-muted rp-published-empty">No published items in cache. Publish a page or block, then reopen this window.</p>`;
+    return `<p class="bp3-text-muted rp-published-empty">No published items yet. Connect in Settings, publish a page or block, then reopen.</p>`;
   }
   return `
     <div class="rp-published-list" role="list">
@@ -104,11 +104,6 @@ export function renderItemsHtml(items) {
 /** @param {object} item */
 function renderItemRow(item) {
   const title = escapeHtml(item.title || item.uid);
-  const teamNames =
-    (item.groupNames && item.groupNames.length
-      ? item.groupNames.join(", ")
-      : null) || item.groupName;
-  const team = teamNames ? escapeHtml(teamNames) : "—";
   const scope =
     item.kind === "block" ? escapeHtml(scopeLabel(item.scope)) : "—";
   const url = item.url
@@ -141,7 +136,6 @@ function renderItemRow(item) {
       </div>
       <div class="rp-published-item-title">${title}</div>
       <div class="rp-published-item-meta bp3-text-muted">
-        <span>Teams: ${team}</span>
         <span>Scope: ${scope}</span>
         <span>Published: ${escapeHtml(formatPublishedAt(item.publishedAt))}</span>
       </div>

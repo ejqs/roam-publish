@@ -10,16 +10,11 @@
  *   kind: "page" | "block",
  *   scope?: PublishScope,
  *   visibility: PublishVisibility,
- *   groupIds?: string[],
- *   groupNames?: string[],
- *   teamDestinations?: string[],
- *   groupId?: string | null,
- *   groupName?: string | null,
- *   teamDestination?: string | null,
  *   title?: string,
  *   url?: string,
  *   publishedAt?: string,
  *   contentFingerprint?: string,
+ *   graphName?: string,
  * }} PublishEntry
  */
 
@@ -86,8 +81,8 @@ export function normalizeScope(scope) {
 
 /** @param {string | undefined | null} visibility @returns {PublishVisibility} */
 export function normalizeVisibility(visibility) {
-  if (visibility === "private" || visibility === "unlisted") return visibility;
-  return "public";
+  if (visibility === "private" || visibility === "public") return visibility;
+  return "unlisted";
 }
 
 /** @param {string | undefined | null} status */
@@ -139,11 +134,6 @@ export function entryTitleAttr(entry) {
   const parts = [statusLabel(entry.status)];
   if (entry.kind === "block") parts.push(scopeLabel(entry.scope));
   parts.push(visibilityLabel(entry.visibility));
-  const teamLabel =
-    (entry.groupNames && entry.groupNames.length
-      ? entry.groupNames.join(", ")
-      : null) || entry.groupName;
-  if (teamLabel) parts.push(`Teams: ${teamLabel}`);
   if (entry.url) parts.push(entry.url);
   return parts.join(" · ");
 }

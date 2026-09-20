@@ -1,4 +1,4 @@
-// Prototype: dummy GET → cache → overlays (pages/chips) + stylesheet (blocks)
+// Prototype: real HTTP → cache → overlays (pages/chips) + stylesheet (blocks)
 // Hot path (scroll/paint) must NOT call rate-limited roamAlphaAPI methods.
 
 import { onCacheChange } from "./cache.js";

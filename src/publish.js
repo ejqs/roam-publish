@@ -13,10 +13,10 @@ import {
 } from "./api.js";
 import { notify } from "./notify.js";
 import { clearBadge, schedulePaint } from "./overlays.js";
+import { getApiKey } from "./settings-store.js";
 import { publishCache, setCachedOpenUid } from "./state.js";
 import { resolvePublishTarget } from "./target.js";
 import { normalizeScope, normalizeVisibility } from "./theme.js";
-import { normalizeGroupIds } from "./groups.js";
 
 /** Set by share-popover onload to avoid import cycles. */
 let dismissSharePopover = () => {};
@@ -26,49 +26,62 @@ export function setSharePopoverDismiss(fn) {
   dismissSharePopover = fn || (() => {});
 }
 
+function requireApiKey() {
+  if (getApiKey()) return true;
+  notify(
+    "Not connected. Settings → paste Roam temporary token → Connect, then try again.",
+  );
+  return false;
+}
+
 /**
  * @param {{
  *   uid?: string,
  *   kind?: "page" | "block",
  *   scope?: "self" | "tree",
  *   visibility?: string,
- *   groupIds?: string[],
- *   groupId?: string | null,
  * }} [opts]
  */
-export async function publish({
-  uid,
-  kind,
-  scope,
-  visibility,
-  groupIds,
-  groupId,
-} = {}) {
+export async function publish({ uid, kind, scope, visibility } = {}) {
+  if (!requireApiKey()) return null;
+
   const target = await resolvePublishTarget({ uid, kind });
   if (!target) return null;
 
-  const record = await postPublish({
-    uid: target.uid,
-    kind: target.kind,
-    title: target.title,
-    scope: target.kind === "block" ? normalizeScope(scope) : undefined,
-    visibility: normalizeVisibility(visibility),
-    groupIds: normalizeGroupIds(groupIds ?? groupId ?? null),
-  });
+  try {
+    const record = await postPublish({
+      uid: target.uid,
+      kind: target.kind,
+      title: target.title,
+      scope: target.kind === "block" ? normalizeScope(scope) : undefined,
+      visibility: normalizeVisibility(visibility),
+    });
 
-  upsertCacheEntry(record);
+    upsertCacheEntry(record);
+    if (record.kind === "page") setCachedOpenUid(record.uid);
 
-  if (record.kind === "page") setCachedOpenUid(record.uid);
-
-  console.log("Roam Publish: published (dummy)", record);
-  schedulePaint();
-  return publishCache.get(record.uid);
+    console.log("Roam Publish: published", record);
+    notify(
+      record.url
+        ? `Published ${record.kind}: ${record.url}`
+        : `Published ${record.kind}.`,
+    );
+    schedulePaint();
+    return publishCache.get(record.uid);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn("Roam Publish: publish failed", err);
+    notify(`Publish failed: ${msg}`);
+    return null;
+  }
 }
 
 /**
  * @param {{ uid?: string, kind?: "page" | "block" }} [opts]
  */
 export async function unpublish({ uid, kind } = {}) {
+  if (!requireApiKey()) return;
+
   const target = await resolvePublishTarget({ uid, kind });
   if (!target) return;
 
@@ -77,72 +90,104 @@ export async function unpublish({ uid, kind } = {}) {
     return;
   }
 
-  await postUnpublish(target.uid);
-  deleteCacheEntry(target.uid);
-  clearBadge(target.uid);
-  dismissSharePopover();
-  console.log("Roam Publish: unpublished (dummy)", target.uid);
-  notify(`Unpublished ${target.kind} (dummy).`);
-  schedulePaint();
+  try {
+    await postUnpublish(target.uid);
+    deleteCacheEntry(target.uid);
+    clearBadge(target.uid);
+    dismissSharePopover();
+    console.log("Roam Publish: unpublished", target.uid);
+    notify(`Unpublished ${target.kind}.`);
+    schedulePaint();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    notify(`Unpublish failed: ${msg}`);
+  }
 }
 
 /**
- * Unpublish a known cache uid (e.g. from share popover) without re-resolving focus.
+ * Unpublish a known cache uid without re-resolving focus.
  * @param {string} uid
  */
 export async function unpublishUid(uid) {
+  if (!requireApiKey()) return;
   if (!uid || !publishCache.has(uid)) {
     notify("Nothing published for that uid.");
     return;
   }
-  await postUnpublish(uid);
-  deleteCacheEntry(uid);
-  clearBadge(uid);
-  dismissSharePopover();
-  console.log("Roam Publish: unpublished (dummy)", uid);
-  notify("Unpublished (dummy).");
-  schedulePaint();
+  try {
+    await postUnpublish(uid);
+    deleteCacheEntry(uid);
+    clearBadge(uid);
+    dismissSharePopover();
+    console.log("Roam Publish: unpublished", uid);
+    notify("Unpublished.");
+    schedulePaint();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    notify(`Unpublish failed: ${msg}`);
+  }
 }
 
 /**
  * @param {string} uid
- * @param {{ visibility?: string, groupIds?: string[], groupId?: string | null, scope?: string }} patch
+ * @param {{ visibility?: string, scope?: string }} patch
  */
 export async function updateShareSettings(uid, patch) {
+  if (!requireApiKey()) return null;
   const current = checkPublishState(uid);
   if (!current) {
     notify("Nothing published for that uid.");
     return null;
   }
-  const next = await postShareSettings(uid, patch, current);
-  upsertCacheEntry(next);
-  schedulePaint();
-  return publishCache.get(uid);
+  try {
+    const next = await postShareSettings(uid, patch, current);
+    upsertCacheEntry(next);
+    schedulePaint();
+    return publishCache.get(uid);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    notify(`Save failed: ${msg}`);
+    return null;
+  }
 }
 
 /** @param {string} uid */
 export async function republish(uid) {
+  if (!requireApiKey()) return null;
   const current = checkPublishState(uid);
   if (!current) {
     notify("Nothing published for that uid.");
     return null;
   }
-  const next = await postRepublish(uid, current);
-  upsertCacheEntry(next);
-  schedulePaint();
-  notify("Updated published copy (dummy).");
-  return publishCache.get(uid);
+  try {
+    const next = await postRepublish(uid, current);
+    upsertCacheEntry(next);
+    schedulePaint();
+    notify("Updated published copy.");
+    return publishCache.get(uid);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    notify(`Update failed: ${msg}`);
+    return null;
+  }
 }
 
 export async function refreshPublishCache() {
-  console.log("Roam Publish: fetching publish index (dummy)…");
-  const payload = await fetchPublishedIndex();
-  applyPublishIndex(payload);
-  console.log(
-    "Roam Publish: cache ready",
-    payload.fetchedAt,
-    Object.fromEntries(publishCache),
-  );
-  schedulePaint();
-  return publishCache;
+  try {
+    console.log("Roam Publish: fetching publish index…");
+    const payload = await fetchPublishedIndex();
+    applyPublishIndex(payload);
+    console.log(
+      "Roam Publish: cache ready",
+      payload.fetchedAt,
+      Object.fromEntries(publishCache),
+    );
+    schedulePaint();
+    return publishCache;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn("Roam Publish: refresh failed", err);
+    notify(`Refresh failed: ${msg}`);
+    return publishCache;
+  }
 }

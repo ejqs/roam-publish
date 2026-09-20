@@ -1,60 +1,3 @@
-// src/groups.js
-var DUMMY_TEAMS = [
-  {
-    id: "team-personal-blog",
-    name: "Personal Blog",
-    destination: "https://example.com/sites/personal-blog",
-    permissions: "you can publish & manage"
-  },
-  {
-    id: "team-work-docs",
-    name: "Work Documents",
-    destination: "https://example.com/sites/work-documents",
-    permissions: "members can view & edit"
-  }
-];
-function listTeams() {
-  return DUMMY_TEAMS.slice();
-}
-function getTeam(id) {
-  if (!id) return null;
-  return DUMMY_TEAMS.find((t) => t.id === id) || null;
-}
-function normalizeGroupIds(raw) {
-  let list = [];
-  if (Array.isArray(raw)) list = raw;
-  else if (typeof raw === "string" && raw) list = [raw];
-  const seen = /* @__PURE__ */ new Set();
-  const out = [];
-  for (const item of list) {
-    const id = typeof item === "string" ? item : null;
-    if (!id || seen.has(id) || !getTeam(id)) continue;
-    seen.add(id);
-    out.push(id);
-  }
-  return out;
-}
-function teamNameFor(id) {
-  return getTeam(id)?.name || null;
-}
-function teamDestinationFor(id) {
-  return getTeam(id)?.destination || null;
-}
-function teamNamesFor(ids) {
-  return normalizeGroupIds(ids).map((id) => teamNameFor(id)).filter(Boolean);
-}
-function teamDestinationsFor(ids) {
-  return normalizeGroupIds(ids).map((id) => teamDestinationFor(id)).filter(Boolean);
-}
-function formatTeamsDestinations(ids) {
-  const normalized = normalizeGroupIds(ids);
-  if (!normalized.length) return null;
-  return normalized.map((id) => {
-    const t = getTeam(id);
-    return t ? `${t.name} \u2192 ${t.destination}` : null;
-  }).filter(Boolean).join("; ");
-}
-
 // src/state.js
 var publishCache = /* @__PURE__ */ new Map();
 var cachedOpenUid = null;
@@ -120,8 +63,8 @@ function normalizeScope(scope) {
   return scope === "tree" ? "tree" : "self";
 }
 function normalizeVisibility(visibility) {
-  if (visibility === "private" || visibility === "unlisted") return visibility;
-  return "public";
+  if (visibility === "private" || visibility === "public") return visibility;
+  return "unlisted";
 }
 function statusLabel(status) {
   return STATUS_THEME[normalizeStatus(status)].label;
@@ -155,8 +98,6 @@ function entryTitleAttr(entry) {
   const parts = [statusLabel(entry.status)];
   if (entry.kind === "block") parts.push(scopeLabel(entry.scope));
   parts.push(visibilityLabel(entry.visibility));
-  const teamLabel = (entry.groupNames && entry.groupNames.length ? entry.groupNames.join(", ") : null) || entry.groupName;
-  if (teamLabel) parts.push(`Teams: ${teamLabel}`);
   if (entry.url) parts.push(entry.url);
   return parts.join(" \xB7 ");
 }
@@ -185,35 +126,19 @@ function listPublishEntries() {
     return String(a.title || a.uid).localeCompare(String(b.title || b.uid));
   });
 }
-function groupIdsFromRaw(entry) {
-  if (entry.groupIds != null || entry.teamIds != null) {
-    return normalizeGroupIds(entry.groupIds ?? entry.teamIds);
-  }
-  return normalizeGroupIds(entry.groupId || entry.teamId || null);
-}
 function normalizeEntry(entry) {
   if (!entry?.uid) return null;
   const kind = entry.kind === "block" ? "block" : "page";
-  const groupIds = groupIdsFromRaw(entry);
-  const groupNames = teamNamesFor(groupIds);
-  const teamDestinations = teamDestinationsFor(groupIds);
-  const groupId = groupIds[0] || null;
   return {
     status: normalizeStatus(entry.status),
     kind,
     scope: kind === "block" ? normalizeScope(entry.scope) : void 0,
     visibility: normalizeVisibility(entry.visibility),
-    groupIds,
-    groupNames,
-    teamDestinations,
-    // Legacy single-value mirrors (first selected team).
-    groupId,
-    groupName: groupNames[0] || teamNameFor(groupId),
-    teamDestination: teamDestinations[0] || teamDestinationFor(groupId),
     title: entry.title,
     url: entry.url,
     publishedAt: entry.publishedAt,
-    contentFingerprint: entry.contentFingerprint
+    contentFingerprint: entry.contentFingerprint,
+    graphName: entry.graphName
   };
 }
 function upsertCacheEntry(entry) {
@@ -247,44 +172,16 @@ var BLOCK_CTX_UNPUBLISH_LABEL = "Roam Publish: Unpublish Block";
 var PAGE_CTX_LABEL = "Roam Publish: Publish Page";
 var PAGE_CTX_UNPUBLISH_LABEL = "Roam Publish: Unpublish Page";
 var STYLE_ID = "rp-publish-dynamic-css";
+var DEFAULT_API_BASE = "https://roampub.up.railway.app";
 
 // src/notify.js
 function notify(message) {
   window.alert(message);
 }
 
-// src/settings-store.js
-var extensionAPI = null;
-function setExtensionAPI(api) {
-  extensionAPI = api;
-}
-function getSetting(key) {
-  try {
-    return extensionAPI?.settings?.get?.(key) ?? null;
-  } catch (_) {
-    return null;
-  }
-}
-function getApiKey() {
-  const v = getSetting("api-key");
-  return typeof v === "string" && v.trim() ? v.trim() : "";
-}
-function isDebugHudEnabled() {
-  try {
-    if (typeof localStorage !== "undefined" && localStorage.getItem("rpDebug") === "1") {
-      return true;
-    }
-  } catch (_) {
-  }
-  return getSetting("debug-hud") === true;
-}
-
 // src/roam.js
 function isPageEntity(pull) {
   return Boolean(pull && pull[":node/title"] != null);
-}
-function entityKindFromPull(pull) {
-  return isPageEntity(pull) ? "page" : "block";
 }
 function entityTitleFromPull(pull, uid) {
   return pull?.[":node/title"] || pull?.[":block/string"] || uid;
@@ -336,161 +233,269 @@ async function openUidInMainWindow(uid) {
   }
 }
 
-// src/api.js
-function withAuthNote(label) {
-  const key = getApiKey();
-  if (key) {
-    console.log(`Roam Publish: ${label} (dummy) with API key (${key.length} chars)`);
-  } else {
-    console.log(`Roam Publish: ${label} (dummy, no API key)`);
+// src/content.js
+var TREE_PULL = "[:block/uid :node/title :block/string :block/order {:block/children ...}]";
+var SELF_PULL = "[:block/uid :node/title :block/string :block/order]";
+function serializeForPublish(uid, { scope = "self", kind } = {}) {
+  if (!uid) return null;
+  const wantTree = kind === "page" || scope === "tree";
+  let pull = null;
+  try {
+    pull = window.roamAlphaAPI.pull(wantTree ? TREE_PULL : SELF_PULL, [
+      ":block/uid",
+      uid
+    ]);
+  } catch (err) {
+    console.warn("Roam Publish: tree pull failed, falling back", uid, err);
+    pull = pullEntity(uid);
   }
-  return key ? { Authorization: `Bearer ${key}` } : {};
+  if (!pull) return null;
+  const root = normalizeChild(pull, wantTree);
+  const payload = {
+    format: "roam-json-v1",
+    uid: root.uid
+  };
+  if (root.title != null) payload.title = root.title;
+  if (root.string != null) payload.string = root.string;
+  if (wantTree && Array.isArray(root.children)) {
+    payload.children = root.children;
+  } else if (kind === "page") {
+    payload.children = root.children || [];
+  }
+  return payload;
 }
-function withTeamFields(record) {
-  const groupIds = normalizeGroupIds(
-    record.groupIds ?? record.teamIds ?? record.groupId ?? record.teamId
-  );
-  const groupNames = teamNamesFor(groupIds);
-  const teamDestinations = teamDestinationsFor(groupIds);
-  const groupId = groupIds[0] || null;
+function normalizeChild(pull, includeChildren) {
+  const node = {};
+  if (pull[":block/uid"] != null) node.uid = String(pull[":block/uid"]);
+  if (pull[":node/title"] != null) node.title = String(pull[":node/title"]);
+  if (pull[":block/string"] != null) node.string = String(pull[":block/string"]);
+  if (includeChildren) {
+    const kids = Array.isArray(pull[":block/children"]) ? pull[":block/children"] : [];
+    const sorted = [...kids].sort(
+      (a, b) => (a?.[":block/order"] ?? 0) - (b?.[":block/order"] ?? 0)
+    );
+    node.children = sorted.map((child) => normalizeChild(child, true));
+  }
+  return node;
+}
+function contentFingerprintForPublish(uid, opts = {}) {
+  const tree = serializeForPublish(uid, opts);
+  if (!tree) return "";
+  try {
+    return JSON.stringify(tree);
+  } catch (_) {
+    return tree.title || tree.string || uid;
+  }
+}
+
+// src/graph.js
+function getGraphName() {
+  try {
+    const hash = String(window.location?.hash || "");
+    const m = hash.match(/#\/app\/([^/?#]+)/);
+    if (m?.[1]) return decodeURIComponent(m[1]);
+  } catch (_) {
+  }
+  try {
+    const path = String(window.location?.pathname || "");
+    const m = path.match(/\/app\/([^/?#]+)/);
+    if (m?.[1]) return decodeURIComponent(m[1]);
+  } catch (_) {
+  }
+  return "";
+}
+
+// src/settings-store.js
+var extensionAPI = null;
+function setExtensionAPI(api) {
+  extensionAPI = api;
+}
+function getSetting(key) {
+  try {
+    return extensionAPI?.settings?.get?.(key) ?? null;
+  } catch (_) {
+    return null;
+  }
+}
+async function setSetting(key, value) {
+  try {
+    await extensionAPI?.settings?.set?.(key, value);
+  } catch (err) {
+    console.warn("Roam Publish: settings.set failed", key, err);
+  }
+}
+function getApiKey() {
+  const v = getSetting("api-key");
+  return typeof v === "string" && v.trim() ? v.trim() : "";
+}
+function getRoamToken() {
+  const v = getSetting("roam-token");
+  return typeof v === "string" && v.trim() ? v.trim() : "";
+}
+function getApiBase() {
+  const v = getSetting("api-base");
+  const raw = typeof v === "string" && v.trim() ? v.trim() : DEFAULT_API_BASE;
+  return raw.replace(/\/+$/, "");
+}
+function isDebugHudEnabled() {
+  try {
+    if (typeof localStorage !== "undefined" && localStorage.getItem("rpDebug") === "1") {
+      return true;
+    }
+  } catch (_) {
+  }
+  return getSetting("debug-hud") === true;
+}
+
+// src/api.js
+async function request(path, { method = "GET", body, auth = true } = {}) {
+  const base = getApiBase();
+  const url = `${base}${path.startsWith("/") ? path : `/${path}`}`;
+  const headers = { Accept: "application/json" };
+  if (body !== void 0) headers["Content-Type"] = "application/json";
+  if (auth) {
+    const key = getApiKey();
+    if (!key) {
+      throw new Error(
+        "No API key. Open Settings \u2192 paste a Roam temporary token \u2192 Connect."
+      );
+    }
+    headers.Authorization = `Bearer ${key}`;
+  }
+  const res = await fetch(url, {
+    method,
+    headers,
+    body: body !== void 0 ? JSON.stringify(body) : void 0
+  });
+  let data = null;
+  const text = await res.text();
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch (_) {
+      data = { error: text };
+    }
+  }
+  if (!res.ok) {
+    const code = data?.error || data?.message;
+    const msg = code ? `${code}${data?.detail ? `: ${data.detail}` : ""}` : `${res.status} ${res.statusText}`;
+    throw new Error(String(msg));
+  }
+  return data;
+}
+async function exchangeRoamToken({ roamToken, graphName }) {
+  const data = await request("/api/auth/exchange", {
+    method: "POST",
+    auth: false,
+    body: { roamToken, graphName }
+  });
+  const apiKey = typeof data?.apiKey === "string" ? data.apiKey : typeof data?.key === "string" ? data.key : "";
+  if (!apiKey) throw new Error("Server did not return an API key.");
   return {
-    ...record,
-    groupIds,
-    groupNames,
-    teamDestinations,
-    groupId,
-    groupName: groupNames[0] || teamNameFor(groupId),
-    teamDestination: teamDestinations[0] || teamDestinationFor(groupId)
+    apiKey,
+    graphName: data.graphName || graphName,
+    baseUrl: data.baseUrl
   };
 }
 async function fetchPublishedIndex() {
-  withAuthNote("fetching publish index");
-  await new Promise((r) => setTimeout(r, 200));
-  const items = [
-    {
-      uid: "dummy-page-alpha",
-      kind: "page",
-      status: "published",
-      visibility: "public",
-      groupIds: ["team-personal-blog"],
-      title: "Dummy Alpha",
-      url: "https://example.com/p/dummy-page-alpha",
-      publishedAt: "2026-09-01T10:00:00Z"
-    },
-    {
-      uid: "dummy-block-beta",
-      kind: "block",
-      status: "outdated",
-      scope: "tree",
-      visibility: "unlisted",
-      groupIds: ["team-work-docs"],
-      title: "Dummy block that drifted",
-      url: "https://example.com/b/dummy-block-beta",
-      publishedAt: "2026-08-15T18:30:00Z"
-    },
-    {
-      uid: "dummy-page-gamma",
-      kind: "page",
-      status: "draft",
-      visibility: "private",
-      groupIds: ["team-personal-blog", "team-work-docs"],
-      title: "Dummy draft (not live)"
-    }
-  ];
-  const seen = new Set(items.map((i) => i.uid));
-  const openUid2 = await refreshCachedOpenUid();
-  if (openUid2 && !seen.has(openUid2)) {
-    const pull = pullEntity(openUid2);
-    items.push({
-      uid: openUid2,
-      kind: entityKindFromPull(pull) || "page",
-      status: "published",
-      scope: "self",
-      visibility: "unlisted",
-      groupIds: ["team-personal-blog"],
-      title: entityTitleFromPull(pull, openUid2),
-      url: `https://example.com/demo/${openUid2}`,
-      publishedAt: (/* @__PURE__ */ new Date()).toISOString(),
-      contentFingerprint: contentFingerprintFor(openUid2)
-    });
-    seen.add(openUid2);
+  if (!getApiKey()) {
+    return { ok: true, fetchedAt: (/* @__PURE__ */ new Date()).toISOString(), items: [] };
   }
-  const focusedUid = window.roamAlphaAPI.ui.getFocusedBlock()?.["block-uid"];
-  if (focusedUid && !seen.has(focusedUid)) {
-    const pull = pullEntity(focusedUid);
-    if (pull && !isPageEntity(pull)) {
-      items.push({
-        uid: focusedUid,
-        kind: "block",
-        status: "published",
-        scope: "self",
-        visibility: "private",
-        groupIds: ["team-work-docs"],
-        title: entityTitleFromPull(pull, focusedUid),
-        url: `https://example.com/demo/${focusedUid}`,
-        publishedAt: (/* @__PURE__ */ new Date()).toISOString(),
-        contentFingerprint: contentFingerprintFor(focusedUid)
-      });
-    }
-  }
-  for (const item of items) {
-    Object.assign(item, withTeamFields(item));
-    if (!item.contentFingerprint) {
-      item.contentFingerprint = contentFingerprintFor(item.uid) || void 0;
-    }
-  }
-  return { ok: true, fetchedAt: (/* @__PURE__ */ new Date()).toISOString(), items };
+  const data = await request("/api/publish");
+  const items = Array.isArray(data?.items) ? data.items : [];
+  return {
+    ok: true,
+    fetchedAt: (/* @__PURE__ */ new Date()).toISOString(),
+    items: items.map(normalizeRecord)
+  };
 }
 async function postPublish(target) {
-  withAuthNote("publish");
-  await new Promise((r) => setTimeout(r, 200));
-  const publishedAt = (/* @__PURE__ */ new Date()).toISOString();
-  const scope = target.kind === "block" ? target.scope || "self" : void 0;
-  const groupIds = normalizeGroupIds(
-    target.groupIds ?? target.groupId ?? null
-  );
-  const url = target.kind === "page" ? `https://example.com/p/${target.uid}` : `https://example.com/b/${target.uid}`;
-  return withTeamFields({
+  const scope = target.kind === "block" ? normalizeScope(target.scope) : void 0;
+  const content = serializeForPublish(target.uid, {
+    kind: target.kind,
+    scope: scope || "self"
+  });
+  if (!content) throw new Error(`Could not serialize ${target.uid}`);
+  const fingerprint = contentFingerprintForPublish(target.uid, {
+    kind: target.kind,
+    scope: scope || "self"
+  }) || contentFingerprintFor(target.uid);
+  const body = {
     uid: target.uid,
     kind: target.kind,
-    status: "published",
-    scope,
-    visibility: target.visibility || "unlisted",
-    groupIds,
     title: target.title,
-    url,
-    publishedAt,
-    contentFingerprint: contentFingerprintFor(target.uid)
+    content,
+    visibility: normalizeVisibility(target.visibility),
+    contentFingerprint: fingerprint
+  };
+  if (target.kind === "block") body.scope = scope;
+  const data = await request("/api/publish", {
+    method: "POST",
+    body
+  });
+  return normalizeRecord({
+    ...data,
+    uid: data?.uid || target.uid,
+    kind: data?.kind || target.kind,
+    title: data?.title || target.title,
+    scope: data?.scope ?? scope,
+    visibility: data?.visibility || target.visibility,
+    contentFingerprint: data?.contentFingerprint || fingerprint
   });
 }
 async function postShareSettings(uid, patch, current) {
-  withAuthNote("share settings");
-  await new Promise((r) => setTimeout(r, 120));
-  const groupIds = patch.groupIds !== void 0 ? normalizeGroupIds(patch.groupIds) : patch.groupId !== void 0 ? normalizeGroupIds(patch.groupId) : normalizeGroupIds(current.groupIds ?? current.groupId);
-  return withTeamFields({
-    uid,
+  const body = {};
+  if (patch.visibility != null) body.visibility = patch.visibility;
+  if (current.kind === "block" && patch.scope != null) body.scope = patch.scope;
+  if (patch.title != null) body.title = patch.title;
+  const data = await request(`/api/publish/${encodeURIComponent(uid)}`, {
+    method: "PATCH",
+    body
+  });
+  return normalizeRecord({
     ...current,
-    visibility: patch.visibility ?? current.visibility,
-    groupIds,
-    scope: current.kind === "block" ? patch.scope ?? current.scope : void 0
+    ...data,
+    uid,
+    kind: data?.kind || current.kind
   });
 }
 async function postRepublish(uid, current) {
-  withAuthNote("republish");
-  await new Promise((r) => setTimeout(r, 150));
-  return withTeamFields({
+  return postPublish({
     uid,
-    ...current,
-    status: "published",
-    publishedAt: (/* @__PURE__ */ new Date()).toISOString(),
-    contentFingerprint: contentFingerprintFor(uid),
-    url: current.url || (current.kind === "page" ? `https://example.com/p/${uid}` : `https://example.com/b/${uid}`)
+    kind: current.kind === "block" ? "block" : "page",
+    title: current.title || uid,
+    scope: current.scope,
+    visibility: current.visibility
   });
 }
 async function postUnpublish(uid) {
-  withAuthNote("unpublish");
-  await new Promise((r) => setTimeout(r, 50));
+  await request(`/api/publish/${encodeURIComponent(uid)}`, {
+    method: "DELETE"
+  });
   return { ok: true, uid };
+}
+function normalizeRecord(raw) {
+  if (!raw) return raw;
+  const graphName = raw.graphName || getGraphName();
+  const uid = raw.uid;
+  let url = raw.url;
+  if (!url && graphName && uid) {
+    url = `${getApiBase()}/${encodeURIComponent(graphName)}/${encodeURIComponent(uid)}`;
+  } else if (typeof url === "string" && url.startsWith("/")) {
+    url = `${getApiBase()}${url}`;
+  }
+  return {
+    uid,
+    kind: raw.kind === "block" ? "block" : "page",
+    status: raw.status || "published",
+    scope: raw.scope || void 0,
+    visibility: raw.visibility || "unlisted",
+    title: raw.title,
+    url,
+    publishedAt: raw.publishedAt || raw.updatedAt,
+    contentFingerprint: raw.contentFingerprint,
+    graphName
+  };
 }
 
 // src/dom/finders.js
@@ -970,92 +975,135 @@ function setSharePopoverDismiss(fn) {
   dismissSharePopover = fn || (() => {
   });
 }
-async function publish({
-  uid,
-  kind,
-  scope,
-  visibility,
-  groupIds,
-  groupId
-} = {}) {
+function requireApiKey() {
+  if (getApiKey()) return true;
+  notify(
+    "Not connected. Settings \u2192 paste Roam temporary token \u2192 Connect, then try again."
+  );
+  return false;
+}
+async function publish({ uid, kind, scope, visibility } = {}) {
+  if (!requireApiKey()) return null;
   const target = await resolvePublishTarget({ uid, kind });
   if (!target) return null;
-  const record = await postPublish({
-    uid: target.uid,
-    kind: target.kind,
-    title: target.title,
-    scope: target.kind === "block" ? normalizeScope(scope) : void 0,
-    visibility: normalizeVisibility(visibility),
-    groupIds: normalizeGroupIds(groupIds ?? groupId ?? null)
-  });
-  upsertCacheEntry(record);
-  if (record.kind === "page") setCachedOpenUid(record.uid);
-  console.log("Roam Publish: published (dummy)", record);
-  schedulePaint();
-  return publishCache.get(record.uid);
+  try {
+    const record = await postPublish({
+      uid: target.uid,
+      kind: target.kind,
+      title: target.title,
+      scope: target.kind === "block" ? normalizeScope(scope) : void 0,
+      visibility: normalizeVisibility(visibility)
+    });
+    upsertCacheEntry(record);
+    if (record.kind === "page") setCachedOpenUid(record.uid);
+    console.log("Roam Publish: published", record);
+    notify(
+      record.url ? `Published ${record.kind}: ${record.url}` : `Published ${record.kind}.`
+    );
+    schedulePaint();
+    return publishCache.get(record.uid);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn("Roam Publish: publish failed", err);
+    notify(`Publish failed: ${msg}`);
+    return null;
+  }
 }
 async function unpublish({ uid, kind } = {}) {
+  if (!requireApiKey()) return;
   const target = await resolvePublishTarget({ uid, kind });
   if (!target) return;
   if (!publishCache.has(target.uid)) {
     notify("Nothing published for that uid.");
     return;
   }
-  await postUnpublish(target.uid);
-  deleteCacheEntry(target.uid);
-  clearBadge(target.uid);
-  dismissSharePopover();
-  console.log("Roam Publish: unpublished (dummy)", target.uid);
-  notify(`Unpublished ${target.kind} (dummy).`);
-  schedulePaint();
+  try {
+    await postUnpublish(target.uid);
+    deleteCacheEntry(target.uid);
+    clearBadge(target.uid);
+    dismissSharePopover();
+    console.log("Roam Publish: unpublished", target.uid);
+    notify(`Unpublished ${target.kind}.`);
+    schedulePaint();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    notify(`Unpublish failed: ${msg}`);
+  }
 }
 async function unpublishUid(uid) {
+  if (!requireApiKey()) return;
   if (!uid || !publishCache.has(uid)) {
     notify("Nothing published for that uid.");
     return;
   }
-  await postUnpublish(uid);
-  deleteCacheEntry(uid);
-  clearBadge(uid);
-  dismissSharePopover();
-  console.log("Roam Publish: unpublished (dummy)", uid);
-  notify("Unpublished (dummy).");
-  schedulePaint();
+  try {
+    await postUnpublish(uid);
+    deleteCacheEntry(uid);
+    clearBadge(uid);
+    dismissSharePopover();
+    console.log("Roam Publish: unpublished", uid);
+    notify("Unpublished.");
+    schedulePaint();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    notify(`Unpublish failed: ${msg}`);
+  }
 }
 async function updateShareSettings(uid, patch) {
+  if (!requireApiKey()) return null;
   const current = checkPublishState(uid);
   if (!current) {
     notify("Nothing published for that uid.");
     return null;
   }
-  const next = await postShareSettings(uid, patch, current);
-  upsertCacheEntry(next);
-  schedulePaint();
-  return publishCache.get(uid);
+  try {
+    const next = await postShareSettings(uid, patch, current);
+    upsertCacheEntry(next);
+    schedulePaint();
+    return publishCache.get(uid);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    notify(`Save failed: ${msg}`);
+    return null;
+  }
 }
 async function republish(uid) {
+  if (!requireApiKey()) return null;
   const current = checkPublishState(uid);
   if (!current) {
     notify("Nothing published for that uid.");
     return null;
   }
-  const next = await postRepublish(uid, current);
-  upsertCacheEntry(next);
-  schedulePaint();
-  notify("Updated published copy (dummy).");
-  return publishCache.get(uid);
+  try {
+    const next = await postRepublish(uid, current);
+    upsertCacheEntry(next);
+    schedulePaint();
+    notify("Updated published copy.");
+    return publishCache.get(uid);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    notify(`Update failed: ${msg}`);
+    return null;
+  }
 }
 async function refreshPublishCache() {
-  console.log("Roam Publish: fetching publish index (dummy)\u2026");
-  const payload = await fetchPublishedIndex();
-  applyPublishIndex(payload);
-  console.log(
-    "Roam Publish: cache ready",
-    payload.fetchedAt,
-    Object.fromEntries(publishCache)
-  );
-  schedulePaint();
-  return publishCache;
+  try {
+    console.log("Roam Publish: fetching publish index\u2026");
+    const payload = await fetchPublishedIndex();
+    applyPublishIndex(payload);
+    console.log(
+      "Roam Publish: cache ready",
+      payload.fetchedAt,
+      Object.fromEntries(publishCache)
+    );
+    schedulePaint();
+    return publishCache;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn("Roam Publish: refresh failed", err);
+    notify(`Refresh failed: ${msg}`);
+    return publishCache;
+  }
 }
 
 // src/outdated.js
@@ -1162,22 +1210,6 @@ function refreshSharePopoverIfOpen() {
   });
 }
 function renderPopoverHtml(uid, entry) {
-  const teams = listTeams();
-  const selectedIds = new Set(
-    normalizeGroupIds(entry.groupIds ?? entry.groupId)
-  );
-  const teamCheckboxes = teams.map((t) => {
-    const checked = selectedIds.has(t.id) ? "checked" : "";
-    return `<label class="bp3-control bp3-checkbox rp-share-radio">
-        <input type="checkbox" name="rp-team" value="${escapeAttr2(t.id)}" ${checked} />
-        <span class="bp3-control-indicator"></span>
-        <span class="rp-share-team-label">
-          <strong>${escapeHtml3(t.name)}</strong>
-          <span class="bp3-text-muted">${escapeHtml3(t.destination)}</span>
-        </span>
-      </label>`;
-  }).join("");
-  const selectedDest = formatTeamsDestinations([...selectedIds]) || "";
   const visibilityOptions = ["private", "unlisted", "public"].map(
     (v) => `<label class="bp3-control bp3-radio rp-share-radio">
           <input type="radio" name="rp-visibility" value="${v}" ${normalizeVisibility(entry.visibility) === v ? "checked" : ""} />
@@ -1235,17 +1267,6 @@ function renderPopoverHtml(uid, entry) {
     </section>
 
     <section class="rp-share-section">
-      <h4 class="bp3-heading rp-share-heading">Teams</h4>
-      <p class="bp3-text-muted rp-share-hint">Share to one or more team sites.</p>
-      <div class="rp-share-radios" data-rp-share-teams>
-        ${teamCheckboxes}
-      </div>
-      <p class="bp3-text-muted rp-share-dest" data-rp-share-dest>
-        ${selectedDest ? escapeHtml3(selectedDest) : "No teams selected"}
-      </p>
-    </section>
-
-    <section class="rp-share-section">
       <h4 class="bp3-heading rp-share-heading">Visibility</h4>
       <div class="rp-share-radios" data-rp-share-visibility>
         ${visibilityOptions}
@@ -1273,44 +1294,22 @@ function bindPopover(pop, uid) {
   pop.querySelector("[data-rp-share-unpublish]")?.addEventListener("click", () => {
     void unpublishUid(uid);
   });
-  const destEl = pop.querySelector("[data-rp-share-dest]");
-  const syncDestPreview = () => {
-    const ids = [
-      ...pop.querySelectorAll('input[name="rp-team"]:checked')
-    ].map((el) => (
-      /** @type {HTMLInputElement} */
-      el.value
-    ));
-    const dest = formatTeamsDestinations(ids);
-    if (destEl) {
-      destEl.textContent = dest || "No teams selected";
-    }
-  };
-  pop.querySelectorAll('input[name="rp-team"]').forEach((el) => {
-    el.addEventListener("change", syncDestPreview);
-  });
   pop.querySelector("[data-rp-share-save]")?.addEventListener("click", () => {
     const visibility = (
       /** @type {HTMLInputElement | null} */
       pop.querySelector('input[name="rp-visibility"]:checked')?.value
     );
-    const groupIds = [
-      ...pop.querySelectorAll('input[name="rp-team"]:checked')
-    ].map((el) => (
-      /** @type {HTMLInputElement} */
-      el.value
-    ));
     const scope = (
       /** @type {HTMLInputElement | null} */
       pop.querySelector('input[name="rp-scope"]:checked')?.value
     );
     void updateShareSettings(uid, {
       visibility,
-      groupIds,
       scope
-    }).then(() => {
+    }).then((result) => {
+      if (!result) return;
       refreshSharePopoverIfOpen();
-      notify("Share settings saved (dummy).");
+      notify("Share settings saved.");
     });
   });
 }
@@ -1403,7 +1402,7 @@ function openPublishedItemsDialog() {
 }
 function renderItemsHtml(items) {
   if (!items.length) {
-    return `<p class="bp3-text-muted rp-published-empty">No published items in cache. Publish a page or block, then reopen this window.</p>`;
+    return `<p class="bp3-text-muted rp-published-empty">No published items yet. Connect in Settings, publish a page or block, then reopen.</p>`;
   }
   return `
     <div class="rp-published-list" role="list">
@@ -1413,8 +1412,6 @@ function renderItemsHtml(items) {
 }
 function renderItemRow(item) {
   const title = escapeHtml4(item.title || item.uid);
-  const teamNames = (item.groupNames && item.groupNames.length ? item.groupNames.join(", ") : null) || item.groupName;
-  const team = teamNames ? escapeHtml4(teamNames) : "\u2014";
   const scope = item.kind === "block" ? escapeHtml4(scopeLabel(item.scope)) : "\u2014";
   const url = item.url ? `<a class="rp-published-item-link" href="${escapeAttr3(
     item.url
@@ -1443,7 +1440,6 @@ function renderItemRow(item) {
       </div>
       <div class="rp-published-item-title">${title}</div>
       <div class="rp-published-item-meta bp3-text-muted">
-        <span>Teams: ${team}</span>
         <span>Scope: ${scope}</span>
         <span>Published: ${escapeHtml4(formatPublishedAt(item.publishedAt))}</span>
       </div>
@@ -1517,18 +1513,58 @@ function buildSettings(extensionAPI2) {
     tabTitle: "Roam Publish",
     settings: [
       {
-        id: "api-key",
-        name: "API key",
-        description: "Stored in this graph\u2019s extension settings. Used by the publish API layer (dummy mode still works if empty).",
+        id: "api-base",
+        name: "Server URL",
+        description: `roam-publish-web base URL (no trailing slash). Default: ${DEFAULT_API_BASE}`,
         action: {
           type: "input",
-          placeholder: "Paste API key\u2026"
+          placeholder: DEFAULT_API_BASE
+        }
+      },
+      {
+        id: "roam-token",
+        name: "Roam temporary token",
+        description: "Paste an append-only temporary token from your Roam account, then click Connect.",
+        action: {
+          type: "input",
+          placeholder: "Paste append-only token\u2026"
+        }
+      },
+      {
+        id: "connect",
+        name: "Connect",
+        description: "Exchange the Roam token for a server API key (stored below). Graph name is taken from the open graph.",
+        action: {
+          type: "button",
+          onClick: () => {
+            void runTokenExchange();
+          }
+        }
+      },
+      {
+        id: "api-key",
+        name: "API key",
+        description: "Filled automatically after Connect. Used as Bearer auth for publish calls. You can also paste a key directly.",
+        action: {
+          type: "input",
+          placeholder: "(not connected)"
+        }
+      },
+      {
+        id: "clear-key",
+        name: "Disconnect",
+        description: "Clear the stored API key (and optional token field).",
+        action: {
+          type: "button",
+          onClick: () => {
+            void clearCredentials();
+          }
         }
       },
       {
         id: "debug-hud",
         name: "Show debug HUD",
-        description: "Bottom-right debug panel (also enable with localStorage.rpDebug = '1'). Off by default. Share overlays stay on regardless.",
+        description: "Bottom-right debug panel (also localStorage.rpDebug = '1'). Off by default.",
         action: {
           type: "switch",
           onChange: () => schedulePaint()
@@ -1536,6 +1572,50 @@ function buildSettings(extensionAPI2) {
       }
     ]
   });
+}
+async function runTokenExchange() {
+  const token = getRoamToken();
+  if (!token) {
+    notify(
+      "Paste a Roam temporary append-only token in Settings \u2192 Roam temporary token, then Connect."
+    );
+    return null;
+  }
+  const graphName = getGraphName();
+  if (!graphName) {
+    notify("Could not detect the open graph name from the URL.");
+    return null;
+  }
+  notify(`Connecting graph \u201C${graphName}\u201D to ${getApiBase()}\u2026`);
+  try {
+    const result = await exchangeRoamToken({
+      roamToken: token,
+      graphName
+    });
+    await setSetting("api-key", result.apiKey);
+    if (result.baseUrl) {
+      await setSetting("api-base", String(result.baseUrl).replace(/\/+$/, ""));
+    }
+    await setSetting("roam-token", "");
+    notify(
+      `Connected${result.graphName ? ` (${result.graphName})` : ""}. API key saved \u2014 you can publish now.`
+    );
+    return result.apiKey;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn("Roam Publish: token exchange failed", err);
+    notify(`Connect failed: ${msg}`);
+    return null;
+  }
+}
+async function clearCredentials() {
+  await setSetting("api-key", "");
+  await setSetting("roam-token", "");
+  if (getApiKey()) {
+    notify("Could not clear API key (settings.set failed).");
+    return;
+  }
+  notify("Disconnected. API key cleared.");
 }
 
 // src/commands.js
@@ -1548,17 +1628,11 @@ async function alertPublishState(uid, label) {
   if (state) {
     const scope = state.kind === "block" ? `
 Scope: ${scopeLabel(state.scope)}` : "";
-    const teamNames = (state.groupNames && state.groupNames.length ? state.groupNames.join(", ") : null) || state.groupName;
-    const team = teamNames ? `
-Teams: ${teamNames}` : "";
-    const dest = (state.teamDestinations && state.teamDestinations.length ? `
-Destinations: ${state.teamDestinations.join(", ")}` : null) || (state.teamDestination ? `
-Destination: ${state.teamDestination}` : "");
     notify(
       `${label} ${uid}
 ${state.kind} \xB7 ${statusLabel(state.status)} \xB7 ${visibilityLabel(
         state.visibility
-      )}${scope}${team}${dest}${state.url ? `
+      )}${scope}${state.url ? `
 ${state.url}` : ""}`
     );
   } else {
@@ -1630,9 +1704,30 @@ var COMMANDS = [
     run: () => openPublishedItemsDialog()
   },
   {
-    label: "Roam Publish: Refresh status cache (dummy)",
+    label: "Roam Publish: Connect (exchange token)",
+    palette: true,
+    run: () => runTokenExchange()
+  },
+  {
+    label: "Roam Publish: Refresh status cache",
     palette: true,
     run: () => refreshPublishCache()
+  },
+  {
+    label: "Roam Publish: Connection status",
+    palette: true,
+    run: () => {
+      const key = getApiKey();
+      const graph = getGraphName() || "(unknown)";
+      notify(
+        key ? `Connected to ${getApiBase()}
+Graph: ${graph}
+API key: ${key.length} chars` : `Not connected.
+Server: ${getApiBase()}
+Graph: ${graph}
+Paste a Roam token in Settings, then Connect.`
+      );
+    }
   },
   {
     label: "Roam Publish: Log status cache",

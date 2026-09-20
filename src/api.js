@@ -1,138 +1,100 @@
-import {
-  normalizeGroupIds,
-  teamDestinationFor,
-  teamDestinationsFor,
-  teamNameFor,
-  teamNamesFor,
-} from "./groups.js";
-import { getApiKey } from "./settings-store.js";
-import {
-  contentFingerprintFor,
-  entityKindFromPull,
-  entityTitleFromPull,
-  isPageEntity,
-  pullEntity,
-  refreshCachedOpenUid,
-} from "./roam.js";
-
 /**
- * Dummy network client. Real server calls land here later.
- * Always attach API key when present (log only in dummy mode).
+ * HTTP client for roam-publish-web.
+ * Contract: Project store docs/api-contract.md
  */
 
-function withAuthNote(label) {
-  const key = getApiKey();
-  if (key) {
-    console.log(`Roam Publish: ${label} (dummy) with API key (${key.length} chars)`);
-  } else {
-    console.log(`Roam Publish: ${label} (dummy, no API key)`);
+import {
+  contentFingerprintForPublish,
+  serializeForPublish,
+} from "./content.js";
+import { getGraphName } from "./graph.js";
+import { contentFingerprintFor } from "./roam.js";
+import { getApiBase, getApiKey } from "./settings-store.js";
+import { normalizeScope, normalizeVisibility } from "./theme.js";
+
+/**
+ * @param {string} path
+ * @param {{ method?: string, body?: unknown, auth?: boolean }} [opts]
+ */
+async function request(path, { method = "GET", body, auth = true } = {}) {
+  const base = getApiBase();
+  const url = `${base}${path.startsWith("/") ? path : `/${path}`}`;
+  /** @type {Record<string, string>} */
+  const headers = { Accept: "application/json" };
+  if (body !== undefined) headers["Content-Type"] = "application/json";
+  if (auth) {
+    const key = getApiKey();
+    if (!key) {
+      throw new Error(
+        "No API key. Open Settings → paste a Roam temporary token → Connect.",
+      );
+    }
+    headers.Authorization = `Bearer ${key}`;
   }
-  return key ? { Authorization: `Bearer ${key}` } : {};
+
+  const res = await fetch(url, {
+    method,
+    headers,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+
+  let data = null;
+  const text = await res.text();
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch (_) {
+      data = { error: text };
+    }
+  }
+
+  if (!res.ok) {
+    const code = data?.error || data?.message;
+    const msg = code
+      ? `${code}${data?.detail ? `: ${data.detail}` : ""}`
+      : `${res.status} ${res.statusText}`;
+    throw new Error(String(msg));
+  }
+  return data;
 }
 
-/** Enrich entry with multi-team fields (+ legacy single mirrors). */
-function withTeamFields(record) {
-  const groupIds = normalizeGroupIds(
-    record.groupIds ?? record.teamIds ?? record.groupId ?? record.teamId,
-  );
-  const groupNames = teamNamesFor(groupIds);
-  const teamDestinations = teamDestinationsFor(groupIds);
-  const groupId = groupIds[0] || null;
+/**
+ * Exchange a Roam temporary append-only token for a server API key.
+ * @param {{ roamToken: string, graphName: string }} input
+ * @returns {Promise<{ apiKey: string, graphName?: string, baseUrl?: string }>}
+ */
+export async function exchangeRoamToken({ roamToken, graphName }) {
+  const data = await request("/api/auth/exchange", {
+    method: "POST",
+    auth: false,
+    body: { roamToken, graphName },
+  });
+  const apiKey =
+    typeof data?.apiKey === "string"
+      ? data.apiKey
+      : typeof data?.key === "string"
+        ? data.key
+        : "";
+  if (!apiKey) throw new Error("Server did not return an API key.");
   return {
-    ...record,
-    groupIds,
-    groupNames,
-    teamDestinations,
-    groupId,
-    groupName: groupNames[0] || teamNameFor(groupId),
-    teamDestination: teamDestinations[0] || teamDestinationFor(groupId),
+    apiKey,
+    graphName: data.graphName || graphName,
+    baseUrl: data.baseUrl,
   };
 }
 
 /** @returns {Promise<{ ok: boolean, fetchedAt: string, items: Array<object> }>} */
 export async function fetchPublishedIndex() {
-  withAuthNote("fetching publish index");
-  await new Promise((r) => setTimeout(r, 200));
-
-  /** @type {Array<object>} */
-  const items = [
-    {
-      uid: "dummy-page-alpha",
-      kind: "page",
-      status: "published",
-      visibility: "public",
-      groupIds: ["team-personal-blog"],
-      title: "Dummy Alpha",
-      url: "https://example.com/p/dummy-page-alpha",
-      publishedAt: "2026-09-01T10:00:00Z",
-    },
-    {
-      uid: "dummy-block-beta",
-      kind: "block",
-      status: "outdated",
-      scope: "tree",
-      visibility: "unlisted",
-      groupIds: ["team-work-docs"],
-      title: "Dummy block that drifted",
-      url: "https://example.com/b/dummy-block-beta",
-      publishedAt: "2026-08-15T18:30:00Z",
-    },
-    {
-      uid: "dummy-page-gamma",
-      kind: "page",
-      status: "draft",
-      visibility: "private",
-      groupIds: ["team-personal-blog", "team-work-docs"],
-      title: "Dummy draft (not live)",
-    },
-  ];
-
-  const seen = new Set(items.map((i) => i.uid));
-  const openUid = await refreshCachedOpenUid();
-  if (openUid && !seen.has(openUid)) {
-    const pull = pullEntity(openUid);
-    items.push({
-      uid: openUid,
-      kind: entityKindFromPull(pull) || "page",
-      status: "published",
-      scope: "self",
-      visibility: "unlisted",
-      groupIds: ["team-personal-blog"],
-      title: entityTitleFromPull(pull, openUid),
-      url: `https://example.com/demo/${openUid}`,
-      publishedAt: new Date().toISOString(),
-      contentFingerprint: contentFingerprintFor(openUid),
-    });
-    seen.add(openUid);
+  if (!getApiKey()) {
+    return { ok: true, fetchedAt: new Date().toISOString(), items: [] };
   }
-
-  const focusedUid = window.roamAlphaAPI.ui.getFocusedBlock()?.["block-uid"];
-  if (focusedUid && !seen.has(focusedUid)) {
-    const pull = pullEntity(focusedUid);
-    if (pull && !isPageEntity(pull)) {
-      items.push({
-        uid: focusedUid,
-        kind: "block",
-        status: "published",
-        scope: "self",
-        visibility: "private",
-        groupIds: ["team-work-docs"],
-        title: entityTitleFromPull(pull, focusedUid),
-        url: `https://example.com/demo/${focusedUid}`,
-        publishedAt: new Date().toISOString(),
-        contentFingerprint: contentFingerprintFor(focusedUid),
-      });
-    }
-  }
-
-  for (const item of items) {
-    Object.assign(item, withTeamFields(item));
-    if (!item.contentFingerprint) {
-      item.contentFingerprint = contentFingerprintFor(item.uid) || undefined;
-    }
-  }
-
-  return { ok: true, fetchedAt: new Date().toISOString(), items };
+  const data = await request("/api/publish");
+  const items = Array.isArray(data?.items) ? data.items : [];
+  return {
+    ok: true,
+    fetchedAt: new Date().toISOString(),
+    items: items.map(normalizeRecord),
+  };
 }
 
 /**
@@ -142,89 +104,120 @@ export async function fetchPublishedIndex() {
  *   title: string,
  *   scope?: "self" | "tree",
  *   visibility?: string,
- *   groupIds?: string[],
- *   groupId?: string | null,
  * }} target
  */
 export async function postPublish(target) {
-  withAuthNote("publish");
-  await new Promise((r) => setTimeout(r, 200));
-  const publishedAt = new Date().toISOString();
-  const scope = target.kind === "block" ? target.scope || "self" : undefined;
-  const groupIds = normalizeGroupIds(
-    target.groupIds ?? target.groupId ?? null,
-  );
-  const url =
-    target.kind === "page"
-      ? `https://example.com/p/${target.uid}`
-      : `https://example.com/b/${target.uid}`;
+  const scope =
+    target.kind === "block" ? normalizeScope(target.scope) : undefined;
+  const content = serializeForPublish(target.uid, {
+    kind: target.kind,
+    scope: scope || "self",
+  });
+  if (!content) throw new Error(`Could not serialize ${target.uid}`);
 
-  return withTeamFields({
+  const fingerprint =
+    contentFingerprintForPublish(target.uid, {
+      kind: target.kind,
+      scope: scope || "self",
+    }) || contentFingerprintFor(target.uid);
+
+  /** @type {Record<string, unknown>} */
+  const body = {
     uid: target.uid,
     kind: target.kind,
-    status: "published",
-    scope,
-    visibility: target.visibility || "unlisted",
-    groupIds,
     title: target.title,
-    url,
-    publishedAt,
-    contentFingerprint: contentFingerprintFor(target.uid),
+    content,
+    visibility: normalizeVisibility(target.visibility),
+    contentFingerprint: fingerprint,
+  };
+  if (target.kind === "block") body.scope = scope;
+
+  const data = await request("/api/publish", {
+    method: "POST",
+    body,
+  });
+
+  return normalizeRecord({
+    ...data,
+    uid: data?.uid || target.uid,
+    kind: data?.kind || target.kind,
+    title: data?.title || target.title,
+    scope: data?.scope ?? scope,
+    visibility: data?.visibility || target.visibility,
+    contentFingerprint: data?.contentFingerprint || fingerprint,
   });
 }
 
 /**
- * Persist share-settings changes (visibility / teams / scope).
  * @param {string} uid
- * @param {{ visibility?: string, groupIds?: string[], groupId?: string | null, scope?: string }} patch
- * @param {object} current existing cache entry
+ * @param {{ visibility?: string, scope?: string, title?: string }} patch
+ * @param {object} current
  */
 export async function postShareSettings(uid, patch, current) {
-  withAuthNote("share settings");
-  await new Promise((r) => setTimeout(r, 120));
-  const groupIds =
-    patch.groupIds !== undefined
-      ? normalizeGroupIds(patch.groupIds)
-      : patch.groupId !== undefined
-        ? normalizeGroupIds(patch.groupId)
-        : normalizeGroupIds(current.groupIds ?? current.groupId);
-  return withTeamFields({
-    uid,
+  /** @type {Record<string, unknown>} */
+  const body = {};
+  if (patch.visibility != null) body.visibility = patch.visibility;
+  if (current.kind === "block" && patch.scope != null) body.scope = patch.scope;
+  if (patch.title != null) body.title = patch.title;
+
+  const data = await request(`/api/publish/${encodeURIComponent(uid)}`, {
+    method: "PATCH",
+    body,
+  });
+  return normalizeRecord({
     ...current,
-    visibility: patch.visibility ?? current.visibility,
-    groupIds,
-    scope:
-      current.kind === "block"
-        ? patch.scope ?? current.scope
-        : undefined,
+    ...data,
+    uid,
+    kind: data?.kind || current.kind,
   });
 }
 
 /**
- * Mark entry as freshly published (dummy republish / sync).
+ * Republish = upsert again (no separate /republish route).
  * @param {string} uid
  * @param {object} current
  */
 export async function postRepublish(uid, current) {
-  withAuthNote("republish");
-  await new Promise((r) => setTimeout(r, 150));
-  return withTeamFields({
+  return postPublish({
     uid,
-    ...current,
-    status: "published",
-    publishedAt: new Date().toISOString(),
-    contentFingerprint: contentFingerprintFor(uid),
-    url:
-      current.url ||
-      (current.kind === "page"
-        ? `https://example.com/p/${uid}`
-        : `https://example.com/b/${uid}`),
+    kind: current.kind === "block" ? "block" : "page",
+    title: current.title || uid,
+    scope: current.scope,
+    visibility: current.visibility,
   });
 }
 
 /** @param {string} uid */
 export async function postUnpublish(uid) {
-  withAuthNote("unpublish");
-  await new Promise((r) => setTimeout(r, 50));
+  await request(`/api/publish/${encodeURIComponent(uid)}`, {
+    method: "DELETE",
+  });
   return { ok: true, uid };
+}
+
+/**
+ * @param {object} raw
+ */
+function normalizeRecord(raw) {
+  if (!raw) return raw;
+  const graphName = raw.graphName || getGraphName();
+  const uid = raw.uid;
+  let url = raw.url;
+  if (!url && graphName && uid) {
+    url = `${getApiBase()}/${encodeURIComponent(graphName)}/${encodeURIComponent(uid)}`;
+  } else if (typeof url === "string" && url.startsWith("/")) {
+    url = `${getApiBase()}${url}`;
+  }
+  return {
+    uid,
+    kind: raw.kind === "block" ? "block" : "page",
+    status: raw.status || "published",
+    scope: raw.scope || undefined,
+    visibility: raw.visibility || "unlisted",
+    title: raw.title,
+    url,
+    publishedAt: raw.publishedAt || raw.updatedAt,
+    contentFingerprint: raw.contentFingerprint,
+    graphName,
+  };
 }

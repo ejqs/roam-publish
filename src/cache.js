@@ -1,12 +1,3 @@
-import {
-  formatTeamsDestinations,
-  formatTeamsLabel,
-  normalizeGroupIds,
-  teamDestinationFor,
-  teamDestinationsFor,
-  teamNameFor,
-  teamNamesFor,
-} from "./groups.js";
 import { publishCache, setPublishCache } from "./state.js";
 import {
   normalizeScope,
@@ -48,17 +39,6 @@ export function listPublishEntries() {
 }
 
 /**
- * Resolve team ids from a raw entry (supports legacy single groupId).
- * @param {object} entry
- */
-function groupIdsFromRaw(entry) {
-  if (entry.groupIds != null || entry.teamIds != null) {
-    return normalizeGroupIds(entry.groupIds ?? entry.teamIds);
-  }
-  return normalizeGroupIds(entry.groupId || entry.teamId || null);
-}
-
-/**
  * Normalize a raw API/cache item into a PublishEntry.
  * @param {object} entry
  * @returns {import("./theme.js").PublishEntry | null}
@@ -66,49 +46,17 @@ function groupIdsFromRaw(entry) {
 export function normalizeEntry(entry) {
   if (!entry?.uid) return null;
   const kind = entry.kind === "block" ? "block" : "page";
-  const groupIds = groupIdsFromRaw(entry);
-  const groupNames = teamNamesFor(groupIds);
-  const teamDestinations = teamDestinationsFor(groupIds);
-  const groupId = groupIds[0] || null;
   return {
     status: normalizeStatus(entry.status),
     kind,
     scope: kind === "block" ? normalizeScope(entry.scope) : undefined,
     visibility: normalizeVisibility(entry.visibility),
-    groupIds,
-    groupNames,
-    teamDestinations,
-    // Legacy single-value mirrors (first selected team).
-    groupId,
-    groupName: groupNames[0] || teamNameFor(groupId),
-    teamDestination: teamDestinations[0] || teamDestinationFor(groupId),
     title: entry.title,
     url: entry.url,
     publishedAt: entry.publishedAt,
     contentFingerprint: entry.contentFingerprint,
+    graphName: entry.graphName,
   };
-}
-
-/** Display helper used by lists / alerts. */
-export function teamsLabelForEntry(entry) {
-  if (!entry) return null;
-  return (
-    formatTeamsLabel(entry.groupIds) ||
-    entry.groupName ||
-    null
-  );
-}
-
-/** Display helper for destinations. */
-export function teamsDestLabelForEntry(entry) {
-  if (!entry) return null;
-  return (
-    formatTeamsDestinations(entry.groupIds) ||
-    (entry.groupName && entry.teamDestination
-      ? `${entry.groupName} → ${entry.teamDestination}`
-      : entry.teamDestination) ||
-    null
-  );
 }
 
 /**
