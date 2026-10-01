@@ -7,6 +7,7 @@ export type Node = {
   viewType?: "numbered" | "document";
   align?: "center" | "right" | "justify";
   embed?: Node;
+  title?: string;
   children: Node[];
 };
 export type Payload = { rootUid: string; kind: "page" | "block"; title: string; tree: Node };
@@ -56,7 +57,7 @@ async function embedOf(text: string, chain: EmbedChain): Promise<Node | undefine
   const isPage = typeof b[":node/title"] === "string";
   const node = await toNode(b, isPage, [...chain, embedUid]);
   if (kind === "embed-children") node.string = "";
-  else if (isPage) node.string = `[[${b[":node/title"]}]]`;
+  else if (isPage) node.title = b[":node/title"];
   return node;
 }
 
