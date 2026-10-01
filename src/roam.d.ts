@@ -8,6 +8,8 @@ type PullBlock = {
   ":block/string"?: string;
   ":block/heading"?: number;
   ":block/order"?: number;
+  ":block/text-align"?: string;
+  ":children/view-type"?: string;
   ":node/title"?: string;
   ":block/children"?: PullBlock[];
 };
