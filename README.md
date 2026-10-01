@@ -25,8 +25,9 @@ publishing after edits updates the live page. To see everything you've published
 
 ## What gets published
 
-The page or block and all of its children. Block references are inlined as text, and `[[links]]` show as plain
-text, or as links when the linked page is also published. Nothing else from your graph is sent.
+The page or block and all of its children. Block references are inlined as text, embeds (`{{embed: …}}`) include
+the embedded block or page with its children, and `[[links]]` show as plain text, or as links when the linked page
+is also published. Nothing else from your graph is sent.
 
 ## Safety
 
@@ -35,11 +36,12 @@ What the extension reads, sends, and stores:
 - **Only on your action.** Nothing leaves Roam until you choose to publish a page or block. There is no background
   upload of your graph.
 - **What is sent:** the published page or block, its children, and the page title, as text (`uid`, `string`,
-  heading level, nesting). Block references (`((uid))`) are resolved to their text, up to 3 levels deep, so
-  referenced blocks outside the published tree are included as inline text. Images are sent as their URL
-  only; the image files are not copied.
-- **Everything published is public.** Anyone with the link can read it. Check block references and children
-  before publishing.
+  heading level, nesting, numbered/document view, text alignment). Block references (`((uid))`) are resolved to
+  their text, up to 3 levels deep, so referenced blocks outside the published tree are included as inline text.
+  Embedded blocks and pages are included with all their children, up to 2 embeds deep. Images, video, audio and
+  PDFs are sent as their URL only; the files are not copied, and files in encrypted graphs won't display.
+- **Everything published is public.** Anyone with the link can read it. Check block references, embeds and
+  children before publishing.
 - **Where it goes:** only to the Roam Publish server (`https://roam.pub`, or the server URL set in settings).
   The extension makes no other network requests and has no analytics.
 - **What is stored locally:** your Roam Publish API key and a cache of what you've published, both in Roam's
