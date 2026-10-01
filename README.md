@@ -21,7 +21,7 @@ Publish Roam Research pages and blocks to the web as clean, public pages.
 - Command palette → *Roam Publish: Publish current page*
 
 The public link is copied to your clipboard. Publishing again with no changes tells you it's already published;
-publishing after edits updates the live page. Everything you've published is listed in the extension settings.
+publishing after edits updates the live page. To see everything you've published, click **Open dashboard** in the extension settings.
 
 ## What gets published
 

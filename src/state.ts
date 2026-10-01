@@ -8,7 +8,6 @@ export type CachedPublication = {
 export type PublicationCache = Record<string, CachedPublication>;
 
 let api: ExtensionAPI;
-const listeners = new Set<() => void>();
 
 export function initState(extensionAPI: ExtensionAPI) {
   api = extensionAPI;
@@ -24,10 +23,4 @@ export const getCache = (): PublicationCache =>
 
 export async function setCache(cache: PublicationCache) {
   await api.settings.set("publications", cache);
-  listeners.forEach((l) => l());
-}
-
-export function onCacheChange(fn: () => void) {
-  listeners.add(fn);
-  return () => listeners.delete(fn);
 }

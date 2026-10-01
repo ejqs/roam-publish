@@ -21,7 +21,6 @@ type ContextMenuCommand<Ctx> = {
 type BlockContextMenuInfo = { "block-uid": string; "page-uid": string; "block-string": string };
 
 interface Window {
-  React: any;
   roamAlphaAPI: {
     graph: { name: string; type: "hosted" | "offline"; isEncrypted: boolean };
     data: {
@@ -50,8 +49,7 @@ interface Window {
 
 type SettingAction =
   | { type: "input"; placeholder?: string; onChange?: (e: Event) => void }
-  | { type: "button"; onClick?: (e: Event) => void; content?: string }
-  | { type: "reactComponent"; component: unknown };
+  | { type: "button"; onClick?: (e: Event) => void; content?: string };
 
 type ExtensionAPI = {
   settings: {

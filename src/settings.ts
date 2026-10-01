@@ -1,33 +1,7 @@
-import { getCache, onCacheChange, type PublicationCache } from "./state";
+import { getServer } from "./state";
 import { syncPublications } from "./publish";
 import { openLogin, tryClaim } from "./verify";
 import { toast } from "./toast";
-
-function PublishedList() {
-  const React = window.React;
-  const [cache, setCache] = React.useState(getCache()) as [PublicationCache, (c: PublicationCache) => void];
-  React.useEffect(() => {
-    const off = onCacheChange(() => setCache(getCache()));
-    return () => {
-      off();
-    };
-  }, []);
-  const items = Object.entries(cache).sort((a, b) => b[1].updatedAt.localeCompare(a[1].updatedAt));
-  const h = React.createElement;
-  if (items.length === 0) return h("div", { style: { color: "#5f6b7c" } }, "Nothing published yet.");
-  return h(
-    "ul",
-    { style: { margin: 0, paddingLeft: 18, maxHeight: 240, overflowY: "auto" } },
-    items.map(([uid, p]) =>
-      h(
-        "li",
-        { key: uid },
-        h("a", { href: p.url, target: "_blank", rel: "noopener" }, p.title || uid),
-        h("span", { style: { color: "#8f99a8", marginLeft: 6 } }, p.kind),
-      ),
-    ),
-  );
-}
 
 export function createSettingsPanel(extensionAPI: ExtensionAPI) {
   extensionAPI.settings.panel.create({
@@ -62,10 +36,14 @@ export function createSettingsPanel(extensionAPI: ExtensionAPI) {
         },
       },
       {
-        id: "published",
-        name: "Published",
-        description: "Pages and blocks published from this graph.",
-        action: { type: "reactComponent", component: PublishedList },
+        id: "dashboard",
+        name: "Dashboard",
+        description: "See and manage everything you've published on the Roam Publish website.",
+        action: {
+          type: "button",
+          content: "Open dashboard",
+          onClick: () => void window.open(`${getServer()}/dashboard`, "_blank", "noopener"),
+        },
       },
       {
         id: "server-url",
