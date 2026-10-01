@@ -1,0 +1,15 @@
+{
+  "name": "roam-publish",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Publish Roam Research pages and blocks to the web.",
+  "scripts": {
+    "build": "node build.mjs",
+    "dev": "node build.mjs --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "typescript": "^5.9.0"
+  }
+}
