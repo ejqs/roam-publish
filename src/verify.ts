@@ -48,6 +48,10 @@ export async function tryClaim(opts: { manual?: boolean } = {}): Promise<boolean
       await setApiKey(apiKey);
       stopPolling();
       toast("Roam Publish is connected! Right-click a page or block to publish.", { intent: "success" });
+      toast(
+        "You can now delete the append-only API token (Settings → Graph → API tokens) and the verification block on today's daily note. Roam Publish doesn't need them anymore.",
+        { durationMs: 15000 },
+      );
       await syncPublications({ quiet: true }).catch(() => {});
       return true;
     } catch (e) {
@@ -77,10 +81,6 @@ export function stopPolling() {
 
 export function openLogin() {
   const { graph } = window.roamAlphaAPI;
-  if (graph.isEncrypted) {
-    toast("Encrypted graphs aren't supported yet: Roam's Append API can't write to them.", { intent: "danger" });
-    return;
-  }
   const next = `/onboarding?graph=${encodeURIComponent(graph.name)}`;
   window.open(`${getServer()}/login?next=${encodeURIComponent(next)}`, "_blank", "noopener");
   if (getApiKey()) toast("This graph is already connected. Continuing will connect it again.");
