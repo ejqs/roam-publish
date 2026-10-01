@@ -1,4 +1,4 @@
-import { getServer } from "./state";
+import { getApiKey, getServer } from "./state";
 import { syncPublications } from "./publish";
 import { openLogin, tryClaim } from "./verify";
 import { toast } from "./toast";
@@ -16,8 +16,15 @@ export function createSettingsPanel(extensionAPI: ExtensionAPI) {
       {
         id: "finish-setup",
         name: "Finish setup",
-        description: "Run this if the API key didn't fill in automatically after verifying on the website.",
-        action: { type: "button", content: "Finish setup", onClick: () => void tryClaim({ manual: true }) },
+        description: "Run this if the API key didn't fill in automatically after verifying on the website. Does nothing once setup is complete.",
+        action: {
+          type: "button",
+          content: "Finish setup",
+          onClick: () => {
+            if (getApiKey()) return void toast("Setup is already complete. This graph is connected.");
+            void tryClaim({ manual: true });
+          },
+        },
       },
       {
         id: "api-key",
