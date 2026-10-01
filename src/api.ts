@@ -21,10 +21,12 @@ export async function api<T>(path: string, init: RequestInit & { auth?: boolean 
   }
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
+    const { error, reason } = body as { error?: string; reason?: string | null };
+    // Moderation errors (suspended account/graph, removed page) carry their own message and reason.
     const msg =
-      res.status === 401
+      res.status === 401 && (!error || error === "Invalid API key")
         ? "Your Roam Publish API key is invalid. Log in again from the extension settings."
-        : (body as { error?: string }).error ?? `Request failed (${res.status})`;
+        : (error ?? `Request failed (${res.status})`) + (reason ? ` Reason: ${reason}` : "");
     throw new ApiError(res.status, msg);
   }
   return body as T;
