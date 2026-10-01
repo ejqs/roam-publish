@@ -1,7 +1,7 @@
 import * as esbuild from "esbuild";
 
 const watch = process.argv.includes("--watch");
-const serverUrl = process.env.ROAM_PUBLISH_SERVER ?? "https://roam-publish.up.railway.app";
+const serverUrl = process.env.ROAM_PUBLISH_SERVER ?? "https://web-production-0245e.up.railway.app";
 
 const ctx = await esbuild.context({
   entryPoints: ["src/index.ts"],
