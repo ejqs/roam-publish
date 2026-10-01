@@ -1,4 +1,4 @@
-import { isPublished, publish, syncPublications, unpublish } from "./publish";
+import { isPublished, publish, setVisibility, syncPublications, unpublish, visibilityOf } from "./publish";
 import { createSettingsPanel } from "./settings";
 import { getApiKey, initState } from "./state";
 import { removeToasts, toast } from "./toast";
@@ -8,6 +8,10 @@ const BLOCK_PUBLISH = "Roam Publish: Publish block";
 const BLOCK_UNPUBLISH = "Roam Publish: Unpublish block";
 const PAGE_PUBLISH = "Roam Publish: Publish page";
 const PAGE_UNPUBLISH = "Roam Publish: Unpublish page";
+const BLOCK_MAKE_PUBLIC = "Roam Publish: Make block public";
+const BLOCK_MAKE_UNLISTED = "Roam Publish: Make block unlisted";
+const PAGE_MAKE_PUBLIC = "Roam Publish: Make page public";
+const PAGE_MAKE_UNLISTED = "Roam Publish: Make page unlisted";
 const CMD_PUBLISH_CURRENT = "Roam Publish: Publish current page";
 const CMD_SYNC = "Roam Publish: Sync published list";
 
@@ -46,8 +50,27 @@ async function onload({ extensionAPI: api }: { extensionAPI: ExtensionAPI }) {
     callback: (c) => void unpublish(c["block-uid"]),
     "display-conditional": (c) => isPublished(c["block-uid"]),
   });
+  // Items cached before visibility existed have none; they were unlisted by default.
+  ui.blockContextMenu.addCommand({
+    label: BLOCK_MAKE_PUBLIC,
+    callback: (c) => void setVisibility(c["block-uid"], "public"),
+    "display-conditional": (c) => isPublished(c["block-uid"]) && visibilityOf(c["block-uid"]) !== "public",
+  });
+  ui.blockContextMenu.addCommand({
+    label: BLOCK_MAKE_UNLISTED,
+    callback: (c) => void setVisibility(c["block-uid"], "unlisted"),
+    "display-conditional": (c) => visibilityOf(c["block-uid"]) === "public",
+  });
   ui.pageContextMenu.addCommand({ label: PAGE_PUBLISH, callback: (c) => void withPageUid(c, publish) });
   ui.pageContextMenu.addCommand({ label: PAGE_UNPUBLISH, callback: (c) => void withPageUid(c, unpublish) });
+  ui.pageContextMenu.addCommand({
+    label: PAGE_MAKE_PUBLIC,
+    callback: (c) => void withPageUid(c, (uid) => setVisibility(uid, "public")),
+  });
+  ui.pageContextMenu.addCommand({
+    label: PAGE_MAKE_UNLISTED,
+    callback: (c) => void withPageUid(c, (uid) => setVisibility(uid, "unlisted")),
+  });
 
   api.ui.commandPalette.addCommand({
     label: CMD_PUBLISH_CURRENT,
@@ -72,6 +95,10 @@ function onunload() {
   ui.blockContextMenu.removeCommand({ label: BLOCK_UNPUBLISH });
   ui.pageContextMenu.removeCommand({ label: PAGE_PUBLISH });
   ui.pageContextMenu.removeCommand({ label: PAGE_UNPUBLISH });
+  ui.blockContextMenu.removeCommand({ label: BLOCK_MAKE_PUBLIC });
+  ui.blockContextMenu.removeCommand({ label: BLOCK_MAKE_UNLISTED });
+  ui.pageContextMenu.removeCommand({ label: PAGE_MAKE_PUBLIC });
+  ui.pageContextMenu.removeCommand({ label: PAGE_MAKE_UNLISTED });
   extensionAPI?.ui.commandPalette.removeCommand({ label: CMD_PUBLISH_CURRENT });
   extensionAPI?.ui.commandPalette.removeCommand({ label: CMD_SYNC });
   stopPolling();
