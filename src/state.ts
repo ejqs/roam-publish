@@ -3,8 +3,10 @@ export type CachedPublication = {
   url: string;
   title: string;
   kind: "page" | "block";
+  visibility: Visibility;
   updatedAt: string;
 };
+export type Visibility = "public" | "unlisted";
 export type PublicationCache = Record<string, CachedPublication>;
 
 let api: ExtensionAPI;
