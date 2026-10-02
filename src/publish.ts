@@ -40,11 +40,35 @@ const changeLogSettings = (graphName = window.roamAlphaAPI.graph.name) =>
 const BROKEN =
   "Roam rejected the append-only token roam.pub stores for this graph, so the change log under your shortlink blocks stopped. The graph's owner can add a new token in its settings on roam.pub.";
 
-/** Tells the user, once per session, that the change log stopped working. */
+/** The graph's change log status as last reported this session; undefined until the server says. */
+let changeLogStatus: ChangeLog["status"] | undefined;
+
+/**
+ * Whether new shortlink blocks get a Changelog block. Not when the graph has no change log (no
+ * token stored), so opted-out graphs don't collect empty ones; one is added on the next publish
+ * once a token is. Servers without a change log keep the previous behavior.
+ */
+async function changeLogWanted() {
+  if (changeLogStatus === undefined) {
+    try {
+      noteChangeLog((await api<{ changeLog: ChangeLog }>("/api/ext/changelog")).changeLog);
+    } catch {
+      return true;
+    }
+  }
+  return changeLogStatus !== "none";
+}
+
+/** Remembers the change log status, and tells the user, once per session, that it stopped working. */
 function warnIfBroken(changeLog: ChangeLog | undefined) {
+  noteChangeLog(changeLog);
   if (changeLog?.status !== "invalid" || warnedThisSession) return;
   warnedThisSession = true;
   toast(BROKEN, { intent: "danger", link: changeLogSettings(), durationMs: 15000 });
+}
+
+function noteChangeLog(changeLog: ChangeLog | undefined) {
+  if (changeLog) changeLogStatus = changeLog.status;
 }
 
 let missingWarned = false;
@@ -80,6 +104,7 @@ export async function confirmChangeLogBlocks() {
     return;
   }
   // No stored token: nothing is written, so there's nothing to confirm this session.
+  noteChangeLog(res.changeLog);
   if (res.changeLog.status === "none") changeLogOff = true;
   if (missing.length) {
     const next = { ...getCache() };
@@ -100,6 +125,7 @@ export async function confirmChangeLogBlocks() {
 export async function checkChangeLog() {
   try {
     const { changeLog, graphName } = await api<{ changeLog: ChangeLog; graphName: string }>("/api/ext/changelog");
+    noteChangeLog(changeLog);
     const link = changeLogSettings(graphName);
     if (changeLog.status === "ok")
       return toast(
@@ -159,7 +185,8 @@ const CHANGELOG = "Changelog";
  *     Changelog        ← the server appends its change log entries here
  *
  * Written before publishing so the server learns the Changelog block's uid with the publish. Null
- * when it's turned off or the server has no shortlinks.
+ * when it's turned off or the server has no shortlinks. Changelog is left out while the graph has
+ * no change log.
  */
 async function ensureShortlinkBlock(rootUid: string, cached: CachedPublication | undefined) {
   if (!getShortlinkEnabled()) return null;
@@ -198,17 +225,20 @@ async function ensureShortlinkBlock(rootUid: string, cached: CachedPublication |
       if ((parent[":block/string"] ?? "") !== tag) await block.update({ block: { uid: parentUid, string: tag } });
       const log = parent[":block/children"]?.find((k) => k[":block/string"] === CHANGELOG)?.[":block/uid"];
       if (log) return { shortUrl, anchorUid: log };
+      if (!(await changeLogWanted())) return { shortUrl, anchorUid: undefined };
       const anchorUid = window.roamAlphaAPI.util.generateUID();
       await block.create({ location: { "parent-uid": parentUid, order: "last" }, block: { uid: anchorUid, string: CHANGELOG } });
       return { shortUrl, anchorUid };
     }
+    const wanted = await changeLogWanted();
     const parentUid = window.roamAlphaAPI.util.generateUID();
-    const anchorUid = window.roamAlphaAPI.util.generateUID();
     await block.create({
       location: { "parent-uid": rootUid, order: getShortlinkPosition() === "top" ? 0 : "last" },
       block: { uid: parentUid, string: tag },
     });
     await block.create({ location: { "parent-uid": parentUid, order: 0 }, block: { string: shortUrl } });
+    if (!wanted) return { shortUrl, anchorUid: undefined };
+    const anchorUid = window.roamAlphaAPI.util.generateUID();
     await block.create({ location: { "parent-uid": parentUid, order: 1 }, block: { uid: anchorUid, string: CHANGELOG } });
     return { shortUrl, anchorUid };
   } catch {
