@@ -2,6 +2,12 @@
 
 All notable changes to the Roam Publish extension. Dates are when the change landed on `main`.
 
+## Unreleased
+
+### Shortlink and change log
+- Graphs without a change log (no append-only token stored on roam.pub) no longer get an empty **Changelog** block
+  under each shortlink. It's added on the next publish once the graph has a change log.
+
 ## 0.1.0 (2026-10-02)
 
 First release.

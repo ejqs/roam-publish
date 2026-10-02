@@ -36,7 +36,7 @@ export function createSettingsPanel(extensionAPI: ExtensionAPI) {
         id: "shortlink-enabled",
         name: "Add shortlink block",
         description:
-          "After publishing, add a block with your tag, the page's permanent roam.pub/p/… link and a Changelog under it. It's never published. With an append-only token in your graph's settings on the website, roam.pub adds an entry under Changelog for every change.",
+          "After publishing, add a block with your tag, the page's permanent roam.pub/p/… link. It's never published. When your graph has a change log on the website (an append-only token in its settings), a Changelog block goes under it too, where roam.pub adds an entry for every change.",
         action: { type: "switch" },
       },
       {
