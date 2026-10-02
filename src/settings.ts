@@ -9,7 +9,7 @@ export function createSettingsPanel(extensionAPI: ExtensionAPI) {
       {
         id: "dashboard",
         name: "Dashboard",
-        description: "Manage access, passwords, collections and members on the Roam Publish website.",
+        description: "Manage access, passwords, collections and members on roam.pub.",
         action: {
           type: "button",
           content: "Open dashboard",
@@ -20,7 +20,7 @@ export function createSettingsPanel(extensionAPI: ExtensionAPI) {
         id: "get-key",
         name: "Get API key",
         description:
-          "Opens your Roam Publish API keys. Connect this graph there (or accept an invite to it), copy its key, and paste it below.",
+          "Connect this graph on roam.pub (or accept an invite to it), then paste its key below.",
         action: {
           type: "button",
           content: "Get API key",
@@ -33,59 +33,59 @@ export function createSettingsPanel(extensionAPI: ExtensionAPI) {
       {
         id: "api-key",
         name: "API key",
-        description: "Your key for this graph, from the Roam Publish website. Keep it secret.",
+        description: "This graph's key. Keep it secret.",
         action: { type: "input", placeholder: "rp_…" },
       },
       {
         id: "author-name",
         name: "Author name",
-        description: "Shown on pages you publish when the graph or collection shows authors. Leave blank to use your @username.",
+        description: "Shown on your pages when authors are shown. Blank: your @username.",
         action: { type: "input", placeholder: "Your name" },
       },
       {
         id: "shortlink-enabled",
         name: "Add Roam Publish block when publishing pages",
         description:
-          "Adds a block with your tag and the page's status link (roam.pub/p/…), with change log entries under it if the change log is on. The link is for you and your graph's members, not for sharing. The block is never published.",
+          "Adds a block with the page's status link and change log. The link is for you and your graph's members, not for sharing. The block itself is never published.",
         action: { type: "switch" },
       },
       {
         id: "shortlink-blocks",
         name: "Add Roam Publish block when publishing blocks",
-        description: "After publishing a block, add a Roam Publish block under it, with its status link and change log, like for pages.",
+        description: "The same, under each block you publish.",
         action: { type: "switch" },
       },
       {
         id: "shortlink-tag",
         name: "Roam Publish block tag",
         description:
-          "The Roam Publish block's text, with the status link under it. Starts as [[Roam Publish]]. Clear it for no text: a blank field means no tag, not the default. A change applies to existing blocks the next time you publish them.",
+          "The block's text. Starts as [[Roam Publish]]. Blank: no tag. Existing blocks update when you next publish them.",
         action: { type: "input", placeholder: "(blank: no tag)" },
       },
       {
         id: "shortlink-text",
         name: "Status link text",
         description:
-          "Shown for the status link, written as [text](roam.pub/p/…). Starts as Roam Publish Status. Clear it for the bare link: a blank field means no text, not the default. A change applies to existing blocks the next time you publish them.",
+          "Written as [text](roam.pub/p/…). Starts as Roam Publish Status. Blank: bare link. Existing blocks update when you next publish them.",
         action: { type: "input", placeholder: "(blank: bare link)" },
       },
       {
         id: "shortlink-position",
         name: "Roam Publish block position",
-        description: "Where the Roam Publish block goes: first or last on the page (or under the block).",
+        description: "First or last on the page, or under the block.",
         action: { type: "select", items: ["top", "bottom"] },
       },
       {
         id: "change-log",
         name: "Change log",
         description:
-          "Opens this graph's change log settings on roam.pub: whether it's on and working, its append-only token, and turning it on or off.",
+          "On roam.pub: turn it on or off, check it works, and manage its token.",
         action: { type: "button", content: "Open settings", onClick: openChangeLogSettings },
       },
       {
         id: "sync",
         name: "Sync published list",
-        description: "Re-download the list of published pages and blocks from the server.",
+        description: "Re-download the list of what you've published.",
         action: {
           type: "button",
           content: "Sync",
@@ -95,14 +95,14 @@ export function createSettingsPanel(extensionAPI: ExtensionAPI) {
       {
         id: "server-url",
         name: "Server URL",
-        description: `Advanced. Defaults to ${__DEFAULT_SERVER__}`,
+        description: "Advanced. Blank: the default server.",
         action: { type: "input", placeholder: __DEFAULT_SERVER__ },
       },
       {
         id: "shortlink-reset",
         name: "Reset Roam Publish block settings",
         description:
-          "Puts the five Roam Publish block settings back to their defaults. Roam keeps settings after you uninstall, so reinstalling doesn't reset them. Existing blocks change the next time you publish them.",
+          "Restores the defaults of the Roam Publish block settings. Reinstalling doesn't, since Roam keeps settings.",
         action: {
           type: "button",
           content: "Reset",

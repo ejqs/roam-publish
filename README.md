@@ -92,16 +92,16 @@ check references, embeds and children first. Nothing else from your graph is sen
 | --- | --- |
 | **Dashboard** | Opens the roam.pub dashboard. |
 | **API key** | Your key for this graph (see Setup). |
-| **Author name** | Shown on pages when the graph or collection shows authors. Blank uses your @username. |
-| **Add Roam Publish block when publishing pages** | On by default. Off: nothing is written into your pages in Roam. roam.pub still keeps each page's status link and history on the website. |
-| **Add Roam Publish block when publishing blocks** | Off by default. On: published blocks get one too, under the block. Works on its own, whatever the pages setting is. |
-| **Roam Publish block tag** | The block's text. Default `[[Roam Publish]]` (graphs set up before this keep `#published`). Blank for none. |
-| **Status link text** | Shown for the link, as `[text](link)`. Default `Roam Publish Status`. Blank for the bare link. |
-| **Roam Publish block position** | `top` or `bottom` of the page. |
-| **Change log** | Opens the graph's change log settings on the website: whether it's on and working, its token, and turning it on or off. |
-| **Sync published list** | Re-downloads the list of what you've published from the server. |
+| **Author name** | Shown on your pages when authors are shown. Blank: your @username. |
+| **Add Roam Publish block when publishing pages** | On by default. Off: nothing is written into your pages. roam.pub still keeps each page's status link and history. |
+| **Add Roam Publish block when publishing blocks** | Off by default. On: the same, under each block you publish. Separate from the pages setting. |
+| **Roam Publish block tag** | The block's text. Default `[[Roam Publish]]` (graphs set up before this keep `#published`). Blank: no tag. |
+| **Status link text** | Written as `[text](link)`. Default `Roam Publish Status`. Blank: bare link. |
+| **Roam Publish block position** | First or last on the page, or under the block. |
+| **Change log** | On roam.pub: turn it on or off, check it works, and manage its token. |
+| **Sync published list** | Re-downloads the list of what you've published. |
 | **Server URL** | Advanced. Defaults to `https://roam.pub`. |
-| **Reset Roam Publish block settings** | Puts the Roam Publish block settings back to their defaults. Roam keeps an extension's settings after you uninstall it, so reinstalling doesn't. |
+| **Reset Roam Publish block settings** | Restores the defaults of the Roam Publish block settings. Reinstalling doesn't, since Roam keeps settings. |
 
 Changing the tag or the link text edits existing blocks in place the next time you publish them.
 
