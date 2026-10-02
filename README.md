@@ -15,12 +15,11 @@ changes across both), see [roam-publish-docs](https://github.com/ejqs/roam-publi
    `roam.pub connected this graph (safe to delete)` to today's daily note; you can delete it and the token right after.
 
    > [!WARNING]
-   > Delete the token in this exact order, or its **API Token: …** page (the token's display name) can never be
-   > deleted:
-   > 1. **Click** the token's link under *Roam Page Title* in Settings → Graph → API tokens
-   >    (e.g. `[[API Token: Roam Publish]]`) to open its page.
-   > 2. **Delete** that page: ⋯ menu (top right) → *Delete Page*.
-   > 3. **Revoke** the token: back in API tokens, click the ✕ next to it.
+   > Creating and verifying a Roam graph may permanently leave a page in your graph that cannot be deleted: the
+   > `[[API Token: …]]` page Roam creates for the API token. This is not the fault of roam.pub, but a consequence of
+   > how display names are treated in Roam Research. If you believe this issue has been resolved, please contact
+   > ejqs [at] ejqs [dot] net.
+
 3. Click **Get API key** on the website (or in Roam: Settings → Roam Publish → Get API key), copy the key, and paste
    it into **Settings → Roam Publish → API key**.
 
