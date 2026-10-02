@@ -40,6 +40,12 @@ export function createSettingsPanel(extensionAPI: ExtensionAPI) {
         action: { type: "switch" },
       },
       {
+        id: "shortlink-blocks",
+        name: "Shortlink block on published blocks",
+        description: "Off: only published pages get a shortlink block and change log. On: published blocks get one too, under the block.",
+        action: { type: "switch" },
+      },
+      {
         id: "shortlink-tag",
         name: "Shortlink tag",
         description: "Written after the link, e.g. #published or [[Roam Publish]]. Leave blank for none.",

@@ -5,6 +5,7 @@ import {
   getServer,
   getCache,
   getShortlinkEnabled,
+  getShortlinkOnBlocks,
   getShortlinkPosition,
   getShortlinkTag,
   setCache,
@@ -112,6 +113,11 @@ const CHANGELOG = "Changelog";
  */
 async function ensureShortlinkBlock(rootUid: string, cached: CachedPublication | undefined) {
   if (!getShortlinkEnabled()) return null;
+  if (!getShortlinkOnBlocks()) {
+    // Pages only, unless turned on for blocks too.
+    const root = await window.roamAlphaAPI.data.async.pull("[:node/title]", `[:block/uid "${rootUid}"]`);
+    if (typeof root?.[":node/title"] !== "string") return null;
+  }
   let shortUrl = cached?.shortUrl;
   if (!shortUrl) {
     try {
