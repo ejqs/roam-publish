@@ -4,6 +4,9 @@ Publish Roam Research pages and blocks to the web as clean, public pages.
 
 > Roam Publish is a third-party service made by [@ejqs](https://ejqs.net). It is not affiliated with Roam Research.
 
+For how the extension and the server work together (the contract, shared invariants, trust boundary, and how to ship
+changes across both), see [roam-publish-docs](https://github.com/ejqs/roam-publish-docs).
+
 ## Setup
 
 1. Install **Roam Publish** from Roam Depot.
@@ -86,4 +89,5 @@ ROAM_PUBLISH_SERVER=http://localhost:3000 npm run dev   # rebuilds extension.js 
 ```
 
 In Roam: Settings → Roam Depot → enable Developer mode → load this folder.
-The server ↔ extension contract lives in the `roam-publish-web` repo docs.
+The server ↔ extension contract lives in the `roam-publish-web` repo docs; how the two fit together is explained in
+[roam-publish-docs](https://github.com/ejqs/roam-publish-docs).
