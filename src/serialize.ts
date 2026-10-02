@@ -24,6 +24,8 @@ const MAX_EMBED_DEPTH = 2;
 
 /** Embeds currently being serialized, to stop at cycles and limit depth. */
 type EmbedChain = string[];
+/** Shortlink blocks to leave out of the tree, with everything under them. */
+type Skip = (s: string | undefined) => boolean;
 
 async function resolveRefs(text: string, depth = 0, seen = new Set<string>()): Promise<string> {
   if (depth >= MAX_REF_DEPTH || !text.includes("((")) return text;
@@ -46,7 +48,7 @@ async function resolveRefs(text: string, depth = 0, seen = new Set<string>()): P
   return parts.map((p) => (p.keep ? p.text : p.text.replace(REF, (m, uid) => resolved.get(uid) ?? m))).join("");
 }
 
-async function embedOf(text: string, chain: EmbedChain): Promise<Node | undefined> {
+async function embedOf(text: string, chain: EmbedChain, skip: Skip): Promise<Node | undefined> {
   const m = EMBED.exec(text);
   if (!m || chain.length > MAX_EMBED_DEPTH) return;
   const [, kind, uid, title] = m;
@@ -55,20 +57,20 @@ async function embedOf(text: string, chain: EmbedChain): Promise<Node | undefine
   const embedUid = b?.[":block/uid"];
   if (!b || !embedUid || chain.includes(embedUid)) return;
   const isPage = typeof b[":node/title"] === "string";
-  const node = await toNode(b, isPage, [...chain, embedUid]);
+  const node = await toNode(b, isPage, [...chain, embedUid], skip);
   if (kind === "embed-children") node.string = "";
   else if (isPage) node.title = b[":node/title"];
   return node;
 }
 
-async function toNode(b: PullBlock, isPageRoot: boolean, chain: EmbedChain): Promise<Node> {
-  const children = [...(b[":block/children"] ?? [])].sort(
+async function toNode(b: PullBlock, isPageRoot: boolean, chain: EmbedChain, skip: Skip): Promise<Node> {
+  const children = (b[":block/children"] ?? []).filter((c) => !skip(c[":block/string"])).sort(
     (a, c) => (a[":block/order"] ?? 0) - (c[":block/order"] ?? 0),
   );
   const node: Node = {
     uid: b[":block/uid"]!,
     string: isPageRoot ? "" : await resolveRefs(b[":block/string"] ?? ""),
-    children: await Promise.all(children.map((c) => toNode(c, false, chain))),
+    children: await Promise.all(children.map((c) => toNode(c, false, chain, skip))),
   };
   const h = b[":block/heading"];
   if (!isPageRoot && (h === 1 || h === 2 || h === 3)) node.heading = h;
@@ -78,17 +80,31 @@ async function toNode(b: PullBlock, isPageRoot: boolean, chain: EmbedChain): Pro
   const align = b[":block/text-align"];
   if (!isPageRoot && (align === "center" || align === "right" || align === "justify")) node.align = align;
   if (!isPageRoot) {
-    const embed = await embedOf(node.string, chain);
+    const embed = await embedOf(node.string, chain, skip);
     if (embed) node.embed = embed;
   }
   return node;
 }
 
-export async function serialize(uid: string): Promise<Payload | null> {
+/**
+ * A shortlink block: "{server}/p/{id} {tag}" for one of this graph's shortlinks. The same rule as
+ * the server's `withoutShortlinks`.
+ */
+export const isShortlinkBlock = (s: string | undefined, shortIds: Set<string>) => {
+  const m = s && /^https?:\/\/\S+?\/p\/([2-9A-HJ-NP-Za-km-z]{8})(?=\s|$)/.exec(s);
+  return !!m && shortIds.has(m[1]);
+};
+
+/**
+ * The publishable tree. Shortlink blocks of the given ids, and the change log under them, are left
+ * out at any depth, so they're never published or hashed.
+ */
+export async function serialize(uid: string, shortIds: Set<string> = new Set()): Promise<Payload | null> {
   const b = await window.roamAlphaAPI.data.async.pull(PATTERN, `[:block/uid "${uid}"]`);
   if (!b || !b[":block/uid"]) return null;
+  const skip: Skip = (s) => isShortlinkBlock(s, shortIds);
   const isPage = typeof b[":node/title"] === "string";
-  const tree = await toNode(b, isPage, [uid]);
+  const tree = await toNode(b, isPage, [uid], skip);
   return {
     rootUid: uid,
     kind: isPage ? "page" : "block",

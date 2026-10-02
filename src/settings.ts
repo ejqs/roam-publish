@@ -33,6 +33,25 @@ export function createSettingsPanel(extensionAPI: ExtensionAPI) {
         action: { type: "input", placeholder: "Your name" },
       },
       {
+        id: "shortlink-enabled",
+        name: "Add shortlink block",
+        description:
+          "After publishing, add a block with the page's permanent roam.pub/p/… link to the page or block. It's never published. With an append-only token in your graph's settings on the website, roam.pub logs changes under it.",
+        action: { type: "switch" },
+      },
+      {
+        id: "shortlink-tag",
+        name: "Shortlink tag",
+        description: "Written after the link, e.g. #published or [[Roam Publish]]. Leave blank for none.",
+        action: { type: "input", placeholder: "#published" },
+      },
+      {
+        id: "shortlink-position",
+        name: "Shortlink position",
+        description: "Where the shortlink block goes: first or last on the page (or under the block).",
+        action: { type: "select", items: ["top", "bottom"] },
+      },
+      {
         id: "sync",
         name: "Sync published list",
         description: "Re-download the list of published pages and blocks from the server.",
