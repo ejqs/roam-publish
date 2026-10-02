@@ -4,9 +4,30 @@ All notable changes to the Roam Publish extension. Dates are when the change lan
 
 ## Unreleased
 
-### Shortlink and change log
-- Graphs without a change log (no append-only token stored on roam.pub) no longer get an empty **Changelog** block
-  under each shortlink. It's added on the next publish once the graph has a change log.
+### Commands
+- The page and block right-click menus have one entry each, **Roam Publish: Page…** and **Roam Publish: Block…**,
+  instead of four. It says whether the page or block is not published, published and up to date, or changed since it
+  was last published, with buttons for what you can do: Publish, Republish, Make public / unlisted, Unpublish. It
+  refreshes the published list from the server first. **Current page status** / **Focused block status** in the
+  command palette show the same.
+- Command palette: **Unpublish current page**, **Publish focused block** and **Unpublish focused block** added. **Sync
+  published list** and the change log command removed from the palette (Sync stays in settings).
+- **Publish current page** publishes the page also when you're zoomed into one of its blocks (it used to publish the
+  zoomed block).
+- Syncing the published list keeps the author name sent with each item, so it no longer counts as changed.
+
+### Status link and change log
+- The link block is now written as **[Roam Publish Status](…/p/…)** under a **[[Roam Publish]]** block, and the change
+  log goes directly under it: no separate Changelog block. Pages published before keep their Changelog block and its
+  entries; new entries go under the link from the next publish, which also rewrites the bare link.
+- New settings: **Status link text** (default `Roam Publish Status`, blank for the bare link). **Roam Publish block
+  tag** defaults to `[[Roam Publish]]` for new installs; graphs already set up keep `#published`. Changes to either
+  apply to existing blocks in place on the next publish.
+- Settings and messages say "status link" and "Roam Publish block" instead of "shortlink", and explain that the link is
+  for you and your graph's members, not for sharing.
+- **Change log → Open settings** (replaces **Check change log**) opens the graph's change log settings on the
+  website, where its owner can see whether it works, manage the token, and turn it off (the token is kept, nothing is
+  logged meanwhile) or back on.
 
 ## 0.1.0 (2026-10-02)
 

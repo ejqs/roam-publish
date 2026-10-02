@@ -3,6 +3,7 @@ import { hashPayload, isShortlinkText, serialize } from "./serialize";
 import {
   getApiKey,
   getAuthor,
+  getShortlinkText,
   getServer,
   getCache,
   getShortlinkEnabled,
@@ -26,38 +27,24 @@ type Remote = {
   contentHash: string;
   visibility: Visibility;
   updatedAt: string;
+  /** Taken down by a moderator (from servers that say). */
+  removed?: boolean;
 };
 
 let syncedThisSession = false;
 
 /** Whether roam.pub can write this graph's change log (from servers that have one). */
-type ChangeLog = { status: "ok" | "invalid" | "none"; lastOkAt: string | null };
+type ChangeLog = { status: "ok" | "invalid" | "paused" | "none"; lastOkAt: string | null };
 let warnedThisSession = false;
 
 const changeLogSettings = (graphName = window.roamAlphaAPI.graph.name) =>
   `${getServer()}/dashboard/${encodeURIComponent(graphName)}/settings#change-log`;
 
 const BROKEN =
-  "Roam rejected the append-only token roam.pub stores for this graph, so the change log under your shortlink blocks stopped. The graph's owner can add a new token in its settings on roam.pub.";
+  "Roam rejected the append-only token roam.pub stores for this graph, so the change log under your Roam Publish Status links stopped. The graph's owner can add a new token in its settings on roam.pub.";
 
 /** The graph's change log status as last reported this session; undefined until the server says. */
 let changeLogStatus: ChangeLog["status"] | undefined;
-
-/**
- * Whether new shortlink blocks get a Changelog block. Not when the graph has no change log (no
- * token stored), so opted-out graphs don't collect empty ones; one is added on the next publish
- * once a token is. Servers without a change log keep the previous behavior.
- */
-async function changeLogWanted() {
-  if (changeLogStatus === undefined) {
-    try {
-      noteChangeLog((await api<{ changeLog: ChangeLog }>("/api/ext/changelog")).changeLog);
-    } catch {
-      return true;
-    }
-  }
-  return changeLogStatus !== "none";
-}
 
 /** Remembers the change log status, and tells the user, once per session, that it stopped working. */
 function warnIfBroken(changeLog: ChangeLog | undefined) {
@@ -71,16 +58,30 @@ function noteChangeLog(changeLog: ChangeLog | undefined) {
   if (changeLog) changeLogStatus = changeLog.status;
 }
 
+/** Reads the change log's status from the server, quietly, while it's off: it may be turned on on the website. */
+export async function refreshChangeLog() {
+  if (!getApiKey()) return;
+  try {
+    noteChangeLog((await api<{ changeLog: ChangeLog }>("/api/ext/changelog")).changeLog);
+  } catch {
+    // Old server, bad key or offline: keep the last known status.
+  }
+}
+
 let missingWarned = false;
-let changeLogOff = false;
+/** The server has no confirmations: nothing to confirm this session. */
+let confirmUnsupported = false;
 
 /**
- * Tells roam.pub which of this graph's Changelog blocks still exist. Roam's Append API writes to the
+ * Tells roam.pub which of the blocks its change log goes under (status links) still exist. Roam's Append API writes to the
  * daily note when its target is gone, so roam.pub only writes to blocks confirmed in the last few
  * minutes; this runs every few minutes while Roam is open. Sends only page and block uids.
  */
 export async function confirmChangeLogBlocks() {
-  if (changeLogOff || !getApiKey() || !getShortlinkEnabled()) return;
+  if (confirmUnsupported || !getApiKey() || !getShortlinkEnabled()) return;
+  // Nothing is written without a token or while it's off, so there's nothing to confirm; just keep
+  // the settings switch in step with changes made on the website.
+  if (changeLogStatus === "none" || changeLogStatus === "paused") return refreshChangeLog();
   const cache = await ensureCache();
   const anchors = Object.entries(cache)
     .filter(([, c]) => c.anchorUid)
@@ -100,12 +101,10 @@ export async function confirmChangeLogBlocks() {
     });
   } catch (e) {
     // Servers without confirmations: nothing to do this session. Anything else: try again next time.
-    if (e instanceof ApiError && e.status === 404) changeLogOff = true;
+    if (e instanceof ApiError && e.status === 404) confirmUnsupported = true;
     return;
   }
-  // No stored token: nothing is written, so there's nothing to confirm this session.
   noteChangeLog(res.changeLog);
-  if (res.changeLog.status === "none") changeLogOff = true;
   if (missing.length) {
     const next = { ...getCache() };
     for (const m of missing) if (next[m.rootUid]) next[m.rootUid] = { ...next[m.rootUid], anchorUid: null };
@@ -113,7 +112,7 @@ export async function confirmChangeLogBlocks() {
     if (!missingWarned) {
       missingWarned = true;
       toast(
-        `${missing.length === 1 ? "A published page's" : `${missing.length} published pages'`} Changelog block was deleted, so roam.pub stopped logging changes there. Publish the page again to add it back, or ignore it on your dashboard.`,
+        `${missing.length === 1 ? "A published page's" : `${missing.length} published pages'`} Roam Publish Status link was deleted, so roam.pub stopped logging changes there. Publish the page again to add it back, or ignore it on your dashboard.`,
         { intent: "danger", link: `${getServer()}/dashboard#change-log-issues`, durationMs: 15000 },
       );
     }
@@ -121,26 +120,9 @@ export async function confirmChangeLogBlocks() {
   warnIfBroken(res.changeLog);
 }
 
-/** Asks the server whether the change log works. Writes nothing to the graph. */
-export async function checkChangeLog() {
-  try {
-    const { changeLog, graphName } = await api<{ changeLog: ChangeLog; graphName: string }>("/api/ext/changelog");
-    noteChangeLog(changeLog);
-    const link = changeLogSettings(graphName);
-    if (changeLog.status === "ok")
-      return toast(
-        changeLog.lastOkAt
-          ? `Change log is working. Roam last accepted an entry on ${new Date(changeLog.lastOkAt).toLocaleString()}.`
-          : "Change log is on. Roam hasn't been sent an entry yet.",
-        { intent: "success" },
-      );
-    if (changeLog.status === "invalid") return toast(BROKEN, { intent: "danger", link });
-    toast("No append-only token is stored for this graph, so there's no change log. Add one in the graph's settings on roam.pub.", { link });
-  } catch (e) {
-    if (e instanceof ApiError && e.status === 404)
-      return toast("This Roam Publish server doesn't have a change log yet.", { intent: "danger" });
-    report(e);
-  }
+/** Opens the graph's change log settings on the website, where its owner can check and change it. */
+export function openChangeLogSettings() {
+  window.open(changeLogSettings(), "_blank", "noopener");
 }
 
 /** Re-download the list of published items from the server into the cache. */
@@ -149,11 +131,14 @@ export async function syncPublications(opts: { quiet?: boolean } = {}) {
     "/api/ext/publications",
   );
   warnIfBroken(changeLog);
+  const previous = getCache();
   const cache: PublicationCache = {};
   for (const p of publications) {
     cache[p.rootUid] = {
       hash: p.contentHash, url: p.url, title: p.title, kind: p.kind, visibility: p.visibility, updatedAt: p.updatedAt,
-      shortUrl: p.shortUrl, anchorUid: p.anchorUid,
+      shortUrl: p.shortUrl, anchorUid: p.anchorUid, removed: p.removed,
+      // The server doesn't send bylines; keep the one sent with the last publish from here.
+      author: previous[p.rootUid]?.author,
     };
   }
   await setCache(cache);
@@ -175,18 +160,24 @@ function report(e: unknown) {
 
 const shortIdOf = (shortUrl: string | null | undefined) => shortUrl?.split("/p/")[1];
 
-const CHANGELOG = "Changelog";
+/** The link block's text: `[{text}]({shortUrl})`, or the bare link when the text setting is blank. */
+const linkText = (shortUrl: string) => {
+  const text = getShortlinkText();
+  return text ? `[${text.replace(/[[\]]/g, "")}](${shortUrl})` : shortUrl;
+};
 
 /**
- * The page's permanent link, written in Roam first or last under the root as
+ * The page's status link, written in Roam first or last under the root as
  *
- *   {tag}
- *     {shortUrl}
- *     Changelog        ← the server appends its change log entries here
+ *   {tag}                          ← Shortlink tag setting, [[Roam Publish]] by default
+ *     [{text}]({shortUrl})         ← Shortlink text setting, "Roam Publish Status" by default
+ *       [[October 2nd, 2026]] …    ← the server appends change log entries here
  *
- * Written before publishing so the server learns the Changelog block's uid with the publish. Null
- * when it's turned off or the server has no shortlinks. Changelog is left out while the graph has
- * no change log.
+ * Written before publishing so the server learns the link block's uid with the publish. A tag or
+ * text changed in settings is applied in place on the next publish, so the entries stay put. Pages
+ * from earlier builds have a separate "Changelog" block under the tag; new entries go under the
+ * link block from then on, and the old block keeps what's already in it. Null when it's turned
+ * off or the server has no shortlinks.
  */
 async function ensureShortlinkBlock(rootUid: string, cached: CachedPublication | undefined) {
   if (!getShortlinkEnabled()) return null;
@@ -210,6 +201,7 @@ async function ensureShortlinkBlock(rootUid: string, cached: CachedPublication |
   }
   const ids = new Set([shortIdOf(shortUrl)!]);
   const tag = getShortlinkTag();
+  const link = linkText(shortUrl);
   const { block } = window.roamAlphaAPI.data;
   try {
     const root = await window.roamAlphaAPI.data.async.pull(
@@ -219,30 +211,22 @@ async function ensureShortlinkBlock(rootUid: string, cached: CachedPublication |
     const parent = root?.[":block/children"]?.find((c) =>
       c[":block/children"]?.some((k) => isShortlinkText(k[":block/string"], ids)),
     );
-    if (parent?.[":block/uid"]) {
-      const parentUid = parent[":block/uid"];
-      // A changed tag is applied in place, so the change log under it stays where it is.
-      if ((parent[":block/string"] ?? "") !== tag) await block.update({ block: { uid: parentUid, string: tag } });
-      const log = parent[":block/children"]?.find((k) => k[":block/string"] === CHANGELOG)?.[":block/uid"];
-      if (log) return { shortUrl, anchorUid: log };
-      if (!(await changeLogWanted())) return { shortUrl, anchorUid: undefined };
-      const anchorUid = window.roamAlphaAPI.util.generateUID();
-      await block.create({ location: { "parent-uid": parentUid, order: "last" }, block: { uid: anchorUid, string: CHANGELOG } });
-      return { shortUrl, anchorUid };
+    const linkBlock = parent?.[":block/children"]?.find((k) => isShortlinkText(k[":block/string"], ids));
+    if (parent?.[":block/uid"] && linkBlock?.[":block/uid"]) {
+      if ((parent[":block/string"] ?? "") !== tag) await block.update({ block: { uid: parent[":block/uid"], string: tag } });
+      if (linkBlock[":block/string"] !== link) await block.update({ block: { uid: linkBlock[":block/uid"], string: link } });
+      return { shortUrl, anchorUid: linkBlock[":block/uid"] };
     }
-    const wanted = await changeLogWanted();
     const parentUid = window.roamAlphaAPI.util.generateUID();
+    const anchorUid = window.roamAlphaAPI.util.generateUID();
     await block.create({
       location: { "parent-uid": rootUid, order: getShortlinkPosition() === "top" ? 0 : "last" },
       block: { uid: parentUid, string: tag },
     });
-    await block.create({ location: { "parent-uid": parentUid, order: 0 }, block: { string: shortUrl } });
-    if (!wanted) return { shortUrl, anchorUid: undefined };
-    const anchorUid = window.roamAlphaAPI.util.generateUID();
-    await block.create({ location: { "parent-uid": parentUid, order: 1 }, block: { uid: anchorUid, string: CHANGELOG } });
+    await block.create({ location: { "parent-uid": parentUid, order: 0 }, block: { uid: anchorUid, string: link } });
     return { shortUrl, anchorUid };
   } catch {
-    toast("Couldn't add the shortlink block. Publishing anyway.", { intent: "none" });
+    toast("Couldn't add the Roam Publish block. Publishing anyway.", { intent: "none" });
     return { shortUrl, anchorUid: undefined };
   }
 }
@@ -359,5 +343,52 @@ export async function unpublish(uid: string) {
   }
 }
 
-export const isPublished = (uid: string) => !!getCache()[uid];
-export const visibilityOf = (uid: string) => getCache()[uid]?.visibility;
+/**
+ * Whether a page or block is published, and if so whether it changed in Roam since: refreshes the
+ * published list from the server first (falling back to the cache offline), then hashes the
+ * content the way publishing does. Offers what can be done next: publish, or republish, make
+ * public or unlisted, and unpublish. Writes nothing to the graph by itself.
+ */
+export async function publishStatus(uid: string) {
+  try {
+    let cache: PublicationCache;
+    let offline = "";
+    try {
+      cache = await syncPublications({ quiet: true });
+    } catch (e) {
+      if (!(e instanceof ApiError) || e.status !== 0) throw e;
+      cache = getCache();
+      offline = " (couldn't reach the server; this is from the last sync)";
+    }
+    const c = cache[uid];
+    const ids = new Set(Object.values(cache).map((x) => shortIdOf(x.shortUrl)).filter((id): id is string => !!id));
+    const payload = await serialize(uid, ids);
+    if (!payload) return toast("Couldn't read that page or block.", { intent: "danger" });
+    const label = payload.kind === "page" ? "Page" : "Block";
+    if (!c)
+      return toast(`${label} isn't published.${offline}`, {
+        action: { label: `Publish ${payload.kind}`, onClick: () => void publish(uid) },
+      });
+    if (c.removed) return toast(`${label} was removed by a moderator.${offline}`, { intent: "danger", link: c.url });
+    const since = new Date(c.updatedAt).toLocaleString();
+    const where = c.visibility === "public" ? "public" : "unlisted";
+    const changed = (await hashPayload(payload)) !== c.hash;
+    // Only known for items published from this graph's extension settings.
+    const bylineChanged = c.author !== undefined && c.author !== getAuthor();
+    const upToDate = !changed && !bylineChanged;
+    const flip: Visibility = c.visibility === "public" ? "unlisted" : "public";
+    const actions = [
+      ...(upToDate ? [] : [{ label: "Republish", onClick: () => void publish(uid) }]),
+      { label: `Make ${flip}`, onClick: () => void setVisibility(uid, flip) },
+      { label: "Unpublish", onClick: () => void unpublish(uid) },
+    ];
+    toast(
+      upToDate
+        ? `${label} is published (${where}) and up to date. Last published ${since}.${offline}`
+        : `${label} is published (${where}) but ${changed ? "has changed" : "has a new author name"} since it was last published on ${since}.${offline}`,
+      { intent: upToDate ? "success" : "none", link: c.url, actions, durationMs: 15000 },
+    );
+  } catch (e) {
+    report(e);
+  }
+}

@@ -87,13 +87,14 @@ async function toNode(b: PullBlock, isPageRoot: boolean, chain: EmbedChain, skip
 }
 
 /** Text starting with "{server}/p/{id}" for one of this graph's shortlinks. */
+/** "{server}/p/{id}" at the start of a block, bare or as `[text]({server}/p/{id})`. */
 export const isShortlinkText = (s: string | undefined, shortIds: Set<string>) => {
-  const m = s && /^https?:\/\/\S+?\/p\/([2-9A-HJ-NP-Za-km-z]{8})(?=\s|$)/.exec(s);
+  const m = s && /^(?:\[[^\]\n]*\]\()?https?:\/\/[^\s)]+?\/p\/([2-9A-HJ-NP-Za-km-z]{8})(?=[\s)]|$)/.exec(s);
   return !!m && shortIds.has(m[1]);
 };
 
 /**
- * A shortlink block: "{tag}" with the "{server}/p/{id}" block and the Changelog under it (or, from
+ * A shortlink block: "{tag}" with the "[text]({server}/p/{id})" block and the change log under it (or, from
  * earlier builds, the link block itself). The same rule as the server's `withoutShortlinks`.
  */
 export const isShortlinkBlock = (b: PullBlock, shortIds: Set<string>) =>

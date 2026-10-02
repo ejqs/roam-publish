@@ -12,6 +12,8 @@ type PullBlock = {
   ":children/view-type"?: string;
   ":node/title"?: string;
   ":block/children"?: PullBlock[];
+  /** The page a block is on. */
+  ":block/page"?: PullBlock;
 };
 
 type ContextMenuCommand<Ctx> = {
@@ -39,6 +41,8 @@ interface Window {
       };
     };
     ui: {
+      /** The block being edited, or null. */
+      getFocusedBlock(): { "block-uid": string; "window-id": string } | null;
       mainWindow: {
         getOpenView(): Promise<{ type: string; uid?: string; title?: string }>;
         getOpenPageOrBlockUid(): Promise<string | null>;
