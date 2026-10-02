@@ -22,6 +22,7 @@ export function initState(extensionAPI: ExtensionAPI) {
   // Store defaults so the settings panel's switch and select show them.
   if (api.settings.get("shortlink-enabled") === undefined) void api.settings.set("shortlink-enabled", true);
   if (api.settings.get("shortlink-position") === undefined) void api.settings.set("shortlink-position", "top");
+  if (api.settings.get("shortlink-blocks") === undefined) void api.settings.set("shortlink-blocks", false);
 }
 
 export const getServer = () =>
@@ -31,6 +32,8 @@ export const getAuthor = () => ((api.settings.get("author-name") as string) || "
 /** On unless switched off. */
 export const getShortlinkEnabled = () => api.settings.get("shortlink-enabled") !== false;
 export const getShortlinkTag = () => ((api.settings.get("shortlink-tag") as string) ?? "#published").trim();
+/** Published blocks get a shortlink block only when this is on; pages always do. */
+export const getShortlinkOnBlocks = () => api.settings.get("shortlink-blocks") === true;
 export const getShortlinkPosition = () => (api.settings.get("shortlink-position") === "bottom" ? "bottom" : "top");
 
 export const getCache = (): PublicationCache =>
