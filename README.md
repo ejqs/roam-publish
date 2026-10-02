@@ -58,10 +58,6 @@ Open the same menu again to check whether it's published, or to **Republish** af
 
 You can also do all of this from the command palette: type "Roam Publish".
 
-**Who can see it?** New pages are unlisted, so only people with the link can read them. Public pages are also listed
-on your graph's front page and in its RSS feed, if the graph owner turned the feed on. Feed readers may keep a copy
-after you unpublish.
-
 ### Supported blocks
 
 The page or block is published with all its children. Everything published can be read by anyone with the link, so
@@ -117,11 +113,7 @@ Changing the tag or the link text edits existing blocks in place the next time y
   [Use of the Append API](#use-of-the-append-api).
 - **Written to your graph:** the Roam Publish block when you publish, and change log entries if you kept an
   append-only token. Nothing else.
-- **Stored in Roam's extension settings for this graph:** your API key, Author name, Roam Publish block settings and a cache of
-  what you've published. The key lets the server publish for you but gives no access to your Roam graph. The extension
-  doesn't read your daily notes, so collaborators who can see them can't pick the key up.
-- **Roam API token:** entered on the website, never in the extension. See [Use of the Append API](#use-of-the-append-api).
-- **Encrypted graphs** are supported.
+- **Encrypted graphs** are supported. The extension only sends the data you choose to publish.
 
 ### Use of the Append API
 
