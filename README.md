@@ -13,6 +13,14 @@ changes across both), see [roam-publish-docs](https://github.com/ejqs/roam-publi
 2. Sign up at [roam.pub](https://roam.pub) and connect your **personal graph** (one you own) with a temporary
    **append-only** API token (Roam: Settings → Graph → API tokens). The server adds a block like
    `roam.pub connected this graph (safe to delete)` to today's daily note; you can delete it and the token right after.
+
+   > [!WARNING]
+   > Delete the token in this exact order, or its **API Token: …** page (the token's display name) can never be
+   > deleted:
+   > 1. **Click** the token's link under *Roam Page Title* in Settings → Graph → API tokens
+   >    (e.g. `[[API Token: Roam Publish]]`) to open its page.
+   > 2. **Delete** that page: ⋯ menu (top right) → *Delete Page*.
+   > 3. **Revoke** the token: back in API tokens, click the ✕ next to it.
 3. Click **Get API key** on the website (or in Roam: Settings → Roam Publish → Get API key), copy the key, and paste
    it into **Settings → Roam Publish → API key**.
 
