@@ -90,6 +90,7 @@ check references, embeds and children first. Nothing else from your graph is sen
 
 | Setting | What it does |
 | --- | --- |
+| **Dashboard** | Opens the roam.pub dashboard. |
 | **API key** | Your key for this graph (see Setup). |
 | **Author name** | Shown on pages when the graph or collection shows authors. Blank uses your @username. |
 | **Add Roam Publish block when publishing pages** | On by default. Off: nothing is written into your pages in Roam. roam.pub still keeps each page's status link and history on the website. |
@@ -98,7 +99,6 @@ check references, embeds and children first. Nothing else from your graph is sen
 | **Status link text** | Shown for the link, as `[text](link)`. Default `Roam Publish Status`. Blank for the bare link. |
 | **Roam Publish block position** | `top` or `bottom` of the page. |
 | **Change log** | Opens the graph's change log settings on the website: whether it's on and working, its token, and turning it on or off. |
-| **Dashboard** | Opens the roam.pub dashboard. |
 | **Sync published list** | Re-downloads the list of what you've published from the server. |
 | **Server URL** | Advanced. Defaults to `https://roam.pub`. |
 | **Reset Roam Publish block settings** | Puts the Roam Publish block settings back to their defaults. Roam keeps an extension's settings after you uninstall it, so reinstalling doesn't. |

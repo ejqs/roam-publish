@@ -7,6 +7,16 @@ export function createSettingsPanel(extensionAPI: ExtensionAPI) {
     tabTitle: "Roam Publish",
     settings: [
       {
+        id: "dashboard",
+        name: "Dashboard",
+        description: "Manage access, passwords, collections and members on the Roam Publish website.",
+        action: {
+          type: "button",
+          content: "Open dashboard",
+          onClick: () => void window.open(`${getServer()}/dashboard`, "_blank", "noopener"),
+        },
+      },
+      {
         id: "get-key",
         name: "Get API key",
         description:
@@ -80,16 +90,6 @@ export function createSettingsPanel(extensionAPI: ExtensionAPI) {
           type: "button",
           content: "Sync",
           onClick: () => void syncPublications().catch((e: Error) => toast(e.message, { intent: "danger" })),
-        },
-      },
-      {
-        id: "dashboard",
-        name: "Dashboard",
-        description: "Manage access, passwords, collections and members on the Roam Publish website.",
-        action: {
-          type: "button",
-          content: "Open dashboard",
-          onClick: () => void window.open(`${getServer()}/dashboard`, "_blank", "noopener"),
         },
       },
       {
