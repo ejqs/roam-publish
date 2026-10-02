@@ -1,0 +1,41 @@
+name: Release
+
+# Push a tag like v0.1.0 to publish a GitHub Release with the matching CHANGELOG.md notes.
+# Roam Depot still needs its source_commit bumped to the released commit.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Tag must match package.json version
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          test "$version" = "$(node -p "require('./package.json').version")" \
+            || { echo "Tag $GITHUB_REF_NAME does not match package.json version"; exit 1; }
+      - run: npm ci
+      - run: npm run typecheck
+      - run: ./build.sh
+      - name: Extract release notes from CHANGELOG.md
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v v="$version" '
+            $0 ~ "^## " v "( |$)" { on = 1; next }
+            /^## / { on = 0 }
+            on
+          ' CHANGELOG.md > notes.md
+          test -s notes.md || { echo "No CHANGELOG.md section for $version"; exit 1; }
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file notes.md --verify-tag

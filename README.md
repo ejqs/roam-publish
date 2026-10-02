@@ -132,6 +132,13 @@ npm run typecheck
 
 In Roam: Settings → Roam Depot → enable Developer mode → load this folder.
 
+### Releasing
+
+CI runs the typecheck and Roam Depot's own `./build.sh` on every PR and push to `main`. To release: update `version` in
+`package.json` and add a matching `## x.y.z` section to `CHANGELOG.md`, then push a tag (`git tag v0.1.1 && git push
+origin v0.1.1`). The Release workflow publishes a GitHub Release with that changelog section. Then bump `source_commit`
+in your roam-depot PR to the released commit.
+
 ## License
 
 [MIT](LICENSE)
