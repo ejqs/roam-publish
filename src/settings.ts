@@ -73,7 +73,7 @@ export function createSettingsPanel(extensionAPI: ExtensionAPI) {
       {
         id: "sync",
         name: "Sync published list",
-        description: "Re-download the list of what you've published.",
+        description: "The extension keeps a list of what you've published, to tell whether a page is published or changed since. This updates it from roam.pub. Use it if a status looks wrong, e.g. after unpublishing on the website. The Page… and Block… menus already do this.",
         action: {
           type: "button",
           content: "Sync",

@@ -99,7 +99,7 @@ check references, embeds and children first. Nothing else from your graph is sen
 | **Status link text** | Written as `[text](link)`. Default `Roam Publish Status`. Blank: bare link. |
 | **Block position** | First or last on the page, or under the block. |
 | **Change log** | On roam.pub: turn it on or off, check it works, and manage its token. |
-| **Sync published list** | Re-downloads the list of what you've published. |
+| **Sync published list** | Updates the extension's list of what you've published from roam.pub. Use it if a status looks wrong, e.g. after unpublishing on the website. The **Page…** and **Block…** menus already do this. |
 | **Server URL** | Advanced. Defaults to `https://roam.pub`. |
 | **Reset Roam Publish block settings** | Restores the defaults of the Roam Publish block settings. Reinstalling doesn't, since Roam keeps settings. |
 
