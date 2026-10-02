@@ -9,25 +9,13 @@ export function createSettingsPanel(extensionAPI: ExtensionAPI) {
       {
         id: "dashboard",
         name: "Dashboard",
-        description: "Manage access, passwords, collections and members on roam.pub.",
+        description:
+          "On roam.pub: get this graph's API key (opens there until you add one below), and manage access, passwords, collections and members.",
         action: {
           type: "button",
           content: "Open dashboard",
-          onClick: () => void window.open(`${getServer()}/dashboard`, "_blank", "noopener"),
-        },
-      },
-      {
-        id: "get-key",
-        name: "Get API key",
-        description:
-          "Connect this graph on roam.pub (or accept an invite to it), then paste its key below.",
-        action: {
-          type: "button",
-          content: "Get API key",
-          onClick: () => {
-            window.open(`${getServer()}/dashboard/keys`, "_blank", "noopener");
-            if (getApiKey()) toast("This graph already has a key. Regenerating it on the website replaces this one.");
-          },
+          // Straight to the keys until there's one, since that's the first thing to do there.
+          onClick: () => void window.open(`${getServer()}/dashboard${getApiKey() ? "" : "/keys"}`, "_blank", "noopener"),
         },
       },
       {
@@ -57,7 +45,7 @@ export function createSettingsPanel(extensionAPI: ExtensionAPI) {
       },
       {
         id: "shortlink-tag",
-        name: "Roam Publish block tag",
+        name: "Block tag",
         description:
           "The block's text. Starts as [[Roam Publish]]. Blank: no tag. Existing blocks update when you next publish them.",
         action: { type: "input", placeholder: "(blank: no tag)" },
@@ -71,7 +59,7 @@ export function createSettingsPanel(extensionAPI: ExtensionAPI) {
       },
       {
         id: "shortlink-position",
-        name: "Roam Publish block position",
+        name: "Block position",
         description: "First or last on the page, or under the block.",
         action: { type: "select", items: ["top", "bottom"] },
       },
