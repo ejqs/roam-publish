@@ -1,5 +1,5 @@
 import { getApiKey, getServer } from "./state";
-import { syncPublications } from "./publish";
+import { checkChangeLog, syncPublications } from "./publish";
 import { toast } from "./toast";
 
 export function createSettingsPanel(extensionAPI: ExtensionAPI) {
@@ -36,7 +36,7 @@ export function createSettingsPanel(extensionAPI: ExtensionAPI) {
         id: "shortlink-enabled",
         name: "Add shortlink block",
         description:
-          "After publishing, add a block with the page's permanent roam.pub/p/… link to the page or block. It's never published. With an append-only token in your graph's settings on the website, roam.pub logs changes under it.",
+          "After publishing, add a block with your tag, the page's permanent roam.pub/p/… link and a Changelog under it. It's never published. With an append-only token in your graph's settings on the website, roam.pub adds an entry under Changelog for every change.",
         action: { type: "switch" },
       },
       {
@@ -50,6 +50,13 @@ export function createSettingsPanel(extensionAPI: ExtensionAPI) {
         name: "Shortlink position",
         description: "Where the shortlink block goes: first or last on the page (or under the block).",
         action: { type: "select", items: ["top", "bottom"] },
+      },
+      {
+        id: "check-change-log",
+        name: "Check change log",
+        description:
+          "Asks roam.pub whether it can still add change log entries under your shortlink blocks, and when Roam last accepted one. Writes nothing.",
+        action: { type: "button", content: "Check", onClick: () => void checkChangeLog() },
       },
       {
         id: "sync",

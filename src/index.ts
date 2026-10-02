@@ -1,4 +1,12 @@
-import { isPublished, publish, setVisibility, syncPublications, unpublish, visibilityOf } from "./publish";
+import {
+  checkChangeLog,
+  isPublished,
+  publish,
+  setVisibility,
+  syncPublications,
+  unpublish,
+  visibilityOf,
+} from "./publish";
 import { createSettingsPanel } from "./settings";
 import { initState } from "./state";
 import { removeToasts, toast } from "./toast";
@@ -13,6 +21,7 @@ const PAGE_MAKE_PUBLIC = "Roam Publish: Make page public";
 const PAGE_MAKE_UNLISTED = "Roam Publish: Make page unlisted";
 const CMD_PUBLISH_CURRENT = "Roam Publish: Publish current page";
 const CMD_SYNC = "Roam Publish: Sync published list";
+const CMD_CHECK_CHANGELOG = "Roam Publish: Check change log";
 
 let extensionAPI: ExtensionAPI;
 
@@ -83,6 +92,7 @@ async function onload({ extensionAPI: api }: { extensionAPI: ExtensionAPI }) {
     label: CMD_SYNC,
     callback: () => void syncPublications().catch((e: Error) => toast(e.message, { intent: "danger" })),
   });
+  api.ui.commandPalette.addCommand({ label: CMD_CHECK_CHANGELOG, callback: () => void checkChangeLog() });
 }
 
 function onunload() {
@@ -97,6 +107,7 @@ function onunload() {
   ui.pageContextMenu.removeCommand({ label: PAGE_MAKE_UNLISTED });
   extensionAPI?.ui.commandPalette.removeCommand({ label: CMD_PUBLISH_CURRENT });
   extensionAPI?.ui.commandPalette.removeCommand({ label: CMD_SYNC });
+  extensionAPI?.ui.commandPalette.removeCommand({ label: CMD_CHECK_CHANGELOG });
   removeToasts();
 }
 
