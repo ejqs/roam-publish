@@ -2,6 +2,7 @@
   "name": "roam-publish",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "description": "Publish Roam Research pages and blocks to the web.",
   "scripts": {
     "build": "node build.mjs",
