@@ -131,3 +131,7 @@ npm run typecheck
 ```
 
 In Roam: Settings → Roam Depot → enable Developer mode → load this folder.
+
+## License
+
+[MIT](LICENSE)
