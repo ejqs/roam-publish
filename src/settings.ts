@@ -66,20 +66,6 @@ export function createSettingsPanel(extensionAPI: ExtensionAPI) {
         action: { type: "select", items: ["top", "bottom"] },
       },
       {
-        id: "shortlink-reset",
-        name: "Reset Roam Publish block settings",
-        description:
-          "Puts the five settings above back to their defaults. Roam keeps settings after you uninstall, so reinstalling doesn't reset them. Existing blocks change the next time you publish them.",
-        action: {
-          type: "button",
-          content: "Reset",
-          onClick: () =>
-            void resetShortlinkSettings()
-              .then(() => toast("Defaults restored. Close and reopen settings to see them."))
-              .catch((e: Error) => toast(e.message, { intent: "danger" })),
-        },
-      },
-      {
         id: "change-log",
         name: "Change log",
         description:
@@ -111,6 +97,20 @@ export function createSettingsPanel(extensionAPI: ExtensionAPI) {
         name: "Server URL",
         description: `Advanced. Defaults to ${__DEFAULT_SERVER__}`,
         action: { type: "input", placeholder: __DEFAULT_SERVER__ },
+      },
+      {
+        id: "shortlink-reset",
+        name: "Reset Roam Publish block settings",
+        description:
+          "Puts the five Roam Publish block settings back to their defaults. Roam keeps settings after you uninstall, so reinstalling doesn't reset them. Existing blocks change the next time you publish them.",
+        action: {
+          type: "button",
+          content: "Reset",
+          onClick: () =>
+            void resetShortlinkSettings()
+              .then(() => toast("Defaults restored. Close and reopen settings to see them."))
+              .catch((e: Error) => toast(e.message, { intent: "danger" })),
+        },
       },
     ],
   });
