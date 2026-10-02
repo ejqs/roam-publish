@@ -154,6 +154,7 @@ npm install
 ROAM_PUBLISH_SERVER=http://localhost:3000 npm run dev   # rebuilds extension.js on change
 npm run build       # production build
 npm run typecheck
+npm test            # serializer, hash parity with the server, API errors
 ```
 
 In Roam: Settings → Roam Depot → enable Developer mode → load this folder.

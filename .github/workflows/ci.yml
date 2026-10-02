@@ -23,6 +23,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
+      - run: npm test
       # Same entry point Roam Depot runs (npm ci && npm run build).
       - run: ./build.sh
       - name: Check extension.js was built
