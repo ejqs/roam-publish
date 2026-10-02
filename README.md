@@ -2,6 +2,13 @@
 
 Publish Roam Research pages and blocks to the web as clean, shareable pages on [roam.pub](https://roam.pub).
 
+**[See an example page →](https://roam.pub/ejqs/DyEQxo40V/roam-publish-kitchen-sink)**
+
+- **Share it your way.** Keep a page unlisted so only people with the link can read it, list it on your graph's
+  blog-style front page, or put it on [Discover](https://roam.pub/discover) for everyone on roam.pub to find.
+- **Lock it down.** Protect a page with a password, or limit it to members of your graph.
+- **Publish together.** Collections gather pages from different graphs and people in one place.
+
 > Roam Publish is a third-party service made by [@ejqs](https://ejqs.net). It is not affiliated with Roam Research.
 
 This repo is the **Roam Depot extension**. It adds the publish commands to Roam and sends the page you choose to the
