@@ -25,6 +25,8 @@ All notable changes to the Roam Publish extension. Dates are when the change lan
   apply to existing blocks in place on the next publish.
 - Settings and messages say "status link" and "Roam Publish block" instead of "shortlink", and explain that the link is
   for you and your graph's members, not for sharing.
+- The **Roam Publish block tag** and **Status link text** fields no longer show the default in grey when empty, which
+  looked like the default would be used. An empty field shows what it does (no tag, bare link).
 - **Change log → Open settings** (replaces **Check change log**) opens the graph's change log settings on the
   website, where its owner can see whether it works, manage the token, and turn it off (the token is kept, nothing is
   logged meanwhile) or back on.

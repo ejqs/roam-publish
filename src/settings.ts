@@ -49,15 +49,15 @@ export function createSettingsPanel(extensionAPI: ExtensionAPI) {
         id: "shortlink-tag",
         name: "Roam Publish block tag",
         description:
-          "The Roam Publish block's text, with the status link under it. Default [[Roam Publish]]. Leave blank for none. A change applies to existing blocks the next time you publish them.",
-        action: { type: "input", placeholder: "[[Roam Publish]]" },
+          "The Roam Publish block's text, with the status link under it. Starts as [[Roam Publish]]. Clear it for no text: a blank field means no tag, not the default. A change applies to existing blocks the next time you publish them.",
+        action: { type: "input", placeholder: "(blank: no tag)" },
       },
       {
         id: "shortlink-text",
         name: "Status link text",
         description:
-          "Shown for the status link, written as [text](roam.pub/p/…). Default Roam Publish Status. Leave blank for the bare link. A change applies to existing blocks the next time you publish them.",
-        action: { type: "input", placeholder: "Roam Publish Status" },
+          "Shown for the status link, written as [text](roam.pub/p/…). Starts as Roam Publish Status. Clear it for the bare link: a blank field means no text, not the default. A change applies to existing blocks the next time you publish them.",
+        action: { type: "input", placeholder: "(blank: bare link)" },
       },
       {
         id: "shortlink-position",
