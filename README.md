@@ -10,9 +10,10 @@ changes across both), see [roam-publish-docs](https://github.com/ejqs/roam-publi
 ## Setup
 
 1. Install **Roam Publish** from Roam Depot.
-2. Sign up at [roam.pub](https://roam.pub) and connect your **personal graph** (one you own) with a temporary
+2. Sign up at [roam.pub](https://roam.pub) and connect your **personal graph** (one you own) with an
    **append-only** API token (Roam: Settings → Graph → API tokens). The server adds a block like
-   `roam.pub connected this graph (safe to delete)` to today's daily note; you can delete it and the token right after.
+   `roam.pub connected this graph (safe to delete)` to today's daily note, which you can delete. The token is kept,
+   encrypted, for the [change log](#shortlinks-and-the-change-log).
 
    > [!WARNING]
    > Creating and verifying a Roam graph may permanently leave a page in your graph that cannot be deleted: the
@@ -44,6 +45,27 @@ shows authors; left blank, your public @username is used.
 Who can read a page (open, password, members only), collections (`roam.pub/c/…`), members, Discover and RSS feeds
 are all managed on the website. In a shared graph, members can only change the pages they published.
 
+## Shortlinks and the change log
+
+After publishing, the extension adds one block to the page (or under the block) with its permanent link:
+
+```
+https://roam.pub/p/k3Xq9aZt #published
+```
+
+The link never changes, wherever the page ends up (its graph, collections, after a rename). Opening it shows you and
+your graph's members where the page lives, with links to copy; everyone else goes straight to the page.
+
+With an append-only token stored for the graph (from verification, or in the graph's settings on the website),
+roam.pub adds a dated entry under that block for everything that happens to the page: published, republished,
+made public or unlisted, listed on Discover, added to or removed from a collection, access changes, unpublished.
+That includes changes made on the website.
+
+The shortlink block and everything under it are **never published** and don't count as changes.
+
+Settings: **Add shortlink block** (on by default), **Shortlink tag** (`#published` by default, e.g. `[[Roam Publish]]`,
+or blank for none; changing it edits the block in place) and **Shortlink position** (`top` or `bottom`).
+
 ## What gets published
 
 The page or block and all of its children. Block references are inlined as text, embeds (`{{embed: …}}`) include
@@ -68,11 +90,15 @@ What the extension reads, sends, and stores:
   who may keep a copy after you unpublish. Unlisted and password- or members-only pages are never in a feed.
 - **Where it goes:** only to the Roam Publish server (`https://roam.pub`, or the server URL set in settings).
   The extension makes no other network requests and has no analytics.
-- **What is stored locally:** your Roam Publish API key, your Author name and a cache of what you've published, all
-  in Roam's extension settings for this graph. The key lets the server publish on your behalf; it does not give
+- **What is written to your graph:** the shortlink block above, created or edited by the extension when you publish
+  (turn it off in settings), and, if you stored an append-only token, change log entries the server appends under
+  it. Nothing else.
+- **What is stored locally:** your Roam Publish API key, your Author name, the shortlink settings and a cache of
+  what you've published, all in Roam's extension settings for this graph. The key lets the server publish on your behalf; it does not give
   access to your Roam graph. Each person in a shared graph has their own key, and the owner can revoke a member's.
-- **Roam API token:** the temporary append-only token is entered on the website, not in the extension. It can only
-  add blocks (used once to write the connection block), cannot read your graph, and you can delete it after setup.
+- **Roam API token:** the append-only token is entered on the website, not in the extension. It can only add blocks
+  and cannot read your graph. The server stores it encrypted and uses it only for the connection block and the
+  change log. Remove it in the graph's settings on the website, or revoke it in Roam, to stop the change log.
 - **No setup reading:** the extension doesn't read your daily notes to finish setup; you paste the key yourself, so
   collaborators who can see your daily notes can't pick it up.
 - **Encrypted graphs:** supported. The connection block is written with the Append API like any other graph.

@@ -30,6 +30,13 @@ interface Window {
         q(query: string, ...args: unknown[]): Promise<any>;
         pull(selector: string, eid: string | number): Promise<PullBlock | null>;
       };
+      block: {
+        create(args: {
+          location: { "parent-uid": string; order: number | "first" | "last" };
+          block: { string: string; uid?: string };
+        }): Promise<void>;
+        update(args: { block: { uid: string; string: string } }): Promise<void>;
+      };
     };
     ui: {
       mainWindow: {
@@ -45,13 +52,15 @@ interface Window {
         removeCommand(args: { label: string }): void;
       };
     };
-    util: { dateToPageUid(date: Date): string };
+    util: { dateToPageUid(date: Date): string; generateUID(): string };
   };
 }
 
 type SettingAction =
   | { type: "input"; placeholder?: string; onChange?: (e: Event) => void }
-  | { type: "button"; onClick?: (e: Event) => void; content?: string };
+  | { type: "button"; onClick?: (e: Event) => void; content?: string }
+  | { type: "switch"; onChange?: (e: Event) => void }
+  | { type: "select"; items: string[]; onChange?: (value: string) => void };
 
 type ExtensionAPI = {
   settings: {
