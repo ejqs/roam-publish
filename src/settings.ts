@@ -36,7 +36,7 @@ export function createSettingsPanel(extensionAPI: ExtensionAPI) {
         id: "shortlink-enabled",
         name: "Add Roam Publish block when publishing pages",
         description:
-          "After publishing a page, add a block with your tag and its status link (roam.pub/p/…). The status link is for you and your graph's members: it shows where the page is published. To share the page, use its graph or collection link. When the graph has a change log on the website, roam.pub adds an entry under the status link for every change. Never published.",
+          "Adds a block with your tag and the page's status link (roam.pub/p/…), with change log entries under it if the change log is on. The link is for you and your graph's members, not for sharing. The block is never published.",
         action: { type: "switch" },
       },
       {
