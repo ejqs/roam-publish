@@ -36,61 +36,59 @@ The old key stops working.
 
 ## Using it
 
-| To | Do this |
-| --- | --- |
-| Publish a page or block | Right-click the page title or bullet → **Roam Publish: Page…** / **Block…** → **Publish**. Or run **Publish current page** / **Publish focused block** from the command palette. |
-| See if it's published | **Roam Publish: Page…** / **Block…** (or **Current page status** / **Focused block status**): not published, published and up to date, or changed since it was published |
-| Update, make public or unlisted, take down | From the same message: **Republish** (when it changed), **Make public** / **Make unlisted**, **Unpublish**. Or run **Unpublish current page** / **Unpublish focused block**. |
+1. Right-click a page title or a bullet.
+2. Choose **Roam Publish: Page…** or **Roam Publish: Block…**.
+3. Click **Publish**. The link is copied to your clipboard.
 
-Page commands act on the page you have open, also when you're zoomed into one of its blocks.
+On the website you also get these. Manage them from the [dashboard](https://roam.pub/dashboard), or click **Open
+dashboard** in the extension settings.
 
-The link is copied to your clipboard when you publish.
+- **Passwords and members-only pages** for anything you don't want fully open.
+- **Collections** that gather pages from several graphs and people in one place, with their own members.
+- **Discover**, where readers upvote pages and browse them by recent, trending (most viewed this week) or top.
+- **Tags and search** on your graph's front page and in collections, plus site-wide search for verified accounts.
+- **RSS feeds** for your graph, your collections and Discover.
+- **Page history**: each page's permanent short link (`roam.pub/p/…`) shows your graph's members what happened to it
+  and when. The same change log is also written back into your Roam page.
+- **A public profile** at `roam.pub/u/{username}`.
+- **Bulk changes**: select many pages to change where they're listed, who can read them, or their tags.
 
-**New pages are unlisted:** only people with the link can read them. **Making a page public** lists it on your graph's
-front page and in its RSS feed, if the graph owner turned the feed on (`roam.pub/{graph}/feed.xml`). Feed readers may
-keep a copy after you unpublish. Password-protected, members-only and unlisted pages are never in a feed.
+Open the same menu again to check whether it's published, or to **Republish** after edits, **Make public**,
+**Make unlisted** or **Unpublish**.
 
-Collections (`roam.pub/c/…`), passwords, members-only access, members and Discover are managed on the
-[website dashboard](https://roam.pub/dashboard); the extension settings have an **Open dashboard** button.
+You can also do all of this from the command palette: type "Roam Publish".
 
-### What gets published
+**Who can see it?** New pages are unlisted, so only people with the link can read them. Public pages are also listed
+on your graph's front page and in its RSS feed, if the graph owner turned the feed on. Feed readers may keep a copy
+after you unpublish.
 
-The page or block and all its children, as text. Everything published is public to anyone with the link, so check
-references, embeds and children first.
+### Supported blocks
 
-- **Block references** `((…))` become inline text, up to 3 levels deep. This includes blocks outside the published page.
-- **Embeds** `{{embed: …}}` include the embedded block or page with its children, up to 2 levels deep.
-- **`[[Links]]`** show as plain text, or as links if the linked page is also published.
-- **Images, video, audio and PDFs** are sent as URLs only. The files aren't copied, and files in encrypted graphs won't
-  display.
+The page or block is published with all its children. Everything published can be read by anyone with the link, so
+check references, embeds and children first. Nothing else from your graph is sent.
 
-Nothing else from your graph is sent.
+- **Text formatting:** bold, italics, ^^highlights^^, ~~strikethrough~~, `inline code`, headings and text alignment.
+- **Links:** `[[page links]]`, `#tags` and aliases. They link to the other page when it's also published, and show as
+  plain text when it isn't.
+- **Block references** `((…))`: shown as the referenced text, up to 3 levels deep, including blocks outside the
+  published page.
+- **Embeds** `{{embed: …}}`: the embedded block or page with its children, up to 2 levels deep.
+- **Views:** bullets, numbered lists and document view.
+- **Tables** `{{table}}` and **kanban boards** `{{kanban}}`.
+- **Math** `$$…$$`, rendered with KaTeX.
+- **Code blocks** with syntax highlighting.
+- **Quotes** `>`, **attributes** `Key:: value`, **TODO / DONE** checkboxes (read-only) and **horizontal rules** `---`.
+- **Images**, **video** (YouTube, Vimeo, Loom and video files), **audio**, **PDFs** and **iframes**.
+- **Tweets** show as a link to the post.
 
-## Status link and change log
+### Unsupported blocks
 
-When you publish a **page**, the extension adds a Roam Publish block with the page's status link:
-
-```
-[[Roam Publish]]
-  [Roam Publish Status](https://roam.pub/p/k3Xq9aZt)
-    [[October 2nd, 2026]] 14:03 Published as unlisted: https://roam.pub/…
-```
-
-The status link never changes, even if the page is renamed or moved to another collection. It's meant for you and
-your graph's members: it shows where the page is published. **Don't share it:** anyone else who opens it is sent to the
-first place they can read the page, which can change. To share the page, use its graph or collection link.
-
-If you gave roam.pub an append-only token (during verification, or in the graph's settings on the website), it also
-logs what happens to the page under the status link: published, republished, made public or unlisted, added to a
-collection, access changes, unpublished. This includes changes made on the website. The graph's owner can turn the
-change log off and on in the graph's settings on the website (**Change log → Open settings** in the extension's
-settings goes there). Off keeps the token; changes made meanwhile aren't logged.
-
-The Roam Publish block and everything under it are never published and never count as changes. Pages published with
-earlier versions have a separate **Changelog** block; it keeps its entries, and new ones go under the status link.
-
-**Deleted the status link?** roam.pub stops logging for that page and lists it on your dashboard. Publish the page
-again to add it back, or ignore it.
+- **Diagrams and drawings** (`{{mermaid}}`, `{{diagram}}`, `{{drawing}}`, Excalidraw) show a "Diagram not shown"
+  placeholder.
+- **Queries and mentions** (`{{query}}`, `{{mentions}}`) show a placeholder. Their results aren't published.
+- **Interactive components** such as buttons, sliders, timers, counters and `roam/js` aren't shown.
+- **Block references more than 3 levels deep** and **embeds more than 2 levels deep** are left out.
+- **Files hosted in Roam** are linked, not copied. Files in encrypted graphs won't display.
 
 ## Settings
 
@@ -98,33 +96,56 @@ again to add it back, or ignore it.
 | --- | --- |
 | **API key** | Your key for this graph (see Setup). |
 | **Author name** | Shown on pages when the graph or collection shows authors. Blank uses your @username. |
-| **Add Roam Publish block** | On by default. Turn off for no status link and no change log. |
+| **Add Roam Publish block** | On by default. Off: nothing is written into your pages in Roam. roam.pub still keeps each page's status link and history on the website. |
 | **Roam Publish block on published blocks** | Off by default, so only pages get one. Turn on to add one under published blocks too. |
 | **Roam Publish block tag** | The block's text. Default `[[Roam Publish]]` (graphs set up before this keep `#published`). Blank for none. |
 | **Status link text** | Shown for the link, as `[text](link)`. Default `Roam Publish Status`. Blank for the bare link. |
 | **Roam Publish block position** | `top` or `bottom` of the page. |
-
-Changing the tag or the link text edits existing blocks in place the next time you publish them.
 | **Change log** | Opens the graph's change log settings on the website: whether it's on and working, its token, and turning it on or off. |
+| **Dashboard** | Opens the roam.pub dashboard. |
 | **Sync published list** | Re-downloads the list of what you've published from the server. |
 | **Server URL** | Advanced. Defaults to `https://roam.pub`. |
+
+Changing the tag or the link text edits existing blocks in place the next time you publish them.
 
 ## Privacy and safety
 
 - **Only on your action:** nothing leaves Roam until you publish a page or block. No analytics, and the only server
   contacted is roam.pub (or your configured Server URL).
 - **One background request:** while Roam is open, about every 5 minutes, the extension tells roam.pub which status link
-  blocks of your published pages still exist, sending uids only and no text. This prevents roam.pub from writing to a
-  block you deleted. Turning off **Add Roam Publish block** stops it.
-- **Written to your graph:** the Roam Publish block (when you publish), and change log entries if you stored an
+  blocks still exist (uids only, no text). Turning off **Add Roam Publish block** stops it. See
+  [Use of the Append API](#use-of-the-append-api).
+- **Written to your graph:** the Roam Publish block when you publish, and change log entries if you kept an
   append-only token. Nothing else.
 - **Stored in Roam's extension settings for this graph:** your API key, Author name, Roam Publish block settings and a cache of
   what you've published. The key lets the server publish for you but gives no access to your Roam graph. The extension
   doesn't read your daily notes, so collaborators who can see them can't pick the key up.
-- **Roam API token:** entered on the website, never in the extension. It can only add blocks. The server stores it
-  encrypted and uses it only for the connection block and the change log. Remove it in the graph's settings on the
-  website, or revoke it in Roam, to stop the change log, or turn the change log off there to pause it.
+- **Roam API token:** entered on the website, never in the extension. See [Use of the Append API](#use-of-the-append-api).
 - **Encrypted graphs** are supported.
+
+### Use of the Append API
+
+roam.pub writes to your graph with Roam's Append API and an **append-only** token you create in Roam. That kind of
+token can only add blocks to its own graph. It can't read, edit, move or delete anything.
+
+- **Verifying your graph, once:** roam.pub adds `roam.pub connected this graph (safe to delete)` to today's daily note.
+  Only a graph's admins can create its tokens, so a successful write proves the graph is yours.
+- **The change log, if you keep the token:** roam.pub adds a dated entry under a page's status link whenever
+  something happens to it (published, made public, access changed, unpublished, and so on), including changes made
+  on the website. Entries hold the date, time, what happened and links, never page content.
+- **Your token:** entered on the website only, stored encrypted, never shown again. Pause the change log or remove the
+  token in the graph's settings on roam.pub (**Change log → Open settings** in the extension), or revoke it in Roam.
+
+The status link (`roam.pub/p/…`) shows you and your graph's members where a page is published. **Don't share it:**
+anyone else is sent to the first place they can read the page, which can change.
+
+For exactly what the extension reads, what it sends and how roam.pub uses the Append API, see
+[Data flow and the Append API](https://github.com/ejqs/roam-publish-docs/blob/main/docs/data-and-append-api.md).
+
+### Reporting a vulnerability
+
+If you find a security issue in the extension or on roam.pub, please report it privately to
+ejqs [at] ejqs [dot] net rather than opening a public issue. I'll reply as soon as I can.
 
 ## Known unknowns
 
