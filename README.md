@@ -67,6 +67,12 @@ roam.pub adds a dated entry under **Changelog** for everything that happens to t
 made public or unlisted, listed on Discover, added to or removed from a collection, access changes, unpublished.
 That includes changes made on the website.
 
+While Roam is open, the extension checks every few minutes that your published pages' Changelog blocks still exist
+and tells roam.pub (page and block uids only). Roam writes to the daily note when an Append API target is missing, so
+roam.pub only writes to blocks seen in the last few minutes. If you delete a Changelog block, roam.pub stops logging
+for that page and your dashboard lists it: publish the page again to add the blocks back (logging continues from
+then on), or ignore it.
+
 **Check change log** (in the extension settings or the command palette) asks roam.pub whether it can still write the
 change log and when Roam last accepted an entry. It writes nothing. If Roam stops accepting the token (revoked or
 replaced), the extension tells you once per session, with a link to the graph's settings.
@@ -86,8 +92,10 @@ is also published. Nothing else from your graph is sent.
 
 What the extension reads, sends, and stores:
 
-- **Only on your action.** Nothing leaves Roam until you choose to publish a page or block. There is no background
-  upload of your graph.
+- **Only on your action.** Nothing from your notes leaves Roam until you choose to publish a page or block. There is
+  no background upload of your graph. The one background request: while Roam is open, every few minutes, the
+  extension tells roam.pub which of your published pages' Changelog blocks still exist (their uids only, no text),
+  so the change log is never written to a block you deleted. Turning off **Add shortlink block** stops it.
 - **What is sent:** the published page or block, its children, and the page title, as text (`uid`, `string`,
   heading level, nesting, numbered/document view, text alignment). Block references (`((uid))`) are resolved to
   their text, up to 3 levels deep, so referenced blocks outside the published tree are included as inline text.

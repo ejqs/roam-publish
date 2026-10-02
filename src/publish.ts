@@ -1,6 +1,7 @@
 import { api, ApiError } from "./api";
 import { hashPayload, isShortlinkText, serialize } from "./serialize";
 import {
+  getApiKey,
   getAuthor,
   getServer,
   getCache,
@@ -44,6 +45,55 @@ function warnIfBroken(changeLog: ChangeLog | undefined) {
   if (changeLog?.status !== "invalid" || warnedThisSession) return;
   warnedThisSession = true;
   toast(BROKEN, { intent: "danger", link: changeLogSettings(), durationMs: 15000 });
+}
+
+let missingWarned = false;
+let changeLogOff = false;
+
+/**
+ * Tells roam.pub which of this graph's Changelog blocks still exist. Roam's Append API writes to the
+ * daily note when its target is gone, so roam.pub only writes to blocks confirmed in the last few
+ * minutes; this runs every few minutes while Roam is open. Sends only page and block uids.
+ */
+export async function confirmChangeLogBlocks() {
+  if (changeLogOff || !getApiKey() || !getShortlinkEnabled()) return;
+  const cache = await ensureCache();
+  const anchors = Object.entries(cache)
+    .filter(([, c]) => c.anchorUid)
+    .map(([rootUid, c]) => ({ rootUid, anchorUid: c.anchorUid! }));
+  if (anchors.length === 0) return;
+  const present: typeof anchors = [];
+  const missing: typeof anchors = [];
+  for (const a of anchors) {
+    const b = await window.roamAlphaAPI.data.async.pull("[:block/uid]", `[:block/uid "${a.anchorUid}"]`);
+    (b?.[":block/uid"] ? present : missing).push(a);
+  }
+  let res: { changeLog: ChangeLog };
+  try {
+    res = await api<{ changeLog: ChangeLog }>("/api/ext/changelog/confirm", {
+      method: "POST",
+      body: JSON.stringify({ present, missing }),
+    });
+  } catch (e) {
+    // Servers without confirmations: nothing to do this session. Anything else: try again next time.
+    if (e instanceof ApiError && e.status === 404) changeLogOff = true;
+    return;
+  }
+  // No stored token: nothing is written, so there's nothing to confirm this session.
+  if (res.changeLog.status === "none") changeLogOff = true;
+  if (missing.length) {
+    const next = { ...getCache() };
+    for (const m of missing) if (next[m.rootUid]) next[m.rootUid] = { ...next[m.rootUid], anchorUid: null };
+    await setCache(next);
+    if (!missingWarned) {
+      missingWarned = true;
+      toast(
+        `${missing.length === 1 ? "A published page's" : `${missing.length} published pages'`} Changelog block was deleted, so roam.pub stopped logging changes there. Publish the page again to add it back, or ignore it on your dashboard.`,
+        { intent: "danger", link: `${getServer()}/dashboard#change-log-issues`, durationMs: 15000 },
+      );
+    }
+  }
+  warnIfBroken(res.changeLog);
 }
 
 /** Asks the server whether the change log works. Writes nothing to the graph. */
