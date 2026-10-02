@@ -1,10 +1,14 @@
 // Tiny self-contained toast so we don't depend on Roam internals.
 let container: HTMLDivElement | null = null;
 
+type ToastAction = { label: string; onClick: () => void };
+
 type ToastOptions = {
   intent?: "success" | "danger" | "none";
   link?: string;
-  action?: { label: string; onClick: () => void };
+  action?: ToastAction;
+  /** Several buttons in a row; `action` is the one-button shorthand. */
+  actions?: ToastAction[];
   durationMs?: number;
 };
 
@@ -35,24 +39,29 @@ export function toast(message: string, opts: ToastOptions = {}) {
     Object.assign(a.style, { color: "#fff", fontWeight: "600", marginLeft: "6px" });
     el.appendChild(a);
   }
-  if (opts.action) {
-    const { label, onClick } = opts.action;
-    const b = document.createElement("button");
-    b.type = "button";
-    b.textContent = label;
-    Object.assign(b.style, {
-      display: "block", marginTop: "8px", padding: "4px 10px", cursor: "pointer",
-      background: "rgba(255,255,255,.15)", color: "#fff", fontSize: "13px", fontWeight: "600",
-      border: "1px solid rgba(255,255,255,.4)", borderRadius: "2px",
-    });
-    b.addEventListener("click", () => {
-      el.remove();
-      onClick();
-    });
-    el.appendChild(b);
+  const actions = [...(opts.action ? [opts.action] : []), ...(opts.actions ?? [])];
+  if (actions.length) {
+    const row = document.createElement("div");
+    Object.assign(row.style, { display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "8px" });
+    for (const { label, onClick } of actions) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = label;
+      Object.assign(b.style, {
+        padding: "4px 10px", cursor: "pointer",
+        background: "rgba(255,255,255,.15)", color: "#fff", fontSize: "13px", fontWeight: "600",
+        border: "1px solid rgba(255,255,255,.4)", borderRadius: "2px",
+      });
+      b.addEventListener("click", () => {
+        el.remove();
+        onClick();
+      });
+      row.appendChild(b);
+    }
+    el.appendChild(row);
   }
   container.appendChild(el);
-  setTimeout(() => el.remove(), opts.durationMs ?? (opts.action ? 12000 : opts.link ? 8000 : 4000));
+  setTimeout(() => el.remove(), opts.durationMs ?? (actions.length ? 12000 : opts.link ? 8000 : 4000));
 }
 
 export function removeToasts() {

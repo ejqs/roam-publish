@@ -1,5 +1,5 @@
 import { getApiKey, getServer } from "./state";
-import { checkChangeLog, syncPublications } from "./publish";
+import { openChangeLogSettings, syncPublications } from "./publish";
 import { toast } from "./toast";
 
 export function createSettingsPanel(extensionAPI: ExtensionAPI) {
@@ -34,35 +34,43 @@ export function createSettingsPanel(extensionAPI: ExtensionAPI) {
       },
       {
         id: "shortlink-enabled",
-        name: "Add shortlink block",
+        name: "Add Roam Publish block",
         description:
-          "After publishing, add a block with your tag, the page's permanent roam.pub/p/… link. It's never published. When your graph has a change log on the website (an append-only token in its settings), a Changelog block goes under it too, where roam.pub adds an entry for every change.",
+          "After publishing a page, add a block with your tag and its status link (roam.pub/p/…). The status link is for you and your graph's members: it shows where the page is published. To share the page, use its graph or collection link. When the graph has a change log on the website, roam.pub adds an entry under the status link for every change. Never published.",
         action: { type: "switch" },
       },
       {
         id: "shortlink-blocks",
-        name: "Shortlink block on published blocks",
-        description: "Off: only published pages get a shortlink block and change log. On: published blocks get one too, under the block.",
+        name: "Roam Publish block on published blocks",
+        description: "Off: only published pages get a Roam Publish block and change log. On: published blocks get one too, under the block.",
         action: { type: "switch" },
       },
       {
         id: "shortlink-tag",
-        name: "Shortlink tag",
-        description: "Written after the link, e.g. #published or [[Roam Publish]]. Leave blank for none.",
-        action: { type: "input", placeholder: "#published" },
+        name: "Roam Publish block tag",
+        description:
+          "The Roam Publish block's text, with the status link under it. Default [[Roam Publish]]. Leave blank for none. A change applies to existing blocks the next time you publish them.",
+        action: { type: "input", placeholder: "[[Roam Publish]]" },
+      },
+      {
+        id: "shortlink-text",
+        name: "Status link text",
+        description:
+          "Shown for the status link, written as [text](roam.pub/p/…). Default Roam Publish Status. Leave blank for the bare link. A change applies to existing blocks the next time you publish them.",
+        action: { type: "input", placeholder: "Roam Publish Status" },
       },
       {
         id: "shortlink-position",
-        name: "Shortlink position",
-        description: "Where the shortlink block goes: first or last on the page (or under the block).",
+        name: "Roam Publish block position",
+        description: "Where the Roam Publish block goes: first or last on the page (or under the block).",
         action: { type: "select", items: ["top", "bottom"] },
       },
       {
-        id: "check-change-log",
-        name: "Check change log",
+        id: "change-log",
+        name: "Change log",
         description:
-          "Asks roam.pub whether it can still add change log entries under your shortlink blocks, and when Roam last accepted one. Writes nothing.",
-        action: { type: "button", content: "Check", onClick: () => void checkChangeLog() },
+          "Opens this graph's change log settings on roam.pub: whether it's on and working, its append-only token, and turning it on or off.",
+        action: { type: "button", content: "Open settings", onClick: openChangeLogSettings },
       },
       {
         id: "sync",

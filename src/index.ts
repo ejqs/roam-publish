@@ -1,33 +1,25 @@
-import {
-  checkChangeLog,
-  confirmChangeLogBlocks,
-  isPublished,
-  publish,
-  setVisibility,
-  syncPublications,
-  unpublish,
-  visibilityOf,
-} from "./publish";
+import { confirmChangeLogBlocks, publish, publishStatus, unpublish } from "./publish";
 import { createSettingsPanel } from "./settings";
 import { initState } from "./state";
 import { removeToasts, toast } from "./toast";
 
-const BLOCK_PUBLISH = "Roam Publish: Publish block";
-const BLOCK_UNPUBLISH = "Roam Publish: Unpublish block";
-const PAGE_PUBLISH = "Roam Publish: Publish page";
-const PAGE_UNPUBLISH = "Roam Publish: Unpublish page";
-const BLOCK_MAKE_PUBLIC = "Roam Publish: Make block public";
-const BLOCK_MAKE_UNLISTED = "Roam Publish: Make block unlisted";
-const PAGE_MAKE_PUBLIC = "Roam Publish: Make page public";
-const PAGE_MAKE_UNLISTED = "Roam Publish: Make page unlisted";
-const CMD_PUBLISH_CURRENT = "Roam Publish: Publish current page";
-const CMD_SYNC = "Roam Publish: Sync published list";
-const CMD_CHECK_CHANGELOG = "Roam Publish: Check change log";
+const BLOCK_MENU = "Roam Publish: Block…";
+const PAGE_MENU = "Roam Publish: Page…";
+
+/** Command palette: the current page, or the block being edited. */
+const PALETTE: { label: string; target: "page" | "block"; run: (uid: string) => Promise<void> }[] = [
+  { label: "Roam Publish: Publish current page", target: "page", run: publish },
+  { label: "Roam Publish: Unpublish current page", target: "page", run: unpublish },
+  { label: "Roam Publish: Current page status", target: "page", run: publishStatus },
+  { label: "Roam Publish: Publish focused block", target: "block", run: publish },
+  { label: "Roam Publish: Unpublish focused block", target: "block", run: unpublish },
+  { label: "Roam Publish: Focused block status", target: "block", run: publishStatus },
+];
 
 let extensionAPI: ExtensionAPI;
 let confirmTimers: ReturnType<typeof setTimeout>[] = [];
 
-/** Changelog blocks are confirmed shortly after load, then every few minutes while Roam is open. */
+/** The blocks the change log goes under are confirmed shortly after load, then every few minutes while Roam is open. */
 const CONFIRM_EVERY_MS = 5 * 60_000;
 const confirm = () => void confirmChangeLogBlocks().catch(() => {});
 
@@ -46,6 +38,20 @@ async function pageUidFromContext(ctx: Record<string, unknown>): Promise<string 
   );
 }
 
+/** The open page, also when zoomed into one of its blocks. */
+async function currentPageUid() {
+  const uid = await window.roamAlphaAPI.ui.mainWindow.getOpenPageOrBlockUid();
+  if (!uid) return null;
+  const b = await window.roamAlphaAPI.data.async.pull("[:node/title {:block/page [:block/uid]}]", `[:block/uid "${uid}"]`);
+  return b?.[":block/page"]?.[":block/uid"] ?? uid;
+}
+
+async function withTarget(target: "page" | "block", fn: (uid: string) => Promise<void>) {
+  const uid = target === "page" ? await currentPageUid() : window.roamAlphaAPI.ui.getFocusedBlock()?.["block-uid"];
+  if (uid) await fn(uid);
+  else toast(target === "page" ? "Open a page first." : "Click into a block first, then run the command.");
+}
+
 async function withPageUid(ctx: Record<string, unknown>, fn: (uid: string) => Promise<void>) {
   const uid = await pageUidFromContext(ctx);
   if (uid) await fn(uid);
@@ -58,63 +64,19 @@ async function onload({ extensionAPI: api }: { extensionAPI: ExtensionAPI }) {
   createSettingsPanel(api);
 
   const { ui } = window.roamAlphaAPI;
-  ui.blockContextMenu.addCommand({ label: BLOCK_PUBLISH, callback: (c) => void publish(c["block-uid"]) });
-  ui.blockContextMenu.addCommand({
-    label: BLOCK_UNPUBLISH,
-    callback: (c) => void unpublish(c["block-uid"]),
-    "display-conditional": (c) => isPublished(c["block-uid"]),
-  });
-  // Items cached before visibility existed have none; they were unlisted by default.
-  ui.blockContextMenu.addCommand({
-    label: BLOCK_MAKE_PUBLIC,
-    callback: (c) => void setVisibility(c["block-uid"], "public"),
-    "display-conditional": (c) => isPublished(c["block-uid"]) && visibilityOf(c["block-uid"]) !== "public",
-  });
-  ui.blockContextMenu.addCommand({
-    label: BLOCK_MAKE_UNLISTED,
-    callback: (c) => void setVisibility(c["block-uid"], "unlisted"),
-    "display-conditional": (c) => visibilityOf(c["block-uid"]) === "public",
-  });
-  ui.pageContextMenu.addCommand({ label: PAGE_PUBLISH, callback: (c) => void withPageUid(c, publish) });
-  ui.pageContextMenu.addCommand({ label: PAGE_UNPUBLISH, callback: (c) => void withPageUid(c, unpublish) });
-  ui.pageContextMenu.addCommand({
-    label: PAGE_MAKE_PUBLIC,
-    callback: (c) => void withPageUid(c, (uid) => setVisibility(uid, "public")),
-  });
-  ui.pageContextMenu.addCommand({
-    label: PAGE_MAKE_UNLISTED,
-    callback: (c) => void withPageUid(c, (uid) => setVisibility(uid, "unlisted")),
-  });
+  // One entry per menu: it shows the status and offers what can be done from there.
+  ui.blockContextMenu.addCommand({ label: BLOCK_MENU, callback: (c) => void publishStatus(c["block-uid"]) });
+  ui.pageContextMenu.addCommand({ label: PAGE_MENU, callback: (c) => void withPageUid(c, publishStatus) });
 
-  api.ui.commandPalette.addCommand({
-    label: CMD_PUBLISH_CURRENT,
-    callback: async () => {
-      const uid = await ui.mainWindow.getOpenPageOrBlockUid();
-      if (uid) await publish(uid);
-      else toast("Open a page first.");
-    },
-  });
-  api.ui.commandPalette.addCommand({
-    label: CMD_SYNC,
-    callback: () => void syncPublications().catch((e: Error) => toast(e.message, { intent: "danger" })),
-  });
-  api.ui.commandPalette.addCommand({ label: CMD_CHECK_CHANGELOG, callback: () => void checkChangeLog() });
+  for (const c of PALETTE) api.ui.commandPalette.addCommand({ label: c.label, callback: () => void withTarget(c.target, c.run) });
   confirmTimers = [setTimeout(confirm, 20_000), setInterval(confirm, CONFIRM_EVERY_MS)];
 }
 
 function onunload() {
   const { ui } = window.roamAlphaAPI;
-  ui.blockContextMenu.removeCommand({ label: BLOCK_PUBLISH });
-  ui.blockContextMenu.removeCommand({ label: BLOCK_UNPUBLISH });
-  ui.pageContextMenu.removeCommand({ label: PAGE_PUBLISH });
-  ui.pageContextMenu.removeCommand({ label: PAGE_UNPUBLISH });
-  ui.blockContextMenu.removeCommand({ label: BLOCK_MAKE_PUBLIC });
-  ui.blockContextMenu.removeCommand({ label: BLOCK_MAKE_UNLISTED });
-  ui.pageContextMenu.removeCommand({ label: PAGE_MAKE_PUBLIC });
-  ui.pageContextMenu.removeCommand({ label: PAGE_MAKE_UNLISTED });
-  extensionAPI?.ui.commandPalette.removeCommand({ label: CMD_PUBLISH_CURRENT });
-  extensionAPI?.ui.commandPalette.removeCommand({ label: CMD_SYNC });
-  extensionAPI?.ui.commandPalette.removeCommand({ label: CMD_CHECK_CHANGELOG });
+  ui.blockContextMenu.removeCommand({ label: BLOCK_MENU });
+  ui.pageContextMenu.removeCommand({ label: PAGE_MENU });
+  for (const c of PALETTE) extensionAPI?.ui.commandPalette.removeCommand({ label: c.label });
   confirmTimers.forEach((t) => clearTimeout(t));
   confirmTimers = [];
   removeToasts();
