@@ -18,8 +18,10 @@ changes across both), see [roam-publish-docs](https://github.com/ejqs/roam-publi
    > [!WARNING]
    > Creating and verifying a Roam graph may permanently leave a page in your graph that cannot be deleted: the
    > `[[API Token: …]]` page Roam creates for the API token. This is not the fault of roam.pub, but a consequence of
-   > how display names are treated in Roam Research. If you believe this issue has been resolved, please contact
-   > ejqs [at] ejqs [dot] net.
+   > how display names are treated in Roam Research.
+   >
+   > There was a way I was able to delete an old API Token page, but I wasn't able to reproduce it. If you know how
+   > to remove it reliably, please let me know at ejqs [at] ejqs [dot] net.
 
 3. Click **Get API key** on the website (or in Roam: Settings → Roam Publish → Get API key), copy the key, and paste
    it into **Settings → Roam Publish → API key**.
@@ -47,19 +49,27 @@ are all managed on the website. In a shared graph, members can only change the p
 
 ## Shortlinks and the change log
 
-After publishing, the extension adds one block to the page (or under the block) with its permanent link:
+After publishing, the extension adds a block to the page (or under the block) with its permanent link:
 
 ```
-https://roam.pub/p/k3Xq9aZt #published
+#published
+  https://roam.pub/p/k3Xq9aZt
+  Changelog
+    [[October 2nd, 2026]] 14:03 Published as unlisted: https://roam.pub/…
 ```
 
 The link never changes, wherever the page ends up (its graph, collections, after a rename). Opening it shows you and
-your graph's members where the page lives, with links to copy; everyone else goes straight to the page.
+your graph's members where the page lives, with links to copy; everyone else goes to the first place they can read
+it. For sharing, prefer the graph or collection links.
 
 With an append-only token stored for the graph (from verification, or in the graph's settings on the website),
-roam.pub adds a dated entry under that block for everything that happens to the page: published, republished,
+roam.pub adds a dated entry under **Changelog** for everything that happens to the page: published, republished,
 made public or unlisted, listed on Discover, added to or removed from a collection, access changes, unpublished.
 That includes changes made on the website.
+
+**Check change log** (in the extension settings or the command palette) asks roam.pub whether it can still write the
+change log and when Roam last accepted an entry. It writes nothing. If Roam stops accepting the token (revoked or
+replaced), the extension tells you once per session, with a link to the graph's settings.
 
 The shortlink block and everything under it are **never published** and don't count as changes.
 

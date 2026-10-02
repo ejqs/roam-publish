@@ -1,7 +1,8 @@
 import { api, ApiError } from "./api";
-import { hashPayload, isShortlinkBlock, serialize } from "./serialize";
+import { hashPayload, isShortlinkText, serialize } from "./serialize";
 import {
   getAuthor,
+  getServer,
   getCache,
   getShortlinkEnabled,
   getShortlinkPosition,
@@ -27,9 +28,50 @@ type Remote = {
 
 let syncedThisSession = false;
 
+/** Whether roam.pub can write this graph's change log (from servers that have one). */
+type ChangeLog = { status: "ok" | "invalid" | "none"; lastOkAt: string | null };
+let warnedThisSession = false;
+
+const changeLogSettings = (graphName = window.roamAlphaAPI.graph.name) =>
+  `${getServer()}/dashboard/${encodeURIComponent(graphName)}/settings#change-log`;
+
+const BROKEN =
+  "Roam rejected the append-only token roam.pub stores for this graph, so the change log under your shortlink blocks stopped. The graph's owner can add a new token in its settings on roam.pub.";
+
+/** Tells the user, once per session, that the change log stopped working. */
+function warnIfBroken(changeLog: ChangeLog | undefined) {
+  if (changeLog?.status !== "invalid" || warnedThisSession) return;
+  warnedThisSession = true;
+  toast(BROKEN, { intent: "danger", link: changeLogSettings(), durationMs: 15000 });
+}
+
+/** Asks the server whether the change log works. Writes nothing to the graph. */
+export async function checkChangeLog() {
+  try {
+    const { changeLog, graphName } = await api<{ changeLog: ChangeLog; graphName: string }>("/api/ext/changelog");
+    const link = changeLogSettings(graphName);
+    if (changeLog.status === "ok")
+      return toast(
+        changeLog.lastOkAt
+          ? `Change log is working. Roam last accepted an entry on ${new Date(changeLog.lastOkAt).toLocaleString()}.`
+          : "Change log is on. Roam hasn't been sent an entry yet.",
+        { intent: "success" },
+      );
+    if (changeLog.status === "invalid") return toast(BROKEN, { intent: "danger", link });
+    toast("No append-only token is stored for this graph, so there's no change log. Add one in the graph's settings on roam.pub.", { link });
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404)
+      return toast("This Roam Publish server doesn't have a change log yet.", { intent: "danger" });
+    report(e);
+  }
+}
+
 /** Re-download the list of published items from the server into the cache. */
 export async function syncPublications(opts: { quiet?: boolean } = {}) {
-  const { publications } = await api<{ publications: Remote[] }>("/api/ext/publications");
+  const { publications, changeLog } = await api<{ publications: Remote[]; changeLog?: ChangeLog }>(
+    "/api/ext/publications",
+  );
+  warnIfBroken(changeLog);
   const cache: PublicationCache = {};
   for (const p of publications) {
     cache[p.rootUid] = {
@@ -56,10 +98,17 @@ function report(e: unknown) {
 
 const shortIdOf = (shortUrl: string | null | undefined) => shortUrl?.split("/p/")[1];
 
+const CHANGELOG = "Changelog";
+
 /**
- * The page's permanent link, and the shortlink block in Roam that the server's change log nests
- * under: "{shortUrl} {tag}", first or last under the root. Written before publishing so the server
- * learns its uid with the publish. Null when it's turned off or the server has no shortlinks.
+ * The page's permanent link, written in Roam first or last under the root as
+ *
+ *   {tag}
+ *     {shortUrl}
+ *     Changelog        ← the server appends its change log entries here
+ *
+ * Written before publishing so the server learns the Changelog block's uid with the publish. Null
+ * when it's turned off or the server has no shortlinks.
  */
 async function ensureShortlinkBlock(rootUid: string, cached: CachedPublication | undefined) {
   if (!getShortlinkEnabled()) return null;
@@ -77,24 +126,34 @@ async function ensureShortlinkBlock(rootUid: string, cached: CachedPublication |
     }
   }
   const ids = new Set([shortIdOf(shortUrl)!]);
-  const text = `${shortUrl} ${getShortlinkTag()}`.trim();
+  const tag = getShortlinkTag();
+  const { block } = window.roamAlphaAPI.data;
   try {
     const root = await window.roamAlphaAPI.data.async.pull(
-      "[{:block/children [:block/uid :block/string]}]",
+      "[{:block/children [:block/uid :block/string {:block/children [:block/uid :block/string]}]}]",
       `[:block/uid "${rootUid}"]`,
     );
-    const existing = root?.[":block/children"]?.find((c) => isShortlinkBlock(c[":block/string"], ids));
-    if (existing?.[":block/uid"]) {
+    const parent = root?.[":block/children"]?.find((c) =>
+      c[":block/children"]?.some((k) => isShortlinkText(k[":block/string"], ids)),
+    );
+    if (parent?.[":block/uid"]) {
+      const parentUid = parent[":block/uid"];
       // A changed tag is applied in place, so the change log under it stays where it is.
-      if (existing[":block/string"] !== text)
-        await window.roamAlphaAPI.data.block.update({ block: { uid: existing[":block/uid"], string: text } });
-      return { shortUrl, anchorUid: existing[":block/uid"] };
+      if ((parent[":block/string"] ?? "") !== tag) await block.update({ block: { uid: parentUid, string: tag } });
+      const log = parent[":block/children"]?.find((k) => k[":block/string"] === CHANGELOG)?.[":block/uid"];
+      if (log) return { shortUrl, anchorUid: log };
+      const anchorUid = window.roamAlphaAPI.util.generateUID();
+      await block.create({ location: { "parent-uid": parentUid, order: "last" }, block: { uid: anchorUid, string: CHANGELOG } });
+      return { shortUrl, anchorUid };
     }
+    const parentUid = window.roamAlphaAPI.util.generateUID();
     const anchorUid = window.roamAlphaAPI.util.generateUID();
-    await window.roamAlphaAPI.data.block.create({
+    await block.create({
       location: { "parent-uid": rootUid, order: getShortlinkPosition() === "top" ? 0 : "last" },
-      block: { uid: anchorUid, string: text },
+      block: { uid: parentUid, string: tag },
     });
+    await block.create({ location: { "parent-uid": parentUid, order: 0 }, block: { string: shortUrl } });
+    await block.create({ location: { "parent-uid": parentUid, order: 1 }, block: { uid: anchorUid, string: CHANGELOG } });
     return { shortUrl, anchorUid };
   } catch {
     toast("Couldn't add the shortlink block. Publishing anyway.", { intent: "none" });
@@ -130,6 +189,7 @@ export async function publish(uid: string) {
       shortUrl?: string;
       contentHash: string;
       visibility: Visibility;
+      changeLog?: ChangeLog;
     }>(
       "/api/ext/publications",
       {
@@ -170,6 +230,7 @@ export async function publish(uid: string) {
         ? { label: "Make public", onClick: () => void setVisibility(uid, "public") }
         : undefined,
     });
+    warnIfBroken(res.changeLog);
   } catch (e) {
     report(e);
   }
