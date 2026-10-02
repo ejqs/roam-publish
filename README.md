@@ -97,6 +97,7 @@ check references, embeds and children first. Nothing else from your graph is sen
 | **Roam Publish block tag** | The block's text. Default `[[Roam Publish]]` (graphs set up before this keep `#published`). Blank for none. |
 | **Status link text** | Shown for the link, as `[text](link)`. Default `Roam Publish Status`. Blank for the bare link. |
 | **Roam Publish block position** | `top` or `bottom` of the page. |
+| **Reset Roam Publish block settings** | Puts the settings above back to their defaults. Roam keeps an extension's settings after you uninstall it, so reinstalling doesn't. |
 | **Change log** | Opens the graph's change log settings on the website: whether it's on and working, its token, and turning it on or off. |
 | **Dashboard** | Opens the roam.pub dashboard. |
 | **Sync published list** | Re-downloads the list of what you've published from the server. |

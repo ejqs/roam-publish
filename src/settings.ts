@@ -1,4 +1,4 @@
-import { getApiKey, getServer } from "./state";
+import { getApiKey, getServer, resetShortlinkSettings } from "./state";
 import { openChangeLogSettings, syncPublications } from "./publish";
 import { toast } from "./toast";
 
@@ -64,6 +64,20 @@ export function createSettingsPanel(extensionAPI: ExtensionAPI) {
         name: "Roam Publish block position",
         description: "Where the Roam Publish block goes: first or last on the page (or under the block).",
         action: { type: "select", items: ["top", "bottom"] },
+      },
+      {
+        id: "shortlink-reset",
+        name: "Reset Roam Publish block settings",
+        description:
+          "Puts the five settings above back to their defaults. Roam keeps settings after you uninstall, so reinstalling doesn't reset them. Existing blocks change the next time you publish them.",
+        action: {
+          type: "button",
+          content: "Reset",
+          onClick: () =>
+            void resetShortlinkSettings()
+              .then(() => toast("Defaults restored. Close and reopen settings to see them."))
+              .catch((e: Error) => toast(e.message, { intent: "danger" })),
+        },
       },
       {
         id: "change-log",

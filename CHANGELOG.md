@@ -30,6 +30,8 @@ All notable changes to the Roam Publish extension. Dates are when the change lan
 - **Add Roam Publish block** is now **Add Roam Publish block when publishing pages**, and **Roam Publish block on
   published blocks** is now **Add Roam Publish block when publishing blocks**. The two are independent: turning off
   the pages one no longer turns it off for blocks too.
+- **Reset Roam Publish block settings** puts the Roam Publish block settings back to their defaults. Roam keeps an
+  extension's settings after it's uninstalled, so reinstalling brings back the old values.
 - **Change log → Open settings** (replaces **Check change log**) opens the graph's change log settings on the
   website, where its owner can see whether it works, manage the token, and turn it off (the token is kept, nothing is
   logged meanwhile) or back on.

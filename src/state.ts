@@ -35,6 +35,20 @@ export function initState(extensionAPI: ExtensionAPI) {
   if (api.settings.get("shortlink-blocks") === undefined) void api.settings.set("shortlink-blocks", false);
 }
 
+/**
+ * Roam keeps an extension's settings in the graph after it's uninstalled, so reinstalling brings
+ * back the old values rather than the defaults. This puts the Roam Publish block settings back.
+ */
+export async function resetShortlinkSettings() {
+  await Promise.all([
+    api.settings.set("shortlink-enabled", true),
+    api.settings.set("shortlink-blocks", false),
+    api.settings.set("shortlink-tag", DEFAULT_SHORTLINK_TAG),
+    api.settings.set("shortlink-text", DEFAULT_SHORTLINK_TEXT),
+    api.settings.set("shortlink-position", "top"),
+  ]);
+}
+
 export const getServer = () =>
   ((api.settings.get("server-url") as string) || __DEFAULT_SERVER__).replace(/\/+$/, "");
 export const getApiKey = () => ((api.settings.get("api-key") as string) || "").trim();
