@@ -1,6 +1,6 @@
 import { api, ApiError } from "./api";
 import { hashPayload, serialize } from "./serialize";
-import { getCache, setCache, type PublicationCache, type Visibility } from "./state";
+import { getAuthor, getCache, setCache, type PublicationCache, type Visibility } from "./state";
 import { toast } from "./toast";
 
 type Remote = {
@@ -48,8 +48,10 @@ export async function publish(uid: string) {
     const hash = await hashPayload(payload);
     const cache = await ensureCache();
     const label = payload.kind === "page" ? "Page" : "Block";
+    // Not part of the hash: changing only the author name still republishes.
+    const author = getAuthor();
 
-    if (cache[uid]?.hash === hash) {
+    if (cache[uid]?.hash === hash && (cache[uid].author ?? "") === author) {
       return toast(`${label} is already published with no changes.`, { link: cache[uid].url });
     }
 
@@ -60,13 +62,13 @@ export async function publish(uid: string) {
       visibility: Visibility;
     }>(
       "/api/ext/publications",
-      { method: "POST", body: JSON.stringify({ ...payload, contentHash: hash }) },
+      { method: "POST", body: JSON.stringify({ ...payload, contentHash: hash, author }) },
     );
     await setCache({
       ...getCache(),
       [uid]: {
         hash: res.contentHash, url: res.url, title: payload.title, kind: payload.kind,
-        visibility: res.visibility, updatedAt: new Date().toISOString(),
+        visibility: res.visibility, updatedAt: new Date().toISOString(), author,
       },
     });
     await navigator.clipboard?.writeText(res.url).catch(() => {});

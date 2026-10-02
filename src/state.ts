@@ -5,6 +5,8 @@ export type CachedPublication = {
   kind: "page" | "block";
   visibility: Visibility;
   updatedAt: string;
+  /** Author name sent with the last publish; republishing with a new one updates the byline. */
+  author?: string;
 };
 export type Visibility = "public" | "unlisted";
 export type PublicationCache = Record<string, CachedPublication>;
@@ -18,7 +20,7 @@ export function initState(extensionAPI: ExtensionAPI) {
 export const getServer = () =>
   ((api.settings.get("server-url") as string) || __DEFAULT_SERVER__).replace(/\/+$/, "");
 export const getApiKey = () => ((api.settings.get("api-key") as string) || "").trim();
-export const setApiKey = (key: string) => api.settings.set("api-key", key);
+export const getAuthor = () => ((api.settings.get("author-name") as string) || "").trim();
 
 export const getCache = (): PublicationCache =>
   (api.settings.get("publications") as PublicationCache) ?? {};

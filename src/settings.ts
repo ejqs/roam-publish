@@ -1,6 +1,5 @@
 import { getApiKey, getServer } from "./state";
 import { syncPublications } from "./publish";
-import { openLogin, tryClaim } from "./verify";
 import { toast } from "./toast";
 
 export function createSettingsPanel(extensionAPI: ExtensionAPI) {
@@ -8,29 +7,30 @@ export function createSettingsPanel(extensionAPI: ExtensionAPI) {
     tabTitle: "Roam Publish",
     settings: [
       {
-        id: "login",
-        name: "Log in to Roam Publish",
-        description: "Opens the website to sign in and connect this graph. Setup finishes automatically.",
-        action: { type: "button", content: "Log in to Roam Publish", onClick: () => openLogin() },
-      },
-      {
-        id: "finish-setup",
-        name: "Finish setup",
-        description: "Run this if the API key didn't fill in automatically after verifying on the website. Does nothing once setup is complete.",
+        id: "get-key",
+        name: "Get API key",
+        description:
+          "Opens your Roam Publish API keys. Connect this graph there (or accept an invite to it), copy its key, and paste it below.",
         action: {
           type: "button",
-          content: "Finish setup",
+          content: "Get API key",
           onClick: () => {
-            if (getApiKey()) return void toast("Setup is already complete. This graph is connected.");
-            void tryClaim({ manual: true });
+            window.open(`${getServer()}/dashboard/keys`, "_blank", "noopener");
+            if (getApiKey()) toast("This graph already has a key. Regenerating it on the website replaces this one.");
           },
         },
       },
       {
         id: "api-key",
         name: "API key",
-        description: "Filled in automatically after setup. Keep it secret.",
+        description: "Your key for this graph, from the Roam Publish website. Keep it secret.",
         action: { type: "input", placeholder: "rp_…" },
+      },
+      {
+        id: "author-name",
+        name: "Author name",
+        description: "Shown on pages you publish when the graph or collection shows authors. Leave blank to use your @username.",
+        action: { type: "input", placeholder: "Your name" },
       },
       {
         id: "sync",
@@ -45,7 +45,7 @@ export function createSettingsPanel(extensionAPI: ExtensionAPI) {
       {
         id: "dashboard",
         name: "Dashboard",
-        description: "See and manage everything you've published on the Roam Publish website.",
+        description: "Manage access, passwords, collections and members on the Roam Publish website.",
         action: {
           type: "button",
           content: "Open dashboard",
