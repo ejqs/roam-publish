@@ -25,6 +25,15 @@ All notable changes to the Roam Publish extension. Dates are when the change lan
   apply to existing blocks in place on the next publish.
 - Settings and messages say "status link" and "Roam Publish block" instead of "shortlink", and explain that the link is
   for you and your graph's members, not for sharing.
+- The **Roam Publish block tag** and **Status link text** fields no longer show the default in grey when empty, which
+  looked like the default would be used. An empty field shows what it does (no tag, bare link).
+- **Add Roam Publish block** is now **Add Roam Publish block when publishing pages**, and **Roam Publish block on
+  published blocks** is now **Add Roam Publish block when publishing blocks**. The two are independent: turning off
+  the pages one no longer turns it off for blocks too.
+- Settings: **Get API key** is merged into **Dashboard**, which opens at your API keys until you've added one. **Roam
+  Publish block tag** and **position** are now **Block tag** and **Block position**. Shorter descriptions throughout.
+- **Reset Roam Publish block settings** puts the Roam Publish block settings back to their defaults. Roam keeps an
+  extension's settings after it's uninstalled, so reinstalling brings back the old values.
 - **Change log → Open settings** (replaces **Check change log**) opens the graph's change log settings on the
   website, where its owner can see whether it works, manage the token, and turn it off (the token is kept, nothing is
   logged meanwhile) or back on.

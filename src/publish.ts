@@ -78,13 +78,13 @@ let confirmUnsupported = false;
  * minutes; this runs every few minutes while Roam is open. Sends only page and block uids.
  */
 export async function confirmChangeLogBlocks() {
-  if (confirmUnsupported || !getApiKey() || !getShortlinkEnabled()) return;
+  if (confirmUnsupported || !getApiKey() || (!getShortlinkEnabled() && !getShortlinkOnBlocks())) return;
   // Nothing is written without a token or while it's off, so there's nothing to confirm; just keep
   // the settings switch in step with changes made on the website.
   if (changeLogStatus === "none" || changeLogStatus === "paused") return refreshChangeLog();
   const cache = await ensureCache();
   const anchors = Object.entries(cache)
-    .filter(([, c]) => c.anchorUid)
+    .filter(([, c]) => c.anchorUid && (c.kind === "block" ? getShortlinkOnBlocks() : getShortlinkEnabled()))
     .map(([rootUid, c]) => ({ rootUid, anchorUid: c.anchorUid! }));
   if (anchors.length === 0) return;
   const present: typeof anchors = [];
@@ -180,12 +180,10 @@ const linkText = (shortUrl: string) => {
  * off or the server has no shortlinks.
  */
 async function ensureShortlinkBlock(rootUid: string, cached: CachedPublication | undefined) {
-  if (!getShortlinkEnabled()) return null;
-  if (!getShortlinkOnBlocks()) {
-    // Pages only, unless turned on for blocks too.
-    const root = await window.roamAlphaAPI.data.async.pull("[:node/title]", `[:block/uid "${rootUid}"]`);
-    if (typeof root?.[":node/title"] !== "string") return null;
-  }
+  // Pages and blocks each have their own setting.
+  const root = await window.roamAlphaAPI.data.async.pull("[:node/title]", `[:block/uid "${rootUid}"]`);
+  const isPage = typeof root?.[":node/title"] === "string";
+  if (!(isPage ? getShortlinkEnabled() : getShortlinkOnBlocks())) return null;
   let shortUrl = cached?.shortUrl;
   if (!shortUrl) {
     try {
