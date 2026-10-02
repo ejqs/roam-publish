@@ -34,15 +34,15 @@ export function createSettingsPanel(extensionAPI: ExtensionAPI) {
       },
       {
         id: "shortlink-enabled",
-        name: "Add Roam Publish block",
+        name: "Add Roam Publish block when publishing pages",
         description:
           "After publishing a page, add a block with your tag and its status link (roam.pub/p/…). The status link is for you and your graph's members: it shows where the page is published. To share the page, use its graph or collection link. When the graph has a change log on the website, roam.pub adds an entry under the status link for every change. Never published.",
         action: { type: "switch" },
       },
       {
         id: "shortlink-blocks",
-        name: "Roam Publish block on published blocks",
-        description: "Off: only published pages get a Roam Publish block and change log. On: published blocks get one too, under the block.",
+        name: "Add Roam Publish block when publishing blocks",
+        description: "After publishing a block, add a Roam Publish block under it, with its status link and change log, like for pages.",
         action: { type: "switch" },
       },
       {

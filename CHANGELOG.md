@@ -27,6 +27,9 @@ All notable changes to the Roam Publish extension. Dates are when the change lan
   for you and your graph's members, not for sharing.
 - The **Roam Publish block tag** and **Status link text** fields no longer show the default in grey when empty, which
   looked like the default would be used. An empty field shows what it does (no tag, bare link).
+- **Add Roam Publish block** is now **Add Roam Publish block when publishing pages**, and **Roam Publish block on
+  published blocks** is now **Add Roam Publish block when publishing blocks**. The two are independent: turning off
+  the pages one no longer turns it off for blocks too.
 - **Change log → Open settings** (replaces **Check change log**) opens the graph's change log settings on the
   website, where its owner can see whether it works, manage the token, and turn it off (the token is kept, nothing is
   logged meanwhile) or back on.

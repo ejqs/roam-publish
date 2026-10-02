@@ -92,8 +92,8 @@ check references, embeds and children first. Nothing else from your graph is sen
 | --- | --- |
 | **API key** | Your key for this graph (see Setup). |
 | **Author name** | Shown on pages when the graph or collection shows authors. Blank uses your @username. |
-| **Add Roam Publish block** | On by default. Off: nothing is written into your pages in Roam. roam.pub still keeps each page's status link and history on the website. |
-| **Roam Publish block on published blocks** | Off by default, so only pages get one. Turn on to add one under published blocks too. |
+| **Add Roam Publish block when publishing pages** | On by default. Off: nothing is written into your pages in Roam. roam.pub still keeps each page's status link and history on the website. |
+| **Add Roam Publish block when publishing blocks** | Off by default. On: published blocks get one too, under the block. Works on its own, whatever the pages setting is. |
 | **Roam Publish block tag** | The block's text. Default `[[Roam Publish]]` (graphs set up before this keep `#published`). Blank for none. |
 | **Status link text** | Shown for the link, as `[text](link)`. Default `Roam Publish Status`. Blank for the bare link. |
 | **Roam Publish block position** | `top` or `bottom` of the page. |
@@ -109,7 +109,7 @@ Changing the tag or the link text edits existing blocks in place the next time y
 - **Only on your action:** nothing leaves Roam until you publish a page or block. No analytics, and the only server
   contacted is roam.pub (or your configured Server URL).
 - **One background request:** while Roam is open, about every 5 minutes, the extension tells roam.pub which status link
-  blocks still exist (uids only, no text). Turning off **Add Roam Publish block** stops it. See
+  blocks still exist (uids only, no text). Turning off **Add Roam Publish block when publishing pages** (and **…blocks**) stops it. See
   [Use of the Append API](#use-of-the-append-api).
 - **Written to your graph:** the Roam Publish block when you publish, and change log entries if you kept an
   append-only token. Nothing else.
