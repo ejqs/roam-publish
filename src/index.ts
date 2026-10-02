@@ -1,5 +1,6 @@
 import {
   checkChangeLog,
+  confirmChangeLogBlocks,
   isPublished,
   publish,
   setVisibility,
@@ -24,6 +25,11 @@ const CMD_SYNC = "Roam Publish: Sync published list";
 const CMD_CHECK_CHANGELOG = "Roam Publish: Check change log";
 
 let extensionAPI: ExtensionAPI;
+let confirmTimers: ReturnType<typeof setTimeout>[] = [];
+
+/** Changelog blocks are confirmed shortly after load, then every few minutes while Roam is open. */
+const CONFIRM_EVERY_MS = 5 * 60_000;
+const confirm = () => void confirmChangeLogBlocks().catch(() => {});
 
 /** The page context menu's context shape is undocumented; accept the likely keys. */
 async function pageUidFromContext(ctx: Record<string, unknown>): Promise<string | null> {
@@ -93,6 +99,7 @@ async function onload({ extensionAPI: api }: { extensionAPI: ExtensionAPI }) {
     callback: () => void syncPublications().catch((e: Error) => toast(e.message, { intent: "danger" })),
   });
   api.ui.commandPalette.addCommand({ label: CMD_CHECK_CHANGELOG, callback: () => void checkChangeLog() });
+  confirmTimers = [setTimeout(confirm, 20_000), setInterval(confirm, CONFIRM_EVERY_MS)];
 }
 
 function onunload() {
@@ -108,6 +115,8 @@ function onunload() {
   extensionAPI?.ui.commandPalette.removeCommand({ label: CMD_PUBLISH_CURRENT });
   extensionAPI?.ui.commandPalette.removeCommand({ label: CMD_SYNC });
   extensionAPI?.ui.commandPalette.removeCommand({ label: CMD_CHECK_CHANGELOG });
+  confirmTimers.forEach((t) => clearTimeout(t));
+  confirmTimers = [];
   removeToasts();
 }
 
