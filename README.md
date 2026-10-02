@@ -34,8 +34,8 @@ publishing after edits updates the live page. To see everything you've published
 Set **Author name** in the extension settings to sign the pages you publish. It shows where the graph or collection
 shows authors; left blank, your public @username is used.
 
-Who can read a page (open, password, members only), collections (`roam.pub/c/…`), members and Discover are all
-managed on the website. In a shared graph, members can only change the pages they published.
+Who can read a page (open, password, members only), collections (`roam.pub/c/…`), members, Discover and RSS feeds
+are all managed on the website. In a shared graph, members can only change the pages they published.
 
 ## What gets published
 
@@ -56,6 +56,9 @@ What the extension reads, sends, and stores:
   PDFs are sent as their URL only; the files are not copied, and files in encrypted graphs won't display.
 - **Everything published is public.** Anyone with the link can read it. Check block references, embeds and
   children before publishing.
+- **Making a page public lists it.** A public page shows on the graph's front page, and, if the graph owner turned
+  on the graph's RSS feed (`roam.pub/{graph}/feed.xml`), its title and the start of its text go out to feed readers,
+  who may keep a copy after you unpublish. Unlisted and password- or members-only pages are never in a feed.
 - **Where it goes:** only to the Roam Publish server (`https://roam.pub`, or the server URL set in settings).
   The extension makes no other network requests and has no analytics.
 - **What is stored locally:** your Roam Publish API key, your Author name and a cache of what you've published, all
