@@ -10,7 +10,7 @@ export async function api<T>(path: string, init: RequestInit & { auth?: boolean 
   const headers: Record<string, string> = { "content-type": "application/json" };
   if (init.auth !== false) {
     const key = getApiKey();
-    if (!key) throw new ApiError(0, "Log in to Roam Publish first (Settings → Roam Publish).");
+    if (!key) throw new ApiError(0, "Add your API key first: Settings → Roam Publish → Get API key.");
     headers["x-api-key"] = key;
   }
   let res: Response;
@@ -25,7 +25,7 @@ export async function api<T>(path: string, init: RequestInit & { auth?: boolean 
     // Moderation errors (suspended account/graph, removed page) carry their own message and reason.
     const msg =
       res.status === 401 && (!error || error === "Invalid API key")
-        ? "Your Roam Publish API key is invalid. Log in again from the extension settings."
+        ? "Your Roam Publish API key is invalid. Get a new one with Get API key in the extension settings."
         : (error ?? `Request failed (${res.status})`) + (reason ? ` Reason: ${reason}` : "");
     throw new ApiError(res.status, msg);
   }

@@ -1,8 +1,7 @@
 import { isPublished, publish, setVisibility, syncPublications, unpublish, visibilityOf } from "./publish";
 import { createSettingsPanel } from "./settings";
-import { getApiKey, initState } from "./state";
+import { initState } from "./state";
 import { removeToasts, toast } from "./toast";
-import { stopPolling, tryClaim } from "./verify";
 
 const BLOCK_PUBLISH = "Roam Publish: Publish block";
 const BLOCK_UNPUBLISH = "Roam Publish: Unpublish block";
@@ -84,9 +83,6 @@ async function onload({ extensionAPI: api }: { extensionAPI: ExtensionAPI }) {
     label: CMD_SYNC,
     callback: () => void syncPublications().catch((e: Error) => toast(e.message, { intent: "danger" })),
   });
-
-  // Not connected yet? A verification block may already be waiting on today's daily note.
-  if (!getApiKey()) void tryClaim().catch(() => {});
 }
 
 function onunload() {
@@ -101,7 +97,6 @@ function onunload() {
   ui.pageContextMenu.removeCommand({ label: PAGE_MAKE_UNLISTED });
   extensionAPI?.ui.commandPalette.removeCommand({ label: CMD_PUBLISH_CURRENT });
   extensionAPI?.ui.commandPalette.removeCommand({ label: CMD_SYNC });
-  stopPolling();
   removeToasts();
 }
 
