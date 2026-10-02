@@ -1,55 +1,67 @@
 # Roam Publish
 
-Publish Roam Research pages and blocks to the web as clean, public pages.
+Publish Roam Research pages and blocks to the web as clean, shareable pages on [roam.pub](https://roam.pub).
 
 > Roam Publish is a third-party service made by [@ejqs](https://ejqs.net). It is not affiliated with Roam Research.
 
-For how the extension and the server work together (the contract, shared invariants, trust boundary, and how to ship
-changes across both), see [roam-publish-docs](https://github.com/ejqs/roam-publish-docs).
+This repo is the **Roam Depot extension**. It adds the publish commands to Roam and sends the page you choose to the
+Roam Publish server. For how the extension and server fit together, see
+[roam-publish-docs](https://github.com/ejqs/roam-publish-docs).
 
 ## Setup
 
 1. Install **Roam Publish** from Roam Depot.
-2. Sign up at [roam.pub](https://roam.pub) and connect your **personal graph** (one you own) with an
-   **append-only** API token (Roam: Settings → Graph → API tokens). The server adds a block like
-   `roam.pub connected this graph (safe to delete)` to today's daily note, which you can delete. The token is kept,
-   encrypted, for the [change log](#shortlinks-and-the-change-log).
+2. Sign up at [roam.pub](https://roam.pub) and connect your graph with an **append-only** API token
+   (Roam: Settings → Graph → API tokens). Use a graph you own. roam.pub adds a block to today's daily note
+   (`roam.pub connected this graph (safe to delete)`), which you can delete afterwards.
+3. In Roam, open **Settings → Roam Publish** and click **Get API key**. Copy the key from the website and paste it into
+   **API key**.
 
-   > [!WARNING]
-   > Creating and verifying a Roam graph may permanently leave a page in your graph that cannot be deleted: the
-   > `[[API Token: …]]` page Roam creates for the API token. This is not the fault of roam.pub, but a consequence of
-   > how display names are treated in Roam Research.
-   >
-   > There was a way I was able to delete an old API Token page, but I wasn't able to reproduce it. If you know how
-   > to remove it reliably, please let me know at ejqs [at] ejqs [dot] net.
+> [!WARNING]
+> Verifying a graph may leave behind an `[[API Token: …]]` page in your graph that can't be deleted. Roam creates it
+> for the token. It isn't caused by roam.pub. If you know how to remove it reliably, email ejqs [at] ejqs [dot] net.
 
-3. Click **Get API key** on the website (or in Roam: Settings → Roam Publish → Get API key), copy the key, and paste
-   it into **Settings → Roam Publish → API key**.
+**Shared graphs:** whoever connects a graph first owns it on roam.pub and invites others by email from the dashboard.
+After you accept, you get your own key for that graph. Members can only change pages they published.
 
-**Shared graphs:** whoever connects a graph first owns it on roam.pub. The owner invites everyone else by email from
-the dashboard; once you accept, you get your own key for that graph. Invites only go to accounts with a verified
-email and a connected graph of their own.
+**Lost your key?** Regenerate it at [roam.pub/dashboard/keys](https://roam.pub/dashboard/keys) and paste the new one.
+The old key stops working.
 
-**Lost your key?** Regenerate it at roam.pub/dashboard/keys and paste the new one. The old key stops working.
+## Using it
 
-## Usage
+| To | Do this |
+| --- | --- |
+| Publish a page | Right-click the page title → **Roam Publish: Publish page**, or run **Publish current page** from the command palette |
+| Publish a block | Right-click the bullet → **Roam Publish: Publish block** |
+| Update a published page or block | Publish it again. If nothing changed, you're told it's already published. |
+| Make it public or unlisted | Right-click → **Make page/block public** or **unlisted** (shown for published items) |
+| Take it down | Right-click → **Unpublish page/block** |
 
-- Right-click a **block bullet** → *Roam Publish: Publish block*
-- Right-click a **page title** → *Roam Publish: Publish page*
-- Command palette → *Roam Publish: Publish current page*
+The link is copied to your clipboard when you publish.
 
-The public link is copied to your clipboard. Publishing again with no changes tells you it's already published;
-publishing after edits updates the live page. To see everything you've published, click **Open dashboard** in the extension settings.
+**New pages are unlisted:** only people with the link can read them. **Making a page public** lists it on your graph's
+front page and in its RSS feed, if the graph owner turned the feed on (`roam.pub/{graph}/feed.xml`). Feed readers may
+keep a copy after you unpublish. Password-protected, members-only and unlisted pages are never in a feed.
 
-Set **Author name** in the extension settings to sign the pages you publish. It shows where the graph or collection
-shows authors; left blank, your public @username is used.
+Collections (`roam.pub/c/…`), passwords, members-only access, members and Discover are managed on the
+[website dashboard](https://roam.pub/dashboard); the extension settings have an **Open dashboard** button.
 
-Who can read a page (open, password, members only), collections (`roam.pub/c/…`), members, Discover and RSS feeds
-are all managed on the website. In a shared graph, members can only change the pages they published.
+### What gets published
 
-## Shortlinks and the change log
+The page or block and all its children, as text. Everything published is public to anyone with the link, so check
+references, embeds and children first.
 
-After publishing, the extension adds a block to the page (or under the block) with its permanent link:
+- **Block references** `((…))` become inline text, up to 3 levels deep. This includes blocks outside the published page.
+- **Embeds** `{{embed: …}}` include the embedded block or page with its children, up to 2 levels deep.
+- **`[[Links]]`** show as plain text, or as links if the linked page is also published.
+- **Images, video, audio and PDFs** are sent as URLs only. The files aren't copied, and files in encrypted graphs won't
+  display.
+
+Nothing else from your graph is sent.
+
+## Shortlink and change log
+
+When you publish a **page**, the extension adds a block with its permanent link:
 
 ```
 #published
@@ -58,90 +70,64 @@ After publishing, the extension adds a block to the page (or under the block) wi
     [[October 2nd, 2026]] 14:03 Published as unlisted: https://roam.pub/…
 ```
 
-The link never changes, wherever the page ends up (its graph, collections, after a rename). Opening it shows you and
-your graph's members where the page lives, with links to copy; everyone else goes to the first place they can read
-it. For sharing, prefer the graph or collection links.
+The shortlink never changes, even if the page is renamed or moved to another collection. It's meant for you: you and
+your graph's members see where the page lives, and everyone else is sent to the first place they can read it. To share
+publicly, prefer the graph or collection links.
 
-With an append-only token stored for the graph (from verification, or in the graph's settings on the website),
-roam.pub adds a dated entry under **Changelog** for everything that happens to the page: published, republished,
-made public or unlisted, listed on Discover, added to or removed from a collection, access changes, unpublished.
-That includes changes made on the website.
+If you gave roam.pub an append-only token (during verification, or in the graph's settings on the website), it also
+logs what happens to the page under **Changelog**: published, republished, made public or unlisted, added to a
+collection, access changes, unpublished. This includes changes made on the website.
 
-While Roam is open, the extension checks every few minutes that your published pages' Changelog blocks still exist
-and tells roam.pub (page and block uids only). Roam writes to the daily note when an Append API target is missing, so
-roam.pub only writes to blocks seen in the last few minutes. If you delete a Changelog block, roam.pub stops logging
-for that page and your dashboard lists it: publish the page again to add the blocks back (logging continues from
-then on), or ignore it.
+The shortlink block and everything under it are never published and never count as changes.
 
-**Check change log** (in the extension settings or the command palette) asks roam.pub whether it can still write the
-change log and when Roam last accepted an entry. It writes nothing. If Roam stops accepting the token (revoked or
-replaced), the extension tells you once per session, with a link to the graph's settings.
+**Deleted the Changelog block?** roam.pub stops logging for that page and lists it on your dashboard. Publish the page
+again to add the block back, or ignore it.
 
-The shortlink block and everything under it are **never published** and don't count as changes.
+## Settings
 
-Settings: **Add shortlink block** (on by default), **Shortlink tag** (`#published` by default, e.g. `[[Roam Publish]]`,
-or blank for none; changing it edits the block in place) and **Shortlink position** (`top` or `bottom`).
+| Setting | What it does |
+| --- | --- |
+| **API key** | Your key for this graph (see Setup). |
+| **Author name** | Shown on pages when the graph or collection shows authors. Blank uses your @username. |
+| **Add shortlink block** | On by default. Turn off for no shortlink block and no change log. |
+| **Shortlink block on published blocks** | Off by default, so only pages get a shortlink block. Turn on to add one under published blocks too. |
+| **Shortlink tag** | Written before the link. Default `#published`. Use e.g. `[[Roam Publish]]` or leave blank. Changing it edits existing blocks in place. |
+| **Shortlink position** | `top` or `bottom` of the page. |
+| **Check change log** | Asks roam.pub whether it can still write to the change log and when Roam last accepted an entry. Writes nothing. |
+| **Sync published list** | Re-downloads the list of what you've published from the server. |
+| **Server URL** | Advanced. Defaults to `https://roam.pub`. |
 
-## What gets published
+## Privacy and safety
 
-The page or block and all of its children. Block references are inlined as text, embeds (`{{embed: …}}`) include
-the embedded block or page with its children, and `[[links]]` show as plain text, or as links when the linked page
-is also published. Nothing else from your graph is sent.
+- **Only on your action:** nothing leaves Roam until you publish a page or block. No analytics, and the only server
+  contacted is roam.pub (or your configured Server URL).
+- **One background request:** while Roam is open, about every 5 minutes, the extension tells roam.pub which Changelog
+  blocks of your published pages still exist, sending uids only and no text. This prevents roam.pub from writing to a
+  block you deleted. Turning off **Add shortlink block** stops it.
+- **Written to your graph:** the shortlink block (when you publish), and change log entries if you stored an
+  append-only token. Nothing else.
+- **Stored in Roam's extension settings for this graph:** your API key, Author name, shortlink settings and a cache of
+  what you've published. The key lets the server publish for you but gives no access to your Roam graph. The extension
+  doesn't read your daily notes, so collaborators who can see them can't pick the key up.
+- **Roam API token:** entered on the website, never in the extension. It can only add blocks. The server stores it
+  encrypted and uses it only for the connection block and the change log. Remove it in the graph's settings on the
+  website, or revoke it in Roam, to stop the change log.
+- **Encrypted graphs** are supported.
 
-## Safety
+## Known unknowns
 
-What the extension reads, sends, and stores:
-
-- **Only on your action.** Nothing from your notes leaves Roam until you choose to publish a page or block. There is
-  no background upload of your graph. The one background request: while Roam is open, every few minutes, the
-  extension tells roam.pub which of your published pages' Changelog blocks still exist (their uids only, no text),
-  so the change log is never written to a block you deleted. Turning off **Add shortlink block** stops it.
-- **What is sent:** the published page or block, its children, and the page title, as text (`uid`, `string`,
-  heading level, nesting, numbered/document view, text alignment). Block references (`((uid))`) are resolved to
-  their text, up to 3 levels deep, so referenced blocks outside the published tree are included as inline text.
-  Embedded blocks and pages are included with all their children, up to 2 embeds deep. Images, video, audio and
-  PDFs are sent as their URL only; the files are not copied, and files in encrypted graphs won't display.
-- **Everything published is public.** Anyone with the link can read it. Check block references, embeds and
-  children before publishing.
-- **Making a page public lists it.** A public page shows on the graph's front page, and, if the graph owner turned
-  on the graph's RSS feed (`roam.pub/{graph}/feed.xml`), its title and the start of its text go out to feed readers,
-  who may keep a copy after you unpublish. Unlisted and password- or members-only pages are never in a feed.
-- **Where it goes:** only to the Roam Publish server (`https://roam.pub`, or the server URL set in settings).
-  The extension makes no other network requests and has no analytics.
-- **What is written to your graph:** the shortlink block above, created or edited by the extension when you publish
-  (turn it off in settings), and, if you stored an append-only token, change log entries the server appends under
-  it. Nothing else.
-- **What is stored locally:** your Roam Publish API key, your Author name, the shortlink settings and a cache of
-  what you've published, all in Roam's extension settings for this graph. The key lets the server publish on your behalf; it does not give
-  access to your Roam graph. Each person in a shared graph has their own key, and the owner can revoke a member's.
-- **Roam API token:** the append-only token is entered on the website, not in the extension. It can only add blocks
-  and cannot read your graph. The server stores it encrypted and uses it only for the connection block and the
-  change log. Remove it in the graph's settings on the website, or revoke it in Roam, to stop the change log.
-- **No setup reading:** the extension doesn't read your daily notes to finish setup; you paste the key yourself, so
-  collaborators who can see your daily notes can't pick it up.
-- **Encrypted graphs:** supported. The connection block is written with the Append API like any other graph.
-
-## To Confirm
-
-Things I haven't verified yet:
-
-- **Do Roam image URLs ever change?** Images are published as links to wherever Roam hosts them (typically
-  Firebase Storage download URLs with a long-lived token), so published pages depend on those URLs staying live.
-  They should be stable unless the image is deleted, the token is revoked, Roam changes its storage, or the graph is
-  encrypted, but I haven't confirmed this. If it turns out they break, the extension would need to re-host
-  images at publish time.
-- **Are extension settings per person in a shared graph?** The API key, Author name and published-list cache are
-  stored with Roam Depot's extension settings, which live in the graph. If collaborators on a multiplayer graph see
-  each other's values, they would share one key and author name; the fix would be to keep these in the browser's
-  local storage, keyed by graph, instead.
+- Images are published as links to Roam's hosting (typically Firebase Storage URLs). If Roam changes these or you
+  delete the image, the published image breaks.
+- Extension settings (including the API key) live in the graph. If collaborators on a shared graph see each other's
+  settings, they'd share one key and author name. This hasn't been confirmed.
 
 ## Development
 
 ```bash
 npm install
 ROAM_PUBLISH_SERVER=http://localhost:3000 npm run dev   # rebuilds extension.js on change
+npm run build       # production build
+npm run typecheck
 ```
 
 In Roam: Settings → Roam Depot → enable Developer mode → load this folder.
-The server ↔ extension contract lives in the `roam-publish-web` repo docs; how the two fit together is explained in
-[roam-publish-docs](https://github.com/ejqs/roam-publish-docs).
