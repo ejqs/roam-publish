@@ -50,7 +50,7 @@ export async function resetShortlinkSettings() {
 }
 
 export const getServer = () =>
-  ((api.settings.get("server-url") as string) || __DEFAULT_SERVER__).replace(/\/+$/, "");
+  ((api.settings.get("server-url") as string)?.trim() || __DEFAULT_SERVER__).replace(/\/+$/, "");
 export const getApiKey = () => ((api.settings.get("api-key") as string) || "").trim();
 export const getAuthor = () => ((api.settings.get("author-name") as string) || "").trim();
 /** On unless switched off. */

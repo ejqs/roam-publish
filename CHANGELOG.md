@@ -2,6 +2,15 @@
 
 All notable changes to the Roam Publish extension. Dates are when the change landed on `main`.
 
+## Unreleased
+
+### Publishing
+- **Publish** always checks with roam.pub, so a page unpublished or removed on the website is published again or
+  shows why it can't be, instead of saying "already published with no changes".
+- Clicking **Publish** again while a publish is still running no longer adds a second Roam Publish block.
+- The toast only says "Link copied" when the link really was copied.
+- Toasts are announced by screen readers.
+
 ## 0.1.0 (2026-10-03)
 
 First release.

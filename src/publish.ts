@@ -78,13 +78,28 @@ let confirmUnsupported = false;
  * minutes; this runs every few minutes while Roam is open. Sends only page and block uids.
  */
 export async function confirmChangeLogBlocks() {
+  // A slow run (many pages, slow server) mustn't overlap the next one.
+  if (confirming) return;
+  confirming = true;
+  try {
+    await confirmOnce();
+  } finally {
+    confirming = false;
+  }
+}
+
+let confirming = false;
+/** Roam uids; anchor uids come from the server, so anything else is never put into a query. */
+const UID = /^[\w-]{1,64}$/;
+
+async function confirmOnce() {
   if (confirmUnsupported || !getApiKey() || (!getShortlinkEnabled() && !getShortlinkOnBlocks())) return;
   // Nothing is written without a token or while it's off, so there's nothing to confirm; just keep
   // the settings switch in step with changes made on the website.
   if (changeLogStatus === "none" || changeLogStatus === "paused") return refreshChangeLog();
   const cache = await ensureCache();
   const anchors = Object.entries(cache)
-    .filter(([, c]) => c.anchorUid && (c.kind === "block" ? getShortlinkOnBlocks() : getShortlinkEnabled()))
+    .filter(([, c]) => c.anchorUid && UID.test(c.anchorUid) && (c.kind === "block" ? getShortlinkOnBlocks() : getShortlinkEnabled()))
     .map(([rootUid, c]) => ({ rootUid, anchorUid: c.anchorUid! }));
   if (anchors.length === 0) return;
   const present: typeof anchors = [];
@@ -229,7 +244,12 @@ async function ensureShortlinkBlock(rootUid: string, cached: CachedPublication |
   }
 }
 
+/** Pages and blocks being published right now: a second click would add a second Roam Publish block. */
+const publishing = new Set<string>();
+
 export async function publish(uid: string) {
+  if (publishing.has(uid)) return toast("Already publishing that. One moment…");
+  publishing.add(uid);
   try {
     const cache = await ensureCache();
     const link = await ensureShortlinkBlock(uid, cache[uid]);
@@ -244,13 +264,9 @@ export async function publish(uid: string) {
     const label = payload.kind === "page" ? "Page" : "Block";
     // Not part of the hash: changing only the author name still republishes.
     const author = getAuthor();
-    // A new or replaced shortlink block still has to reach the server.
-    const anchorKnown = !link?.anchorUid || link.anchorUid === cache[uid]?.anchorUid;
 
-    if (cache[uid]?.hash === hash && (cache[uid].author ?? "") === author && anchorKnown) {
-      return toast(`${label} is already published with no changes.`, { link: cache[uid].url });
-    }
-
+    // Always asked, even when the cache has this hash: the cache can be stale (unpublished or
+    // removed on the website), and the server answers "unchanged" itself.
     const res = await api<{
       status: "created" | "updated" | "unchanged";
       url: string;
@@ -279,17 +295,18 @@ export async function publish(uid: string) {
         shortUrl: res.shortUrl ?? link?.shortUrl ?? null, anchorUid: link?.anchorUid ?? cache[uid]?.anchorUid ?? null,
       },
     });
-    await navigator.clipboard?.writeText(res.url).catch(() => {});
+    const copied = await navigator.clipboard?.writeText(res.url).then(() => true, () => false);
+    const copiedNote = copied ? " Link copied." : "";
 
     const unlisted = res.visibility === "unlisted";
     const msg =
       res.status === "unchanged"
         ? `${label} is already published with no changes.`
         : res.status === "updated"
-          ? `${label} republished with your changes. Link copied.`
+          ? `${label} republished with your changes.${copiedNote}`
           : unlisted
-            ? `${label} published as unlisted: only people with the link can see it. Link copied.`
-            : `${label} published! Link copied.`;
+            ? `${label} published as unlisted: only people with the link can see it.${copiedNote}`
+            : `${label} published!${copiedNote}`;
     toast(msg, {
       intent: res.status === "unchanged" ? "none" : "success",
       link: res.url,
@@ -301,6 +318,8 @@ export async function publish(uid: string) {
     warnIfBroken(res.changeLog);
   } catch (e) {
     report(e);
+  } finally {
+    publishing.delete(uid);
   }
 }
 

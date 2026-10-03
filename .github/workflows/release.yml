@@ -25,6 +25,7 @@ jobs:
             || { echo "Tag $GITHUB_REF_NAME does not match package.json version"; exit 1; }
       - run: npm ci
       - run: npm run typecheck
+      - run: npm test
       - run: ./build.sh
       - name: Extract release notes from CHANGELOG.md
         run: |

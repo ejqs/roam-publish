@@ -16,6 +16,9 @@ export function toast(message: string, opts: ToastOptions = {}) {
   if (!container) {
     container = document.createElement("div");
     container.id = "roam-publish-toasts";
+    // Screen readers announce each toast as it appears.
+    container.setAttribute("role", "status");
+    container.setAttribute("aria-live", "polite");
     Object.assign(container.style, {
       position: "fixed", top: "12px", left: "50%", transform: "translateX(-50%)",
       zIndex: "1000", display: "flex", flexDirection: "column", gap: "8px", alignItems: "center",
