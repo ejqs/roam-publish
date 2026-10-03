@@ -130,10 +130,12 @@ token can only add blocks to its own graph. It can't read, edit, move or delete 
   token in the graph's settings on roam.pub (**Change log → Open settings** in the extension), or revoke it in Roam.
 
 The status link (`roam.pub/p/…`) shows you and your graph's members where a page is published. **Don't share it:**
-anyone else is sent to the first place they can read the page, which can change.
+anyone else is asked to log in or gets a "not found" page. Share the page's graph or collection link instead.
 
 For exactly what the extension reads, what it sends and how roam.pub uses the Append API, see
 [Data flow and the Append API](https://github.com/ejqs/roam-publish-docs/blob/main/docs/data-and-append-api.md).
+roam.pub's [Privacy policy](https://roam.pub/privacy) and [Terms](https://roam.pub/terms) cover the website and the
+extension.
 
 ### Reporting a vulnerability
 
@@ -154,6 +156,7 @@ npm install
 ROAM_PUBLISH_SERVER=http://localhost:3000 npm run dev   # rebuilds extension.js on change
 npm run build       # production build
 npm run typecheck
+npm test            # serializer, hash parity with the server, API errors
 ```
 
 In Roam: Settings → Roam Depot → enable Developer mode → load this folder.

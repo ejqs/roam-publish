@@ -30,7 +30,8 @@ export function toast(message: string, opts: ToastOptions = {}) {
     maxWidth: "480px",
   });
   el.textContent = message;
-  if (opts.link) {
+  // Links come from the server's responses; only ever open web pages from them.
+  if (opts.link && /^https?:\/\//i.test(opts.link)) {
     const a = document.createElement("a");
     a.href = opts.link;
     a.target = "_blank";

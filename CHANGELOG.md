@@ -51,6 +51,7 @@ First release.
 - Embeds, view types (numbered, document), text alignment and heading levels are sent. Block references are inlined,
   and references inside code and block-ref aliases are left as written.
 - Server moderation messages and reasons are shown when a publish is refused.
+- Toast links only open web (http/https) addresses, whatever the server returns.
 
 ### Setup and settings
 - Paste the API key from the website into **Settings → Roam Publish**. The extension no longer reads your daily
