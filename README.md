@@ -134,6 +134,8 @@ anyone else is asked to log in or gets a "not found" page. Share the page's grap
 
 For exactly what the extension reads, what it sends and how roam.pub uses the Append API, see
 [Data flow and the Append API](https://github.com/ejqs/roam-publish-docs/blob/main/docs/data-and-append-api.md).
+roam.pub's [Privacy policy](https://roam.pub/privacy) and [Terms](https://roam.pub/terms) cover the website and the
+extension.
 
 ### Reporting a vulnerability
 
