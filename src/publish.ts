@@ -12,6 +12,8 @@ import {
   getShortlinkTag,
   setCache,
   type CachedPublication,
+  type Listing,
+  listingOf,
   type PublicationCache,
   type Visibility,
 } from "./state";
@@ -26,6 +28,8 @@ type Remote = {
   anchorUid?: string | null;
   contentHash: string;
   visibility: Visibility;
+  listing?: Listing;
+  discoverBlocked?: string | null;
   updatedAt: string;
   /** Taken down by a moderator (from servers that say). */
   removed?: boolean;
@@ -161,6 +165,7 @@ export async function syncPublications(opts: { quiet?: boolean } = {}) {
   for (const p of publications) {
     cache[p.rootUid] = {
       hash: p.contentHash, url: p.url, title: p.title, kind: p.kind, visibility: p.visibility, updatedAt: p.updatedAt,
+      listing: p.listing, discoverBlocked: p.discoverBlocked,
       shortUrl: p.shortUrl, anchorUid: p.anchorUid, removed: p.removed, mine: p.mine,
       // The server doesn't send bylines; keep the one sent with the last publish from here.
       author: previous[p.rootUid]?.author,
@@ -308,6 +313,8 @@ export async function publish(uid: string) {
       shortUrl?: string;
       contentHash: string;
       visibility: Visibility;
+      listing?: Listing;
+      discoverBlocked?: string | null;
       changeLog?: ChangeLog;
     }>(
       "/api/ext/publications",
@@ -326,14 +333,15 @@ export async function publish(uid: string) {
       ...getCache(),
       [uid]: {
         hash: res.contentHash, url: res.url, title: payload.title, kind: payload.kind,
-        visibility: res.visibility, updatedAt: new Date().toISOString(), author,
+        visibility: res.visibility, listing: res.listing, discoverBlocked: res.discoverBlocked,
+        updatedAt: new Date().toISOString(), author,
         shortUrl: res.shortUrl ?? link?.shortUrl ?? null, anchorUid: link?.anchorUid ?? cache[uid]?.anchorUid ?? null,
       },
     });
     const copied = await navigator.clipboard?.writeText(res.url).then(() => true, () => false);
     const copiedNote = copied ? " Link copied." : "";
 
-    const unlisted = res.visibility === "unlisted";
+    const unlisted = listingOf(res) === "unlisted";
     const msg =
       res.status === "unchanged"
         ? `${label} is already published with no changes.`
@@ -345,10 +353,8 @@ export async function publish(uid: string) {
     toast(msg, {
       intent: res.status === "unchanged" ? "none" : "success",
       link: res.url,
-      // New items start unlisted; offer the one-click upgrade right where they'll see it.
-      action: res.status === "created" && unlisted
-        ? { label: "Make public", onClick: () => void setVisibility(uid, "public") }
-        : undefined,
+      // New items start unlisted; offer the one-click upgrades right where they'll see it.
+      actions: res.status === "created" && unlisted ? listingActions(uid, res) : undefined,
     });
     warnIfBroken(res.changeLog);
   } catch (e) {
@@ -362,20 +368,40 @@ export async function publish(uid: string) {
   }
 }
 
-export async function setVisibility(uid: string, visibility: Visibility) {
+/** The website's words for where a page is listed. */
+const LISTING_LABEL: Record<Listing, string> = { unlisted: "unlisted", listed: "listed", discover: "discoverable" };
+
+const NOW: Record<Listing, string> = {
+  unlisted: "Now unlisted: only people with the link can see it.",
+  listed: "Now listed on your graph's front page.",
+  discover: "Now discoverable: listed on your graph's front page and on Discover.",
+};
+
+/**
+ * "Make …" buttons for every listing but the current one. Make discoverable only shows when the
+ * server says it can be (older servers don't say, so it never shows there).
+ */
+function listingActions(uid: string, c: { visibility: Visibility; listing?: Listing; discoverBlocked?: string | null }) {
+  const current = listingOf(c);
+  const discoverOk = c.listing !== undefined && !c.discoverBlocked;
+  return (["listed", "discover", "unlisted"] as const)
+    .filter((l) => l !== current && (l !== "discover" || discoverOk))
+    .map((l) => ({ label: `Make ${LISTING_LABEL[l]}`, onClick: () => void setListing(uid, l) }));
+}
+
+export async function setListing(uid: string, listing: Listing) {
   try {
-    const res = await api<{ visibility: Visibility; url: string }>(
+    const res = await api<{ visibility: Visibility; listing?: Listing; discoverBlocked?: string | null; url: string }>(
       `/api/ext/publications/${encodeURIComponent(uid)}`,
-      { method: "PATCH", body: JSON.stringify({ visibility }) },
+      { method: "PATCH", body: JSON.stringify({ listing }) },
     );
     const cache = getCache();
-    if (cache[uid]) await setCache({ ...cache, [uid]: { ...cache[uid], visibility: res.visibility, url: res.url } });
-    toast(
-      res.visibility === "public"
-        ? "Now public: listed on your graph's front page."
-        : "Now unlisted: only people with the link can see it.",
-      { intent: "success", link: res.url },
-    );
+    if (cache[uid])
+      await setCache({
+        ...cache,
+        [uid]: { ...cache[uid], visibility: res.visibility, listing: res.listing, discoverBlocked: res.discoverBlocked, url: res.url },
+      });
+    toast(NOW[listingOf(res)], { intent: "success", link: res.url });
   } catch (e) {
     report(e);
   }
@@ -415,7 +441,7 @@ export async function unpublish(uid: string) {
  * Whether a page or block is published, and if so whether it changed in Roam since: refreshes the
  * published list from the server first (falling back to the cache offline), then hashes the
  * content the way publishing does. Offers what can be done next: publish, or republish, make
- * public or unlisted, and unpublish. Writes nothing to the graph by itself.
+ * listed, discoverable or unlisted, and unpublish. Writes nothing to the graph by itself.
  */
 export async function publishStatus(uid: string) {
   try {
@@ -437,7 +463,7 @@ export async function publishStatus(uid: string) {
         action: { label: `Publish ${payload.kind}`, onClick: () => void publish(uid) },
       });
     if (c.removed) return toast(`${label} was removed by a moderator.${offline}`, { intent: "danger", link: c.url });
-    const where = c.visibility === "public" ? "public" : "unlisted";
+    const where = LISTING_LABEL[listingOf(c)];
     if (c.mine === false)
       return toast(
         `${label} is published (${where}) by another member of this graph. Only they or the graph's owner can change it.${offline}`,
@@ -448,16 +474,17 @@ export async function publishStatus(uid: string) {
     // Only known for items published from this graph's extension settings.
     const bylineChanged = c.author !== undefined && c.author !== getAuthor();
     const upToDate = !changed && !bylineChanged;
-    const flip: Visibility = c.visibility === "public" ? "unlisted" : "public";
     const actions = [
       ...(upToDate ? [] : [{ label: "Republish", onClick: () => void publish(uid) }]),
-      { label: `Make ${flip}`, onClick: () => void setVisibility(uid, flip) },
+      ...listingActions(uid, c),
       { label: "Unpublish", onClick: () => confirmUnpublish(uid) },
     ];
+    // Roam's toasts can't grey a button out, so say why Make discoverable isn't there.
+    const blocked = c.discoverBlocked && listingOf(c) !== "discover" ? ` ${c.discoverBlocked}` : "";
     toast(
       upToDate
-        ? `${label} is published (${where}) and up to date. Last published ${since}.${offline}`
-        : `${label} is published (${where}) but ${changed ? "has changed" : "has a new author name"} since it was last published on ${since}.${offline}`,
+        ? `${label} is published (${where}) and up to date. Last published ${since}.${offline}${blocked}`
+        : `${label} is published (${where}) but ${changed ? "has changed" : "has a new author name"} since it was last published on ${since}.${offline}${blocked}`,
       { intent: upToDate ? "success" : "none", link: c.url, actions, durationMs: 15000 },
     );
   } catch (e) {
