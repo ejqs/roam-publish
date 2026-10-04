@@ -9,6 +9,8 @@ All notable changes to the Roam Publish extension. Dates are when the change lan
   is now **Make listed**.
 - **Make discoverable** puts a page on your graph's front page and on Discover, right from the toast. When a page
   can't be Discoverable (for example, it has a password or search engines are off), the status toast says why.
+- Making a Discoverable page listed or unlisted asks first, as the website does, so a page isn't taken off
+  Discover by a stray click.
 
 ## 0.1.0 (2026-10-04)
 

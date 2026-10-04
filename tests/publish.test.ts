@@ -178,6 +178,24 @@ describe("status", () => {
     assert.match(toasts.at(-1)!, /Now discoverable/);
   });
 
+  test("asks before taking a Discoverable page off Discover", async () => {
+    const calls = server({
+      ...remote({ visibility: "public", listing: "discover", discoverBlocked: null }),
+      "PATCH /api/ext/publications/page1": (b) => [200, { visibility: "public", listing: b.listing, discoverBlocked: null, url: "https://roam.pub/g/x" }],
+    });
+    await publishStatus("page1");
+    assert.deepEqual(labels().filter((l) => l?.startsWith("Make")), ["Make listed", "Make unlisted"]);
+    const before = calls.length;
+    button("Make unlisted")!.click!();
+    await new Promise((r) => setImmediate(r));
+    assert.equal(calls.length, before);
+    assert.match(toasts.at(-1)!, /Take “Page” off roam.pub\/discover\? .*only people with the link/);
+    buttons.findLast((b) => b.textContent === "Make unlisted")!.click!();
+    await new Promise((r) => setImmediate(r));
+    assert.deepEqual(calls.at(-1)!.body, { listing: "unlisted" });
+    assert.match(toasts.at(-1)!, /Now unlisted/);
+  });
+
   test("leaves out Make discoverable and says why when it can't be", async () => {
     server(remote({ visibility: "public", listing: "listed", discoverBlocked: "Turn on search engines in Sharing to make pages Discoverable." }));
     await publishStatus("page1");

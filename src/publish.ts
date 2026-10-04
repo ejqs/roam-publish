@@ -379,14 +379,36 @@ const NOW: Record<Listing, string> = {
 
 /**
  * "Make …" buttons for every listing but the current one. Make discoverable only shows when the
- * server says it can be (older servers don't say, so it never shows there).
+ * server says it can be (older servers don't say, so it never shows there). Taking a page off
+ * Discover asks first, as the website does.
  */
 function listingActions(uid: string, c: { visibility: Visibility; listing?: Listing; discoverBlocked?: string | null }) {
   const current = listingOf(c);
   const discoverOk = c.listing !== undefined && !c.discoverBlocked;
   return (["listed", "discover", "unlisted"] as const)
     .filter((l) => l !== current && (l !== "discover" || discoverOk))
-    .map((l) => ({ label: `Make ${LISTING_LABEL[l]}`, onClick: () => void setListing(uid, l) }));
+    .map((l) => ({
+      label: `Make ${LISTING_LABEL[l]}`,
+      onClick: () => (current === "discover" && l !== "discover" ? confirmLeaveDiscover(uid, l) : void setListing(uid, l)),
+    }));
+}
+
+const OFF_DISCOVER: Record<Exclude<Listing, "discover">, string> = {
+  listed: "It stays on your graph's front page.",
+  unlisted: "It also comes off your graph's front page: only people with the link can see it.",
+};
+
+/** Asks before taking a Discoverable page off Discover, as the website does. */
+export function confirmLeaveDiscover(uid: string, listing: Exclude<Listing, "discover">) {
+  const title = getCache()[uid]?.title;
+  toast(
+    `Take ${title ? `“${title}”` : "this"} off roam.pub/discover? ${OFF_DISCOVER[listing]}`,
+    {
+      intent: "danger",
+      actions: [{ label: `Make ${LISTING_LABEL[listing]}`, onClick: () => void setListing(uid, listing) }],
+      durationMs: 15000,
+    },
+  );
 }
 
 export async function setListing(uid: string, listing: Listing) {
