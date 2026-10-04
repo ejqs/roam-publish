@@ -13,6 +13,8 @@ export type CachedPublication = {
   anchorUid?: string | null;
   /** Taken down by a moderator, as of the last sync. */
   removed?: boolean;
+  /** False when another member of a shared graph published it, so this key can't change it. */
+  mine?: boolean;
 };
 export type Visibility = "public" | "unlisted";
 export type PublicationCache = Record<string, CachedPublication>;
@@ -50,7 +52,7 @@ export async function resetShortlinkSettings() {
 }
 
 export const getServer = () =>
-  ((api.settings.get("server-url") as string) || __DEFAULT_SERVER__).replace(/\/+$/, "");
+  ((api.settings.get("server-url") as string)?.trim() || __DEFAULT_SERVER__).replace(/\/+$/, "");
 export const getApiKey = () => ((api.settings.get("api-key") as string) || "").trim();
 export const getAuthor = () => ((api.settings.get("author-name") as string) || "").trim();
 /** On unless switched off. */

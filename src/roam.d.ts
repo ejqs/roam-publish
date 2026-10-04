@@ -38,6 +38,7 @@ interface Window {
           block: { string: string; uid?: string };
         }): Promise<void>;
         update(args: { block: { uid: string; string: string } }): Promise<void>;
+        delete(args: { block: { uid: string } }): Promise<void>;
       };
     };
     ui: {

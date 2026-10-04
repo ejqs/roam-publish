@@ -1,5 +1,5 @@
 import { api, ApiError } from "./api";
-import { hashPayload, isShortlinkText, serialize } from "./serialize";
+import { hashPayload, isShortlinkText, serialize, type Shortlinks } from "./serialize";
 import {
   getApiKey,
   getAuthor,
@@ -29,6 +29,8 @@ type Remote = {
   updatedAt: string;
   /** Taken down by a moderator (from servers that say). */
   removed?: boolean;
+  /** Whether this key may change it: the owner's, or published by this member (from servers that say). */
+  mine?: boolean;
 };
 
 let syncedThisSession = false;
@@ -78,27 +80,50 @@ let confirmUnsupported = false;
  * minutes; this runs every few minutes while Roam is open. Sends only page and block uids.
  */
 export async function confirmChangeLogBlocks() {
+  // A slow run (many pages, slow server) mustn't overlap the next one.
+  if (confirming) return;
+  confirming = true;
+  try {
+    await confirmOnce();
+  } finally {
+    confirming = false;
+  }
+}
+
+let confirming = false;
+const CONFIRM_BATCH = 2000;
+/** Roam uids; anchor uids come from the server, so anything else is never put into a query. */
+const UID = /^[\w-]{1,64}$/;
+
+async function confirmOnce() {
   if (confirmUnsupported || !getApiKey() || (!getShortlinkEnabled() && !getShortlinkOnBlocks())) return;
   // Nothing is written without a token or while it's off, so there's nothing to confirm; just keep
   // the settings switch in step with changes made on the website.
   if (changeLogStatus === "none" || changeLogStatus === "paused") return refreshChangeLog();
   const cache = await ensureCache();
   const anchors = Object.entries(cache)
-    .filter(([, c]) => c.anchorUid && (c.kind === "block" ? getShortlinkOnBlocks() : getShortlinkEnabled()))
+    .filter(([, c]) => c.anchorUid && UID.test(c.anchorUid) && (c.kind === "block" ? getShortlinkOnBlocks() : getShortlinkEnabled()))
     .map(([rootUid, c]) => ({ rootUid, anchorUid: c.anchorUid! }));
   if (anchors.length === 0) return;
-  const present: typeof anchors = [];
-  const missing: typeof anchors = [];
+  const exists = new Map<string, boolean>();
   for (const a of anchors) {
     const b = await window.roamAlphaAPI.data.async.pull("[:block/uid]", `[:block/uid "${a.anchorUid}"]`);
-    (b?.[":block/uid"] ? present : missing).push(a);
+    exists.set(a.rootUid, !!b?.[":block/uid"]);
   }
-  let res: { changeLog: ChangeLog };
+  const missing = anchors.filter((a) => !exists.get(a.rootUid));
+  let res!: { changeLog: ChangeLog };
   try {
-    res = await api<{ changeLog: ChangeLog }>("/api/ext/changelog/confirm", {
-      method: "POST",
-      body: JSON.stringify({ present, missing }),
-    });
+    // The server takes so many per request; a graph with more is confirmed in batches.
+    for (let i = 0; i < anchors.length; i += CONFIRM_BATCH) {
+      const batch = anchors.slice(i, i + CONFIRM_BATCH);
+      res = await api<{ changeLog: ChangeLog }>("/api/ext/changelog/confirm", {
+        method: "POST",
+        body: JSON.stringify({
+          present: batch.filter((a) => exists.get(a.rootUid)),
+          missing: batch.filter((a) => !exists.get(a.rootUid)),
+        }),
+      });
+    }
   } catch (e) {
     // Servers without confirmations: nothing to do this session. Anything else: try again next time.
     if (e instanceof ApiError && e.status === 404) confirmUnsupported = true;
@@ -136,7 +161,7 @@ export async function syncPublications(opts: { quiet?: boolean } = {}) {
   for (const p of publications) {
     cache[p.rootUid] = {
       hash: p.contentHash, url: p.url, title: p.title, kind: p.kind, visibility: p.visibility, updatedAt: p.updatedAt,
-      shortUrl: p.shortUrl, anchorUid: p.anchorUid, removed: p.removed,
+      shortUrl: p.shortUrl, anchorUid: p.anchorUid, removed: p.removed, mine: p.mine,
       // The server doesn't send bylines; keep the one sent with the last publish from here.
       author: previous[p.rootUid]?.author,
     };
@@ -176,8 +201,11 @@ const linkText = (shortUrl: string) => {
  * Written before publishing so the server learns the link block's uid with the publish. A tag or
  * text changed in settings is applied in place on the next publish, so the entries stay put. Pages
  * from earlier builds have a separate "Changelog" block under the tag; new entries go under the
- * link block from then on, and the old block keeps what's already in it. Null when it's turned
- * off or the server has no shortlinks.
+ * link block from then on, and the old block keeps what's already in it. The existing block is the
+ * one holding the recorded Changelog block, or failing that one whose text is the tag: a status link
+ * pasted under an ordinary block is never mistaken for it (and its text never replaced). `created`
+ * is the new block's uid when this wrote one. Null when it's turned off or the server has no
+ * shortlinks.
  */
 async function ensureShortlinkBlock(rootUid: string, cached: CachedPublication | undefined) {
   // Pages and blocks each have their own setting.
@@ -206,14 +234,18 @@ async function ensureShortlinkBlock(rootUid: string, cached: CachedPublication |
       "[{:block/children [:block/uid :block/string {:block/children [:block/uid :block/string]}]}]",
       `[:block/uid "${rootUid}"]`,
     );
-    const parent = root?.[":block/children"]?.find((c) =>
+    const withLink = (root?.[":block/children"] ?? []).filter((c) =>
       c[":block/children"]?.some((k) => isShortlinkText(k[":block/string"], ids)),
     );
+    const anchor = cached?.anchorUid;
+    const parent =
+      withLink.find((c) => !!anchor && c[":block/children"]!.some((k) => k[":block/uid"] === anchor)) ??
+      withLink.find((c) => (c[":block/string"] ?? "") === tag);
     const linkBlock = parent?.[":block/children"]?.find((k) => isShortlinkText(k[":block/string"], ids));
     if (parent?.[":block/uid"] && linkBlock?.[":block/uid"]) {
       if ((parent[":block/string"] ?? "") !== tag) await block.update({ block: { uid: parent[":block/uid"], string: tag } });
       if (linkBlock[":block/string"] !== link) await block.update({ block: { uid: linkBlock[":block/uid"], string: link } });
-      return { shortUrl, anchorUid: linkBlock[":block/uid"] };
+      return { shortUrl, anchorUid: linkBlock[":block/uid"], created: undefined };
     }
     const parentUid = window.roamAlphaAPI.util.generateUID();
     const anchorUid = window.roamAlphaAPI.util.generateUID();
@@ -222,35 +254,54 @@ async function ensureShortlinkBlock(rootUid: string, cached: CachedPublication |
       block: { uid: parentUid, string: tag },
     });
     await block.create({ location: { "parent-uid": parentUid, order: 0 }, block: { uid: anchorUid, string: link } });
-    return { shortUrl, anchorUid };
+    return { shortUrl, anchorUid, created: parentUid };
   } catch {
     toast("Couldn't add the Roam Publish block. Publishing anyway.", { intent: "none" });
-    return { shortUrl, anchorUid: undefined };
+    return { shortUrl, anchorUid: undefined, created: undefined };
   }
 }
 
+/**
+ * The shortlink blocks to leave out of a page: this graph's shortlink ids, and the Changelog blocks
+ * they nest under, including the one just found or written for this publish.
+ */
+function shortlinksOf(cache: PublicationCache, link?: { shortUrl: string; anchorUid?: string } | null): Shortlinks {
+  const items = [...Object.values(cache), ...(link ? [link] : [])];
+  return {
+    ids: new Set(items.map((c) => shortIdOf(c.shortUrl)).filter((id): id is string => !!id)),
+    anchors: new Set(items.map((c) => c.anchorUid).filter((u): u is string => !!u)),
+  };
+}
+
+/** Takes back a Roam Publish block written for a publish that didn't happen; best effort. */
+async function removeBlock(uid: string | undefined) {
+  if (uid) await window.roamAlphaAPI.data.block.delete({ block: { uid } }).catch(() => {});
+}
+
+/** Pages and blocks being published right now: a second click would add a second Roam Publish block. */
+const publishing = new Set<string>();
+
 export async function publish(uid: string) {
+  if (publishing.has(uid)) return toast("Already publishing that. One moment…");
+  publishing.add(uid);
+  let link: Awaited<ReturnType<typeof ensureShortlinkBlock>> = null;
   try {
     const cache = await ensureCache();
-    const link = await ensureShortlinkBlock(uid, cache[uid]);
+    link = await ensureShortlinkBlock(uid, cache[uid]);
     // Shortlink blocks (this page's, and those of blocks published from inside it) and their change
     // logs are never published or hashed.
-    const ids = new Set(
-      [link?.shortUrl, ...Object.values(cache).map((c) => c.shortUrl)].map(shortIdOf).filter((id): id is string => !!id),
-    );
-    const payload = await serialize(uid, ids);
-    if (!payload) return toast("Couldn't read that page or block.", { intent: "danger" });
+    const payload = await serialize(uid, shortlinksOf(cache, link));
+    if (!payload) {
+      await removeBlock(link?.created);
+      return toast("Couldn't read that page or block.", { intent: "danger" });
+    }
     const hash = await hashPayload(payload);
     const label = payload.kind === "page" ? "Page" : "Block";
     // Not part of the hash: changing only the author name still republishes.
     const author = getAuthor();
-    // A new or replaced shortlink block still has to reach the server.
-    const anchorKnown = !link?.anchorUid || link.anchorUid === cache[uid]?.anchorUid;
 
-    if (cache[uid]?.hash === hash && (cache[uid].author ?? "") === author && anchorKnown) {
-      return toast(`${label} is already published with no changes.`, { link: cache[uid].url });
-    }
-
+    // Always asked, even when the cache has this hash: the cache can be stale (unpublished or
+    // removed on the website), and the server answers "unchanged" itself.
     const res = await api<{
       status: "created" | "updated" | "unchanged";
       url: string;
@@ -279,17 +330,18 @@ export async function publish(uid: string) {
         shortUrl: res.shortUrl ?? link?.shortUrl ?? null, anchorUid: link?.anchorUid ?? cache[uid]?.anchorUid ?? null,
       },
     });
-    await navigator.clipboard?.writeText(res.url).catch(() => {});
+    const copied = await navigator.clipboard?.writeText(res.url).then(() => true, () => false);
+    const copiedNote = copied ? " Link copied." : "";
 
     const unlisted = res.visibility === "unlisted";
     const msg =
       res.status === "unchanged"
         ? `${label} is already published with no changes.`
         : res.status === "updated"
-          ? `${label} republished with your changes. Link copied.`
+          ? `${label} republished with your changes.${copiedNote}`
           : unlisted
-            ? `${label} published as unlisted: only people with the link can see it. Link copied.`
-            : `${label} published! Link copied.`;
+            ? `${label} published as unlisted: only people with the link can see it.${copiedNote}`
+            : `${label} published!${copiedNote}`;
     toast(msg, {
       intent: res.status === "unchanged" ? "none" : "success",
       link: res.url,
@@ -300,7 +352,13 @@ export async function publish(uid: string) {
     });
     warnIfBroken(res.changeLog);
   } catch (e) {
+    // The server refused it (too large, removed, another member's…): nothing was published, so the
+    // block written for it goes too. Kept when the server couldn't be reached, as it may have
+    // published; the next publish reuses it.
+    if (e instanceof ApiError && e.status >= 400) await removeBlock(link?.created);
     report(e);
+  } finally {
+    publishing.delete(uid);
   }
 }
 
@@ -321,6 +379,18 @@ export async function setVisibility(uid: string, visibility: Visibility) {
   } catch (e) {
     report(e);
   }
+}
+
+/**
+ * Asks before unpublishing: roam.pub deletes the page with everything attached to it there, and
+ * publishing again starts from scratch.
+ */
+export function confirmUnpublish(uid: string) {
+  const title = getCache()[uid]?.title;
+  toast(
+    `Unpublish ${title ? `“${title}”` : "this"}? Its link stops working, and its access settings, passwords, views, upvotes and places in collections on roam.pub are deleted. Publishing it again starts over.`,
+    { intent: "danger", actions: [{ label: "Unpublish", onClick: () => void unpublish(uid) }], durationMs: 15000 },
+  );
 }
 
 export async function unpublish(uid: string) {
@@ -359,8 +429,7 @@ export async function publishStatus(uid: string) {
       offline = " (couldn't reach the server; this is from the last sync)";
     }
     const c = cache[uid];
-    const ids = new Set(Object.values(cache).map((x) => shortIdOf(x.shortUrl)).filter((id): id is string => !!id));
-    const payload = await serialize(uid, ids);
+    const payload = await serialize(uid, shortlinksOf(cache));
     if (!payload) return toast("Couldn't read that page or block.", { intent: "danger" });
     const label = payload.kind === "page" ? "Page" : "Block";
     if (!c)
@@ -368,8 +437,13 @@ export async function publishStatus(uid: string) {
         action: { label: `Publish ${payload.kind}`, onClick: () => void publish(uid) },
       });
     if (c.removed) return toast(`${label} was removed by a moderator.${offline}`, { intent: "danger", link: c.url });
-    const since = new Date(c.updatedAt).toLocaleString();
     const where = c.visibility === "public" ? "public" : "unlisted";
+    if (c.mine === false)
+      return toast(
+        `${label} is published (${where}) by another member of this graph. Only they or the graph's owner can change it.${offline}`,
+        { link: c.url },
+      );
+    const since = new Date(c.updatedAt).toLocaleString();
     const changed = (await hashPayload(payload)) !== c.hash;
     // Only known for items published from this graph's extension settings.
     const bylineChanged = c.author !== undefined && c.author !== getAuthor();
@@ -378,7 +452,7 @@ export async function publishStatus(uid: string) {
     const actions = [
       ...(upToDate ? [] : [{ label: "Republish", onClick: () => void publish(uid) }]),
       { label: `Make ${flip}`, onClick: () => void setVisibility(uid, flip) },
-      { label: "Unpublish", onClick: () => void unpublish(uid) },
+      { label: "Unpublish", onClick: () => confirmUnpublish(uid) },
     ];
     toast(
       upToDate

@@ -7,6 +7,8 @@ export type Node = {
   viewType?: "numbered" | "document";
   align?: "center" | "right" | "justify";
   embed?: Node;
+  /** Further embeds in the same block, in order; omitted when it has at most one. */
+  moreEmbeds?: Node[];
   title?: string;
   children: Node[];
 };
@@ -18,7 +20,9 @@ const REF = /\(\(([\w-]{9,})\)\)/g;
 // Spans whose block refs stay as written: code, embeds, and block-ref aliases `[label](((uid)))`.
 const KEEP = /```[\s\S]*?```|`[^`\n]+`|\{\{(?:\[\[)?embed(?:-path|-children)?(?:\]\])?:[^}]*\}\}|\]\(\(\([\w-]{9,}\)\)\)/g;
 const EMBED =
-  /\{\{(?:\[\[)?(embed(?:-path|-children)?)(?:\]\])?:\s*(?:\(\(([\w-]{9,})\)\)|\[\[(.+?)\]\])\s*\}\}/;
+  /\{\{(?:\[\[)?(embed(?:-path|-children)?)(?:\]\])?:\s*(?:\(\(([\w-]{9,})\)\)|\[\[(.+?)\]\])\s*\}\}/g;
+/** More than anyone puts in one block; keeps a pathological block from pulling half the graph. */
+const MAX_EMBEDS_PER_BLOCK = 20;
 const MAX_REF_DEPTH = 3;
 const MAX_EMBED_DEPTH = 2;
 
@@ -26,6 +30,8 @@ const MAX_EMBED_DEPTH = 2;
 type EmbedChain = string[];
 /** Shortlink blocks to leave out of the tree, with everything under them. */
 type Skip = (b: PullBlock) => boolean;
+/** This graph's shortlink ids, and the uids of the Changelog blocks they nest under in Roam. */
+export type Shortlinks = { ids: Set<string>; anchors: Set<string> };
 
 async function resolveRefs(text: string, depth = 0, seen = new Set<string>()): Promise<string> {
   if (depth >= MAX_REF_DEPTH || !text.includes("((")) return text;
@@ -48,9 +54,18 @@ async function resolveRefs(text: string, depth = 0, seen = new Set<string>()): P
   return parts.map((p) => (p.keep ? p.text : p.text.replace(REF, (m, uid) => resolved.get(uid) ?? m))).join("");
 }
 
-async function embedOf(text: string, chain: EmbedChain, skip: Skip): Promise<Node | undefined> {
-  const m = EMBED.exec(text);
-  if (!m || chain.length > MAX_EMBED_DEPTH) return;
+/** Every `{{embed: …}}` in a block, in order; ones that can't be read or would loop are skipped. */
+async function embedsOf(text: string, chain: EmbedChain, skip: Skip): Promise<Node[]> {
+  if (chain.length > MAX_EMBED_DEPTH) return [];
+  const nodes: Node[] = [];
+  for (const m of [...text.matchAll(EMBED)].slice(0, MAX_EMBEDS_PER_BLOCK)) {
+    const node = await embedOf(m, chain, skip);
+    if (node) nodes.push(node);
+  }
+  return nodes;
+}
+
+async function embedOf(m: RegExpMatchArray, chain: EmbedChain, skip: Skip): Promise<Node | undefined> {
   const [, kind, uid, title] = m;
   const eid = uid ? `[:block/uid "${uid}"]` : `[:node/title "${title.replace(/["\\]/g, "\\$&")}"]`;
   const b = await window.roamAlphaAPI.data.async.pull(PATTERN, eid);
@@ -80,13 +95,13 @@ async function toNode(b: PullBlock, isPageRoot: boolean, chain: EmbedChain, skip
   const align = b[":block/text-align"];
   if (!isPageRoot && (align === "center" || align === "right" || align === "justify")) node.align = align;
   if (!isPageRoot) {
-    const embed = await embedOf(node.string, chain, skip);
+    const [embed, ...more] = await embedsOf(node.string, chain, skip);
     if (embed) node.embed = embed;
+    if (more.length) node.moreEmbeds = more;
   }
   return node;
 }
 
-/** Text starting with "{server}/p/{id}" for one of this graph's shortlinks. */
 /** "{server}/p/{id}" at the start of a block, bare or as `[text]({server}/p/{id})`. */
 export const isShortlinkText = (s: string | undefined, shortIds: Set<string>) => {
   const m = s && /^(?:\[[^\]\n]*\]\()?https?:\/\/[^\s)]+?\/p\/([2-9A-HJ-NP-Za-km-z]{8})(?=[\s)]|$)/.exec(s);
@@ -95,20 +110,28 @@ export const isShortlinkText = (s: string | undefined, shortIds: Set<string>) =>
 
 /**
  * A shortlink block: "{tag}" with the "[text]({server}/p/{id})" block and the change log under it (or, from
- * earlier builds, the link block itself). The same rule as the server's `withoutShortlinks`.
+ * earlier builds, the link block itself). The tag block is recognised by a recorded Changelog block among
+ * its children (the link block, or an earlier build's separate "Changelog" block next to it), so a status
+ * link pasted under an ordinary block leaves out only the link. The same rule as the server's
+ * `withoutShortlinks`.
  */
-export const isShortlinkBlock = (b: PullBlock, shortIds: Set<string>) =>
-  isShortlinkText(b[":block/string"], shortIds) ||
-  !!b[":block/children"]?.some((c) => isShortlinkText(c[":block/string"], shortIds));
+export const isShortlinkBlock = (b: PullBlock, { ids, anchors }: Shortlinks) => {
+  if (isShortlinkText(b[":block/string"], ids)) return true;
+  const kids = b[":block/children"] ?? [];
+  return kids.some((c) => isShortlinkText(c[":block/string"], ids)) && kids.some((c) => anchors.has(c[":block/uid"] ?? ""));
+};
 
 /**
  * The publishable tree. Shortlink blocks of the given ids, and the change log under them, are left
  * out at any depth, so they're never published or hashed.
  */
-export async function serialize(uid: string, shortIds: Set<string> = new Set()): Promise<Payload | null> {
+export async function serialize(
+  uid: string,
+  shortlinks: Shortlinks = { ids: new Set(), anchors: new Set() },
+): Promise<Payload | null> {
   const b = await window.roamAlphaAPI.data.async.pull(PATTERN, `[:block/uid "${uid}"]`);
   if (!b || !b[":block/uid"]) return null;
-  const skip: Skip = (c) => isShortlinkBlock(c, shortIds);
+  const skip: Skip = (c) => isShortlinkBlock(c, shortlinks);
   const isPage = typeof b[":node/title"] === "string";
   const tree = await toNode(b, isPage, [uid], skip);
   return {

@@ -54,7 +54,9 @@ dashboard** in the extension settings.
 - **Bulk changes**: select many pages to change where they're listed, who can read them, or their tags.
 
 Open the same menu again to check whether it's published, or to **Republish** after edits, **Make public**,
-**Make unlisted** or **Unpublish**.
+**Make unlisted** or **Unpublish**. Unpublishing asks first: it deletes the page on roam.pub along with its access
+settings, passwords, views, upvotes and places in collections. On a shared graph, pages another member published show
+their status only; only they or the graph's owner can change them.
 
 You can also do all of this from the command palette: type "Roam Publish".
 
@@ -68,7 +70,8 @@ check references, embeds and children first. Nothing else from your graph is sen
   plain text when it isn't.
 - **Block references** `((…))`: shown as the referenced text, up to 3 levels deep, including blocks outside the
   published page.
-- **Embeds** `{{embed: …}}`: the embedded block or page with its children, up to 2 levels deep.
+- **Embeds** `{{embed: …}}`: the embedded block or page with its children, up to 2 levels deep, and every embed when
+  a block has several.
 - **Views:** bullets, numbered lists and document view.
 - **Tables** `{{table}}` and **kanban boards** `{{kanban}}`.
 - **Math** `$$…$$`, rendered with KaTeX.
@@ -100,7 +103,7 @@ check references, embeds and children first. Nothing else from your graph is sen
 | **Block position** | First or last on the page, or under the block. |
 | **Change log** | On roam.pub: turn it on or off, check it works, and manage its token. |
 | **Sync published list** | Updates the extension's list of what you've published from roam.pub. Use it if a status looks wrong, e.g. after unpublishing on the website. The **Page…** and **Block…** menus already do this. |
-| **Server URL** | Advanced. Defaults to `https://roam.pub`. |
+| **Server URL** | Advanced. Defaults to `https://roam.pub`. Must use `https://` (or `http://localhost` for development), so your key is never sent unencrypted. |
 | **Reset Roam Publish block settings** | Restores the defaults of the Roam Publish block settings. Reinstalling doesn't, since Roam keeps settings. |
 
 Changing the tag or the link text edits existing blocks in place the next time you publish them.
