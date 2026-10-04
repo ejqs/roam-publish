@@ -39,7 +39,34 @@ export function fakeRoam(pages: Block[]) {
     return page ? toPull(page) : null;
   };
 
-  (globalThis as unknown as { window: unknown }).window = {
-    roamAlphaAPI: { data: { async: { pull } }, graph: { name: "test-graph" } },
+  const parentOf = (uid: string) => [...byUid.values()].find((b) => b.children?.some((c) => c.uid === uid));
+  const renumber = (b: Block) => b.children?.forEach((c, i) => (c.order = i));
+  let nextUid = 0;
+  const block = {
+    async create({ location, block: nb }: { location: { "parent-uid": string; order: number | "last" }; block: Block }) {
+      const parent = byUid.get(location["parent-uid"])!;
+      const kids = (parent.children ??= []);
+      kids.splice(location.order === "last" ? kids.length : location.order, 0, { ...nb });
+      byUid.set(nb.uid, kids.find((k) => k.uid === nb.uid)!);
+      renumber(parent);
+    },
+    async update({ block: b }: { block: { uid: string; string: string } }) {
+      byUid.get(b.uid)!.string = b.string;
+    },
+    async delete({ block: b }: { block: { uid: string } }) {
+      const parent = parentOf(b.uid);
+      if (parent) parent.children = parent.children!.filter((c) => c.uid !== b.uid);
+      byUid.delete(b.uid);
+      if (parent) renumber(parent);
+    },
   };
+
+  (globalThis as unknown as { window: unknown }).window = {
+    roamAlphaAPI: {
+      data: { async: { pull }, block },
+      graph: { name: "test-graph" },
+      util: { generateUID: () => `gen${String(nextUid++).padStart(6, "0")}` },
+    },
+  };
+  return { blocks: byUid };
 }

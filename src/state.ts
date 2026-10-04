@@ -13,6 +13,8 @@ export type CachedPublication = {
   anchorUid?: string | null;
   /** Taken down by a moderator, as of the last sync. */
   removed?: boolean;
+  /** False when another member of a shared graph published it, so this key can't change it. */
+  mine?: boolean;
 };
 export type Visibility = "public" | "unlisted";
 export type PublicationCache = Record<string, CachedPublication>;

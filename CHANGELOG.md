@@ -10,6 +10,22 @@ All notable changes to the Roam Publish extension. Dates are when the change lan
 - Clicking **Publish** again while a publish is still running no longer adds a second Roam Publish block.
 - The toast only says "Link copied" when the link really was copied.
 - Toasts are announced by screen readers.
+- **Unpublish** asks first, and says what's deleted on roam.pub with the page (access settings, passwords, views,
+  upvotes, places in collections).
+- If roam.pub refuses a publish (too large, removed by a moderator, another member's page), the Roam Publish block
+  written for it is taken back out of your page.
+- A block with several embeds publishes all of them, not just the first.
+- A status link pasted under an ordinary block no longer hides that block from the published page, and is never
+  mistaken for the page's own Roam Publish block (whose text publishing rewrites).
+- Requests give up after a minute with a clear message instead of hanging.
+
+### Status link and change log
+- Graphs with more than 2,000 published pages and blocks keep their change log confirmations working.
+
+### Setup and settings
+- On a shared graph, **Page…** and **Block…** show the status of pages another member published without offering
+  changes only they or the graph's owner can make.
+- **Server URL** must use `https://` (or `http://localhost`), so the API key is never sent unencrypted.
 
 ## 0.1.0 (2026-10-03)
 

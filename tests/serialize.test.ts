@@ -95,8 +95,52 @@ describe("serialize", () => {
         { uid: "b1", string: "content" },
       ] },
     ]);
-    const p = await serialize("page1", new Set(["abcd2345"]));
+    const p = await serialize("page1", { ids: new Set(["abcd2345"]), anchors: new Set(["link"]) });
     assert.deepEqual(p!.tree.children.map((c) => c.uid), ["b1"]);
+  });
+
+  test("an earlier build's block, whose Changelog block is the anchor, is left out too", async () => {
+    fakeRoam([
+      { uid: "page1", title: "P", children: [
+        { uid: "tag", string: "#published", children: [
+          { uid: "link", string: "https://roam.pub/p/abcd2345" },
+          { uid: "log", string: "Changelog", children: [{ uid: "e1", string: "entry" }] },
+        ] },
+      ] },
+    ]);
+    const p = await serialize("page1", { ids: new Set(["abcd2345"]), anchors: new Set(["log"]) });
+    assert.deepEqual(p!.tree.children, []);
+  });
+
+  test("a status link pasted under an ordinary block leaves out only the link", async () => {
+    fakeRoam([
+      { uid: "page1", title: "P", children: [
+        { uid: "rel", string: "Related:", children: [
+          { uid: "pasted", string: "https://roam.pub/p/abcd2345" },
+          { uid: "note", string: "a note" },
+        ] },
+      ] },
+    ]);
+    const p = await serialize("page1", { ids: new Set(["abcd2345"]), anchors: new Set(["anchor123"]) });
+    assert.deepEqual(p!.tree.children.map((c) => c.uid), ["rel"]);
+    assert.deepEqual(p!.tree.children[0].children.map((c) => c.uid), ["note"]);
+  });
+
+  test("every embed in a block is sent, in order", async () => {
+    fakeRoam([
+      { uid: "page1", title: "P", children: [
+        { uid: "b1", string: "{{embed: ((embedaaa1))}} {{[[embed]]: ((embedaaa2))}} {{embed: ((embedaaa3))}}" },
+        { uid: "b2", string: "{{embed: ((embedaaa1))}}" },
+      ] },
+      { uid: "other", title: "O", children: [
+        { uid: "embedaaa1", string: "one" }, { uid: "embedaaa2", string: "two" }, { uid: "embedaaa3", string: "three" },
+      ] },
+    ]);
+    const p = await serialize("page1");
+    const [b1, b2] = p!.tree.children;
+    assert.equal(b1.embed!.string, "one");
+    assert.deepEqual(b1.moreEmbeds!.map((e) => e.string), ["two", "three"]);
+    assert.equal(b2.moreEmbeds, undefined, "one embed hashes as before");
   });
 
   test("isShortlinkText only matches this graph's ids, at the start", () => {

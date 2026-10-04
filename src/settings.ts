@@ -83,7 +83,7 @@ export function createSettingsPanel(extensionAPI: ExtensionAPI) {
       {
         id: "server-url",
         name: "Server URL",
-        description: "Advanced. Blank: the default server.",
+        description: "Advanced. Blank: the default server. Must start with https://.",
         action: { type: "input", placeholder: __DEFAULT_SERVER__ },
       },
       {

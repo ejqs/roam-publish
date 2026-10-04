@@ -44,6 +44,24 @@ describe("api", () => {
     await assert.rejects(api("/x"), (e: InstanceType<typeof ApiError>) => e.status === 0);
   });
 
+  test("the key is never sent over plain http, except to this machine", async () => {
+    const calls = respond(200, {});
+    settings.set("server-url", "http://srv.example");
+    await assert.rejects(api("/x"), /must start with https/);
+    assert.equal(calls.length, 0);
+    settings.set("server-url", "http://localhost:3000");
+    await api("/x");
+    assert.equal(calls.length, 1);
+    settings.set("server-url", "https://srv.example/");
+  });
+
+  test("a server that never answers times out with a friendly error", async () => {
+    globalThis.fetch = (async () => {
+      throw new DOMException("timed out", "TimeoutError");
+    }) as never;
+    await assert.rejects(api("/x"), (e: InstanceType<typeof ApiError>) => e.status === 0 && /took too long/.test(e.message));
+  });
+
   test("without a key nothing is sent", async () => {
     settings.set("api-key", "");
     const calls = respond(200, {});
