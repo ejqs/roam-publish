@@ -81,6 +81,8 @@ describe("publish", () => {
     await publish("page1");
     assert.deepEqual(calls.map((c) => c.method), ["POST"]);
     assert.match(toasts.at(-1)!, /published as unlisted/);
+    // An older server doesn't say whether it can be Discoverable, so only Make listed is offered.
+    assert.deepEqual(buttons.map((b) => b.textContent), ["Make listed"]);
     // No clipboard here, so it doesn't claim the link was copied.
     assert.doesNotMatch(toasts.at(-1)!, /Link copied/);
   });
@@ -152,6 +154,42 @@ describe("status", () => {
     await publishStatus("page1");
     assert.match(toasts.at(-1)!, /by another member/);
     assert.equal(buttons.length, 0);
+  });
+
+  const remote = (over: object) => ({
+    "GET /api/ext/publications": (): [number, unknown] => [200, {
+      publications: [{ rootUid: "page1", kind: "page", title: "Page", url: "https://roam.pub/g/x", contentHash: "x",
+        updatedAt: "", ...over }],
+    }],
+  });
+  const labels = () => buttons.map((b) => b.textContent);
+
+  test("uses the website's words and offers the other two listings", async () => {
+    const calls = server({
+      ...remote({ visibility: "unlisted", listing: "unlisted", discoverBlocked: null }),
+      "PATCH /api/ext/publications/page1": (b) => [200, { visibility: "public", listing: b.listing, discoverBlocked: null, url: "https://roam.pub/g/x" }],
+    });
+    await publishStatus("page1");
+    assert.match(toasts.at(-1)!, /published \(unlisted\)/);
+    assert.deepEqual(labels().filter((l) => l?.startsWith("Make")), ["Make listed", "Make discoverable"]);
+    button("Make discoverable")!.click!();
+    await new Promise((r) => setImmediate(r));
+    assert.deepEqual(calls.at(-1)!.body, { listing: "discover" });
+    assert.match(toasts.at(-1)!, /Now discoverable/);
+  });
+
+  test("leaves out Make discoverable and says why when it can't be", async () => {
+    server(remote({ visibility: "public", listing: "listed", discoverBlocked: "Turn on search engines in Sharing to make pages Discoverable." }));
+    await publishStatus("page1");
+    assert.match(toasts.at(-1)!, /published \(listed\).*Turn on search engines/);
+    assert.deepEqual(labels().filter((l) => l?.startsWith("Make")), ["Make unlisted"]);
+  });
+
+  test("an older server that only says public still gets the new words", async () => {
+    server(remote({ visibility: "public" }));
+    await publishStatus("page1");
+    assert.match(toasts.at(-1)!, /published \(listed\)/);
+    assert.deepEqual(labels().filter((l) => l?.startsWith("Make")), ["Make unlisted"]);
   });
 });
 

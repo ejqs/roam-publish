@@ -4,6 +4,10 @@ export type CachedPublication = {
   title: string;
   kind: "page" | "block";
   visibility: Visibility;
+  /** Unlisted, Listed or Discoverable, as the website says (from servers that say). */
+  listing?: Listing;
+  /** Why it can't be made Discoverable, in words; null when it can (from servers that say). */
+  discoverBlocked?: string | null;
   updatedAt: string;
   /** Author name sent with the last publish; republishing with a new one updates the byline. */
   author?: string;
@@ -17,6 +21,11 @@ export type CachedPublication = {
   mine?: boolean;
 };
 export type Visibility = "public" | "unlisted";
+export type Listing = "unlisted" | "listed" | "discover";
+
+/** Where it's listed; older servers only say public or unlisted. */
+export const listingOf = (c: { visibility: Visibility; listing?: Listing }): Listing =>
+  c.listing ?? (c.visibility === "public" ? "listed" : "unlisted");
 export type PublicationCache = Record<string, CachedPublication>;
 
 let api: ExtensionAPI;

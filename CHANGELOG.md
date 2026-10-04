@@ -2,6 +2,14 @@
 
 All notable changes to the Roam Publish extension. Dates are when the change landed on `main`.
 
+## Unreleased
+
+### Publishing
+- Uses the website's words for where a page is listed: **Unlisted**, **Listed** and **Discoverable**. **Make public**
+  is now **Make listed**.
+- **Make discoverable** puts a page on your graph's front page and on Discover, right from the toast. When a page
+  can't be Discoverable (for example, it has a password or search engines are off), the status toast says why.
+
 ## 0.1.0 (2026-10-04)
 
 First release.

@@ -4,8 +4,9 @@ Publish Roam Research pages and blocks to the web as clean, shareable pages on [
 
 **[See an example page →](https://roam.pub/ejqs/DyEQxo40V/roam-publish-kitchen-sink)**
 
-- **Share it your way.** Keep a page unlisted so only people with the link can read it, list it on your graph's
-  blog-style front page, or put it on [Discover](https://roam.pub/discover) for everyone on roam.pub to find.
+- **Share it your way.** Keep a page **Unlisted** so only people with the link can read it, make it **Listed** on your
+  graph's blog-style front page, or **Discoverable** on [Discover](https://roam.pub/discover) for everyone on roam.pub
+  to find.
 - **Lock it down.** Protect a page with a password, or limit it to members of your graph.
 - **Publish together.** Collections gather pages from different graphs and people in one place.
 
@@ -53,10 +54,15 @@ dashboard** in the extension settings.
 - **A public profile** at `roam.pub/u/{username}`.
 - **Bulk changes**: select many pages to change where they're listed, who can read them, or their tags.
 
-Open the same menu again to check whether it's published, or to **Republish** after edits, **Make public**,
-**Make unlisted** or **Unpublish**. Unpublishing asks first: it deletes the page on roam.pub along with its access
-settings, passwords, views, upvotes and places in collections. On a shared graph, pages another member published show
-their status only; only they or the graph's owner can change them.
+New pages and blocks are published **Unlisted**: only people with the link can see them. The toast offers **Make
+listed** and **Make discoverable** right away.
+
+Open the same menu again to check whether it's published and where it's listed, or to **Republish** after edits,
+change where it's listed (**Make listed**, **Make discoverable**, **Make unlisted**) or **Unpublish**. A page can only
+be Discoverable when it's open to everyone, shown in your graph, and your graph's front page and search engines are
+on; otherwise the toast says what's stopping it. Unpublishing asks first: it deletes the page on roam.pub along with
+its access settings, passwords, views, upvotes and places in collections. On a shared graph, pages another member
+published show their status only; only they or the graph's owner can change them.
 
 You can also do all of this from the command palette: type "Roam Publish".
 
@@ -127,7 +133,7 @@ token can only add blocks to its own graph. It can't read, edit, move or delete 
 - **Verifying your graph, once:** roam.pub adds `roam.pub connected this graph (safe to delete)` to today's daily note.
   Only a graph's admins can create its tokens, so a successful write proves the graph is yours.
 - **The change log, if you keep the token:** roam.pub adds a dated entry under a page's status link whenever
-  something happens to it (published, made public, access changed, unpublished, and so on), including changes made
+  something happens to it (published, listed, access changed, unpublished, and so on), including changes made
   on the website. Entries hold the date, time, what happened and links, never page content.
 - **Your token:** entered on the website only, stored encrypted, never shown again. Pause the change log or remove the
   token in the graph's settings on roam.pub (**Change log → Open settings** in the extension), or revoke it in Roam.
