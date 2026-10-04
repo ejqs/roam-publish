@@ -398,6 +398,9 @@ const OFF_DISCOVER: Record<Exclude<Listing, "discover">, string> = {
   unlisted: "It also comes off your graph's front page: only people with the link can see it.",
 };
 
+/** Closes a confirm toast without doing anything (any button closes it). */
+const CANCEL = { label: "Cancel", onClick: () => {} };
+
 /** Asks before taking a Discoverable page off Discover, as the website does. */
 export function confirmLeaveDiscover(uid: string, listing: Exclude<Listing, "discover">) {
   const title = getCache()[uid]?.title;
@@ -405,7 +408,7 @@ export function confirmLeaveDiscover(uid: string, listing: Exclude<Listing, "dis
     `Take ${title ? `“${title}”` : "this"} off roam.pub/discover? ${OFF_DISCOVER[listing]}`,
     {
       intent: "danger",
-      actions: [{ label: `Make ${LISTING_LABEL[listing]}`, onClick: () => void setListing(uid, listing) }],
+      actions: [{ label: `Make ${LISTING_LABEL[listing]}`, onClick: () => void setListing(uid, listing) }, CANCEL],
       durationMs: 15000,
     },
   );
@@ -437,7 +440,7 @@ export function confirmUnpublish(uid: string) {
   const title = getCache()[uid]?.title;
   toast(
     `Unpublish ${title ? `“${title}”` : "this"}? Its link stops working, and its access settings, passwords, views, upvotes and places in collections on roam.pub are deleted. Publishing it again starts over.`,
-    { intent: "danger", actions: [{ label: "Unpublish", onClick: () => void unpublish(uid) }], durationMs: 15000 },
+    { intent: "danger", actions: [{ label: "Unpublish", onClick: () => void unpublish(uid) }, CANCEL], durationMs: 15000 },
   );
 }
 

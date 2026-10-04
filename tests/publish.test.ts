@@ -190,6 +190,10 @@ describe("status", () => {
     await new Promise((r) => setImmediate(r));
     assert.equal(calls.length, before);
     assert.match(toasts.at(-1)!, /Take “Page” off roam.pub\/discover\? .*only people with the link/);
+    buttons.findLast((b) => b.textContent === "Cancel")!.click!();
+    await new Promise((r) => setImmediate(r));
+    assert.equal(calls.length, before);
+    button("Make unlisted")!.click!();
     buttons.findLast((b) => b.textContent === "Make unlisted")!.click!();
     await new Promise((r) => setImmediate(r));
     assert.deepEqual(calls.at(-1)!.body, { listing: "unlisted" });
