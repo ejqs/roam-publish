@@ -26,7 +26,7 @@ Roam Publish server. For how the extension and server fit together, see
 
 > [!WARNING]
 > Verifying a graph may leave behind an `[[API Token: …]]` page in your graph that can't be deleted. Roam creates it
-> for the token. It isn't caused by roam.pub. If you know how to remove it reliably, email ejqs [at] ejqs [dot] net.
+> for the token. It isn't caused by roam.pub. If you know how to remove it reliably, email support@roam.pub.
 
 **Shared graphs:** whoever connects a graph first owns it on roam.pub and invites others by email from the dashboard.
 After you accept, you get your own key for that graph. Members can only change pages they published.
@@ -143,7 +143,7 @@ extension.
 ### Reporting a vulnerability
 
 If you find a security issue in the extension or on roam.pub, please report it privately to
-ejqs [at] ejqs [dot] net rather than opening a public issue. I'll reply as soon as I can.
+support@roam.pub or ejqs [at] ejqs [dot] net rather than opening a public issue. I'll reply as soon as I can.
 
 ## Known unknowns
 
