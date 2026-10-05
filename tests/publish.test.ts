@@ -13,7 +13,7 @@ type El = { textContent?: string; style: object; click?: () => void; [k: string]
 const toasts: string[] = [];
 let buttons: El[] = [];
 const el = (): El => ({
-  style: {},
+  style: { setProperty() {} },
   setAttribute() {},
   addEventListener(_: string, fn: () => void) {
     this.click = fn;
