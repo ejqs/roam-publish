@@ -30,9 +30,20 @@ export function toast(message: string, opts: ToastOptions = {}) {
   Object.assign(el.style, {
     background: bg, color: "#fff", padding: "10px 14px", borderRadius: "2px", fontSize: "14px",
     boxShadow: "0 0 0 1px rgba(17,20,24,.1), 0 2px 4px rgba(17,20,24,.2), 0 8px 24px rgba(17,20,24,.2)",
-    maxWidth: "480px",
+    maxWidth: "480px", position: "relative", paddingRight: "34px",
   });
   el.textContent = message;
+  const close = document.createElement("button");
+  close.type = "button";
+  close.textContent = "×";
+  close.setAttribute("aria-label", "Dismiss");
+  close.title = "Dismiss";
+  Object.assign(close.style, {
+    position: "absolute", top: "4px", right: "6px", padding: "0 4px", cursor: "pointer",
+    background: "transparent", border: "none", color: "#fff", fontSize: "18px", lineHeight: "1",
+  });
+  close.addEventListener("click", () => el.remove());
+  el.appendChild(close);
   // Links come from the server's responses; only ever open web pages from them.
   if (opts.link && /^https?:\/\//i.test(opts.link)) {
     const a = document.createElement("a");

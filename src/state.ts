@@ -13,6 +13,8 @@ export type CachedPublication = {
   author?: string;
   /** Permanent {server}/p/{id} link, from servers that have shortlinks. */
   shortUrl?: string | null;
+  /** How many places (its graph, collections) it's published in, as of the last sync (from servers that say). */
+  places?: number;
   /** The shortlink block in Roam the server's change log nests under. */
   anchorUid?: string | null;
   /** Taken down by a moderator, as of the last sync. */

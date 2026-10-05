@@ -26,6 +26,7 @@ type Remote = {
   url: string;
   shortUrl?: string | null;
   anchorUid?: string | null;
+  places?: number;
   contentHash: string;
   visibility: Visibility;
   listing?: Listing;
@@ -166,7 +167,7 @@ export async function syncPublications(opts: { quiet?: boolean } = {}) {
     cache[p.rootUid] = {
       hash: p.contentHash, url: p.url, title: p.title, kind: p.kind, visibility: p.visibility, updatedAt: p.updatedAt,
       listing: p.listing, discoverBlocked: p.discoverBlocked,
-      shortUrl: p.shortUrl, anchorUid: p.anchorUid, removed: p.removed, mine: p.mine,
+      shortUrl: p.shortUrl, anchorUid: p.anchorUid, places: p.places, removed: p.removed, mine: p.mine,
       // The server doesn't send bylines; keep the one sent with the last publish from here.
       author: previous[p.rootUid]?.author,
     };
@@ -187,6 +188,9 @@ async function ensureCache() {
 function report(e: unknown) {
   toast(e instanceof ApiError || e instanceof Error ? e.message : "Something went wrong", { intent: "danger" });
 }
+
+/** What Open goes to: the status link when it's published in more than one place, so all of them show. */
+const openLink = (c: CachedPublication) => ((c.places ?? 1) > 1 && c.shortUrl) || c.url;
 
 const shortIdOf = (shortUrl: string | null | undefined) => shortUrl?.split("/p/")[1];
 
@@ -336,6 +340,7 @@ export async function publish(uid: string) {
         visibility: res.visibility, listing: res.listing, discoverBlocked: res.discoverBlocked,
         updatedAt: new Date().toISOString(), author,
         shortUrl: res.shortUrl ?? link?.shortUrl ?? null, anchorUid: link?.anchorUid ?? cache[uid]?.anchorUid ?? null,
+        places: cache[uid]?.places,
       },
     });
     const copied = await navigator.clipboard?.writeText(res.url).then(() => true, () => false);
@@ -421,12 +426,9 @@ export async function setListing(uid: string, listing: Listing) {
       { method: "PATCH", body: JSON.stringify({ listing }) },
     );
     const cache = getCache();
-    if (cache[uid])
-      await setCache({
-        ...cache,
-        [uid]: { ...cache[uid], visibility: res.visibility, listing: res.listing, discoverBlocked: res.discoverBlocked, url: res.url },
-      });
-    toast(NOW[listingOf(res)], { intent: "success", link: res.url });
+    const next = cache[uid] && { ...cache[uid], visibility: res.visibility, listing: res.listing, discoverBlocked: res.discoverBlocked, url: res.url };
+    if (next) await setCache({ ...cache, [uid]: next });
+    toast(NOW[listingOf(res)], { intent: "success", link: next ? openLink(next) : res.url });
   } catch (e) {
     report(e);
   }
@@ -487,12 +489,12 @@ export async function publishStatus(uid: string) {
       return toast(`${label} isn't published.${offline}`, {
         action: { label: `Publish ${payload.kind}`, onClick: () => void publish(uid) },
       });
-    if (c.removed) return toast(`${label} was removed by a moderator.${offline}`, { intent: "danger", link: c.url });
+    if (c.removed) return toast(`${label} was removed by a moderator.${offline}`, { intent: "danger", link: openLink(c) });
     const where = LISTING_LABEL[listingOf(c)];
     if (c.mine === false)
       return toast(
         `${label} is published (${where}) by another member of this graph. Only they or the graph's owner can change it.${offline}`,
-        { link: c.url },
+        { link: openLink(c) },
       );
     const since = new Date(c.updatedAt).toLocaleString();
     const changed = (await hashPayload(payload)) !== c.hash;
@@ -510,7 +512,7 @@ export async function publishStatus(uid: string) {
       upToDate
         ? `${label} is published (${where}) and up to date. Last published ${since}.${offline}${blocked}`
         : `${label} is published (${where}) but ${changed ? "has changed" : "has a new author name"} since it was last published on ${since}.${offline}${blocked}`,
-      { intent: upToDate ? "success" : "none", link: c.url, actions, durationMs: 15000 },
+      { intent: upToDate ? "success" : "none", link: openLink(c), actions, durationMs: 15000 },
     );
   } catch (e) {
     report(e);
