@@ -26,7 +26,7 @@ First release.
   Discover by a stray click.
 - New: **Unpublish** asks first, and says what's deleted on roam.pub with the page (access settings, passwords, views,
   upvotes, places in collections). Confirm toasts have a **Cancel** button.
-- New: Every Roam Publish toast has an **×** in its upper-right corner to close it, with plenty of room to click.
+- New: Every Roam Publish toast has a **Close** button.
 - New: Embeds (every one, when a block has several), view types (numbered, document), text alignment and heading
   levels are sent. Block references are inlined, and references inside code and block-ref aliases are left as written.
 - New: Server moderation messages and reasons are shown when a publish is refused, and the Roam Publish block written
