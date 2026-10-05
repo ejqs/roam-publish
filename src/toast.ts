@@ -38,9 +38,13 @@ export function toast(message: string, opts: ToastOptions = {}) {
   close.textContent = "×";
   close.setAttribute("aria-label", "Dismiss");
   close.title = "Dismiss";
+  // Every size set outright: Roam's own button styles (padding, min sizes) would otherwise stretch
+  // the clickable area away from the ×.
   Object.assign(close.style, {
-    position: "absolute", top: "4px", right: "6px", padding: "0 4px", cursor: "pointer",
-    background: "transparent", border: "none", color: "#fff", fontSize: "18px", lineHeight: "1",
+    position: "absolute", top: "6px", right: "6px", width: "22px", height: "22px", minWidth: "0", minHeight: "0",
+    margin: "0", padding: "0", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center",
+    cursor: "pointer", background: "transparent", border: "none", boxShadow: "none", color: "#fff",
+    fontSize: "18px", lineHeight: "1",
   });
   close.addEventListener("click", () => el.remove());
   el.appendChild(close);
