@@ -34,6 +34,8 @@ let created = 0;
   body: { appendChild() {} },
 };
 const button = (label: string) => buttons.find((b) => b.textContent === label);
+/** Buttons other than each toast's × to close it. */
+const actions = () => buttons.filter((b) => b.textContent !== "×");
 
 const settings = new Map<string, unknown>();
 initState({ settings: { get: (k: string) => settings.get(k), set: async (k: string, v: unknown) => void settings.set(k, v) } } as never);
@@ -82,7 +84,7 @@ describe("publish", () => {
     assert.deepEqual(calls.map((c) => c.method), ["POST"]);
     assert.match(toasts.at(-1)!, /published as unlisted/);
     // An older server doesn't say whether it can be Discoverable, so only Make listed is offered.
-    assert.deepEqual(buttons.map((b) => b.textContent), ["Make listed"]);
+    assert.deepEqual(actions().map((b) => b.textContent), ["Make listed"]);
     // No clipboard here, so it doesn't claim the link was copied.
     assert.doesNotMatch(toasts.at(-1)!, /Link copied/);
   });
@@ -153,7 +155,7 @@ describe("status", () => {
     });
     await publishStatus("page1");
     assert.match(toasts.at(-1)!, /by another member/);
-    assert.equal(buttons.length, 0);
+    assert.equal(actions().length, 0);
   });
 
   const remote = (over: object) => ({
@@ -162,7 +164,7 @@ describe("status", () => {
         updatedAt: "", ...over }],
     }],
   });
-  const labels = () => buttons.map((b) => b.textContent);
+  const labels = () => actions().map((b) => b.textContent);
 
   test("uses the website's words and offers the other two listings", async () => {
     const calls = server({
