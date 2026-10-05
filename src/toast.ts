@@ -30,7 +30,7 @@ export function toast(message: string, opts: ToastOptions = {}) {
   Object.assign(el.style, {
     background: bg, color: "#fff", padding: "10px 14px", borderRadius: "2px", fontSize: "14px",
     boxShadow: "0 0 0 1px rgba(17,20,24,.1), 0 2px 4px rgba(17,20,24,.2), 0 8px 24px rgba(17,20,24,.2)",
-    maxWidth: "480px", position: "relative", paddingRight: "34px",
+    maxWidth: "480px", position: "relative", paddingRight: "36px",
   });
   el.textContent = message;
   const close = document.createElement("button");
@@ -38,14 +38,14 @@ export function toast(message: string, opts: ToastOptions = {}) {
   close.textContent = "×";
   close.setAttribute("aria-label", "Dismiss");
   close.title = "Dismiss";
-  // Every size set outright: Roam's own button styles (padding, min sizes) would otherwise stretch
-  // the clickable area away from the ×.
-  Object.assign(close.style, {
-    position: "absolute", top: "6px", right: "6px", width: "22px", height: "22px", minWidth: "0", minHeight: "0",
-    margin: "0", padding: "0", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center",
-    cursor: "pointer", background: "transparent", border: "none", boxShadow: "none", color: "#fff",
-    fontSize: "18px", lineHeight: "1",
-  });
+  // A generous square in the corner with the × centered in it. Set as !important, which beats any
+  // stylesheet: Roam's own button styles otherwise move the clickable area off the ×.
+  const closeStyle: Record<string, string> = {
+    all: "unset", position: "absolute", top: "0", right: "0", width: "32px", height: "32px",
+    "box-sizing": "border-box", display: "flex", "align-items": "center", "justify-content": "center",
+    cursor: "pointer", color: "#fff", "font-size": "18px", "line-height": "1", "font-family": "inherit",
+  };
+  for (const [k, v] of Object.entries(closeStyle)) close.style.setProperty(k, v, "important");
   close.addEventListener("click", () => el.remove());
   el.appendChild(close);
   // Links come from the server's responses; only ever open web pages from them.
