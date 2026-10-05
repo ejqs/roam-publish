@@ -13,7 +13,7 @@ type El = { textContent?: string; style: object; click?: () => void; [k: string]
 const toasts: string[] = [];
 let buttons: El[] = [];
 const el = (): El => ({
-  style: { setProperty() {} },
+  style: {},
   setAttribute() {},
   addEventListener(_: string, fn: () => void) {
     this.click = fn;
@@ -34,8 +34,8 @@ let created = 0;
   body: { appendChild() {} },
 };
 const button = (label: string) => buttons.find((b) => b.textContent === label);
-/** Buttons other than each toast's × to close it. */
-const actions = () => buttons.filter((b) => b.textContent !== "×");
+/** Buttons other than each toast's Close. */
+const actions = () => buttons.filter((b) => b.textContent !== "Close");
 
 const settings = new Map<string, unknown>();
 initState({ settings: { get: (k: string) => settings.get(k), set: async (k: string, v: unknown) => void settings.set(k, v) } } as never);
