@@ -8,6 +8,8 @@ export type CachedPublication = {
   listing?: Listing;
   /** Why it can't be made Discoverable, in words; null when it can (from servers that say). */
   discoverBlocked?: string | null;
+  /** Why it's listed but nothing shows it (its graph's front page is off), in words (from servers that say). */
+  listedNote?: string | null;
   updatedAt: string;
   /** Author name sent with the last publish; republishing with a new one updates the byline. */
   author?: string;

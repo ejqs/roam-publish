@@ -31,6 +31,7 @@ type Remote = {
   visibility: Visibility;
   listing?: Listing;
   discoverBlocked?: string | null;
+  listedNote?: string | null;
   updatedAt: string;
   /** Taken down by a moderator (from servers that say). */
   removed?: boolean;
@@ -166,7 +167,7 @@ export async function syncPublications(opts: { quiet?: boolean } = {}) {
   for (const p of publications) {
     cache[p.rootUid] = {
       hash: p.contentHash, url: p.url, title: p.title, kind: p.kind, visibility: p.visibility, updatedAt: p.updatedAt,
-      listing: p.listing, discoverBlocked: p.discoverBlocked,
+      listing: p.listing, discoverBlocked: p.discoverBlocked, listedNote: p.listedNote,
       shortUrl: p.shortUrl, anchorUid: p.anchorUid, places: p.places, removed: p.removed, mine: p.mine,
       // The server doesn't send bylines; keep the one sent with the last publish from here.
       author: previous[p.rootUid]?.author,
@@ -398,6 +399,8 @@ function listingActions(uid: string, c: { visibility: Visibility; listing?: List
     }));
 }
 
+const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
+
 const OFF_DISCOVER: Record<Exclude<Listing, "discover">, string> = {
   listed: "It stays on your graph's front page.",
   unlisted: "It also comes off your graph's front page: only people with the link can see it.",
@@ -421,14 +424,27 @@ export function confirmLeaveDiscover(uid: string, listing: Exclude<Listing, "dis
 
 export async function setListing(uid: string, listing: Listing) {
   try {
-    const res = await api<{ visibility: Visibility; listing?: Listing; discoverBlocked?: string | null; url: string }>(
-      `/api/ext/publications/${encodeURIComponent(uid)}`,
-      { method: "PATCH", body: JSON.stringify({ listing }) },
-    );
+    const res = await api<{
+      visibility: Visibility;
+      listing?: Listing;
+      discoverBlocked?: string | null;
+      listedNote?: string | null;
+      url: string;
+    }>(`/api/ext/publications/${encodeURIComponent(uid)}`, { method: "PATCH", body: JSON.stringify({ listing }) });
     const cache = getCache();
-    const next = cache[uid] && { ...cache[uid], visibility: res.visibility, listing: res.listing, discoverBlocked: res.discoverBlocked, url: res.url };
+    const next = cache[uid] && {
+      ...cache[uid], visibility: res.visibility, listing: res.listing, discoverBlocked: res.discoverBlocked,
+      listedNote: res.listedNote, url: res.url,
+    };
     if (next) await setCache({ ...cache, [uid]: next });
-    toast(NOW[listingOf(res)], { intent: "success", link: next ? openLink(next) : res.url });
+    // Listed with the graph's front page off: nothing lists it, so don't say the front page does.
+    const now = listingOf(res);
+    const note = now !== "unlisted" && res.listedNote;
+    toast(note ? `Now listed, but ${lowerFirst(note)}` : NOW[now], {
+      intent: note ? "none" : "success",
+      link: next ? openLink(next) : res.url,
+      durationMs: note ? 15000 : undefined,
+    });
   } catch (e) {
     report(e);
   }
@@ -507,7 +523,9 @@ export async function publishStatus(uid: string) {
       { label: "Unpublish", onClick: () => confirmUnpublish(uid) },
     ];
     // Roam's toasts can't grey a button out, so say why Make discoverable isn't there.
-    const blocked = c.discoverBlocked && listingOf(c) !== "discover" ? ` ${c.discoverBlocked}` : "";
+    const blocked =
+      (listingOf(c) !== "unlisted" && c.listedNote ? ` ${c.listedNote}` : "") ||
+      (c.discoverBlocked && listingOf(c) !== "discover" ? ` ${c.discoverBlocked}` : "");
     toast(
       upToDate
         ? `${label} is published (${where}) and up to date. Last published ${since}.${offline}${blocked}`
