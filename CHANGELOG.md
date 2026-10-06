@@ -11,6 +11,11 @@ What's new shows it once Roam Depot serves it. Every bullet starts with **New:**
   get the right one.
 
 ### Publishing
+- New: **Add to collection…** on the publish and status toasts puts a page in one of your collections, from a
+  dropdown that says how it starts out in each one (listed, on Discover, password-protected or members only). When
+  the collection is locked and your graph isn't, the page moves out of your graph so its graph link can't get
+  around the lock.
+- Improved: Toasts stay open while your pointer or keyboard focus is in them.
 - Fixed: **Make listed** no longer says a page is on your graph's front page when the front page is turned off.
   It says nothing lists the page yet, and the status toast says so too.
 

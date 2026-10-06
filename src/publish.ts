@@ -158,10 +158,13 @@ export function openChangeLogSettings() {
 
 /** Re-download the list of published items from the server into the cache. */
 export async function syncPublications(opts: { quiet?: boolean } = {}) {
-  const { publications, changeLog } = await api<{ publications: Remote[]; changeLog?: ChangeLog }>(
-    "/api/ext/publications",
-  );
+  const { publications, changeLog, collections } = await api<{
+    publications: Remote[];
+    changeLog?: ChangeLog;
+    collections?: number;
+  }>("/api/ext/publications");
   warnIfBroken(changeLog);
+  collectionCount = collections;
   const previous = getCache();
   const cache: PublicationCache = {};
   for (const p of publications) {
@@ -321,6 +324,7 @@ export async function publish(uid: string) {
       listing?: Listing;
       discoverBlocked?: string | null;
       changeLog?: ChangeLog;
+      collections?: number;
     }>(
       "/api/ext/publications",
       {
@@ -344,6 +348,7 @@ export async function publish(uid: string) {
         places: cache[uid]?.places,
       },
     });
+    collectionCount = res.collections;
     const copied = await navigator.clipboard?.writeText(res.url).then(() => true, () => false);
     const copiedNote = copied ? " Link copied." : "";
 
@@ -359,8 +364,11 @@ export async function publish(uid: string) {
     toast(msg, {
       intent: res.status === "unchanged" ? "none" : "success",
       link: res.url,
-      // New items start unlisted; offer the one-click upgrades right where they'll see it.
-      actions: res.status === "created" && unlisted ? listingActions(uid, res) : undefined,
+      // New items start unlisted; offer the one-click upgrades, and collections, right where they'll see it.
+      actions:
+        res.status === "created"
+          ? [...(unlisted ? listingActions(uid, res) : []), ...collectionAction(uid)]
+          : undefined,
     });
     warnIfBroken(res.changeLog);
   } catch (e) {
@@ -450,6 +458,96 @@ export async function setListing(uid: string, listing: Listing) {
   }
 }
 
+/** Collections the key's holder can add pages to, as the server last said; undefined on servers that don't. */
+let collectionCount: number | undefined;
+
+/** "Add to collection…", when there's a collection to add to. */
+const collectionAction = (uid: string) =>
+  collectionCount ? [{ label: "Add to collection…", onClick: () => void chooseCollection(uid) }] : [];
+
+type CollectionChoice = {
+  id: string;
+  name: string;
+  listing: Exclude<Listing, "unlisted">;
+  access: "open" | "password" | "members";
+  entryUrl: string | null;
+  movesOutOfGraph: boolean;
+};
+
+/** How a page starts out in a collection, as the dropdown says it. */
+function startsAs(c: Pick<CollectionChoice, "listing" | "access">) {
+  return c.access === "password"
+    ? "password-protected"
+    : c.access === "members"
+      ? "members only"
+      : c.listing === "discover"
+        ? "listed and on Discover"
+        : "listed";
+}
+
+/**
+ * Asks which collection to add a published page to. Each one says how the page will start out
+ * there, from the collection's own defaults, and whether it leaves the graph.
+ */
+export async function chooseCollection(uid: string) {
+  try {
+    const { collections } = await api<{ collections: CollectionChoice[] }>(
+      `/api/ext/publications/${encodeURIComponent(uid)}/collections`,
+    );
+    if (collections.length === 0)
+      return toast("You're not in any collections yet. Create or join one on roam.pub.", {
+        link: `${getServer()}/dashboard/collections`,
+      });
+    const title = getCache()[uid]?.title;
+    toast(`Add ${title ? `“${title}”` : "this"} to a collection. It starts out the way the collection says.`, {
+      select: {
+        placeholder: "Choose a collection…",
+        options: collections.map((c) => ({
+          value: c.id,
+          label: c.entryUrl
+            ? `${c.name} (already there)`
+            : `${c.name}: ${startsAs(c)}${c.movesOutOfGraph ? ", leaves your graph" : ""}`,
+          disabled: !!c.entryUrl,
+        })),
+        onChoose: (id) => void addToCollection(uid, id),
+      },
+      durationMs: 20000,
+    });
+  } catch (e) {
+    report(e);
+  }
+}
+
+export async function addToCollection(uid: string, collectionId: string) {
+  try {
+    const res = await api<{
+      name: string;
+      entryUrl: string;
+      listing: Listing;
+      access: CollectionChoice["access"];
+      movedOutOfGraph: boolean;
+      url: string;
+    }>(`/api/ext/publications/${encodeURIComponent(uid)}/collections`, {
+      method: "POST",
+      body: JSON.stringify({ collectionId }),
+    });
+    const cache = getCache();
+    if (cache[uid])
+      await setCache({ ...cache, [uid]: { ...cache[uid], url: res.url, places: (cache[uid].places ?? 1) + (res.movedOutOfGraph ? 0 : 1) } });
+    const how = res.listing === "unlisted" ? "unlisted" : startsAs({ listing: res.listing, access: res.access });
+    toast(
+      `Added to ${res.name}, ${how} there.${
+        res.movedOutOfGraph
+          ? ` It left your graph, so its graph link can't get around ${res.access === "password" ? "the password" : "members-only access"}.`
+          : ""
+      }`,
+      { intent: "success", link: res.entryUrl, durationMs: res.movedOutOfGraph ? 15000 : undefined },
+    );
+  } catch (e) {
+    report(e);
+  }
+}
+
 /**
  * Asks before unpublishing: roam.pub deletes the page with everything attached to it there, and
  * publishing again starts from scratch.
@@ -520,6 +618,7 @@ export async function publishStatus(uid: string) {
     const actions = [
       ...(upToDate ? [] : [{ label: "Republish", onClick: () => void publish(uid) }]),
       ...listingActions(uid, c),
+      ...collectionAction(uid),
       { label: "Unpublish", onClick: () => confirmUnpublish(uid) },
     ];
     // Roam's toasts can't grey a button out, so say why Make discoverable isn't there.

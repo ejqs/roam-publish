@@ -12,14 +12,17 @@ mock.timers.enable({ apis: ["setTimeout"] });
 type El = { textContent?: string; style: object; click?: () => void; [k: string]: unknown };
 const toasts: string[] = [];
 let buttons: El[] = [];
+let selects: El[] = [];
 const el = (): El => ({
   style: {},
+  children: [] as El[],
   setAttribute() {},
   addEventListener(_: string, fn: () => void) {
     this.click = fn;
   },
   remove() {},
   appendChild(c: El) {
+    (this.children as El[]).push(c);
     if (this === container && c.textContent) toasts.push(c.textContent);
   },
 });
@@ -29,6 +32,7 @@ let created = 0;
   createElement: (tag: string) => {
     const e = created++ === 0 ? container : el();
     if (tag === "button") buttons.push(e);
+    if (tag === "select") selects.push(e);
     return e;
   },
   body: { appendChild() {} },
@@ -71,6 +75,7 @@ beforeEach(() => {
   settings.set("publications", cached());
   toasts.length = 0;
   buttons = [];
+  selects = [];
   roam = fakeRoam([{ uid: "page1", title: "Page", children: [{ uid: "b1", string: "hello" }] }]);
 });
 
@@ -130,6 +135,60 @@ describe("publish", () => {
     const tree = calls.at(-1)!.body.tree as { children: { uid: string; children: unknown[] }[] };
     assert.equal(rel.uid, "rel");
     assert.deepEqual(tree.children.map((c) => [c.uid, c.children.length]), [["rel", 0]]);
+  });
+});
+
+describe("add to collection", () => {
+  const choices = [
+    { id: "c1", name: "Writing", listing: "listed", access: "open", entryUrl: "https://roam.pub/c/aaa", movesOutOfGraph: false },
+    { id: "c2", name: "Best of", listing: "discover", access: "open", entryUrl: null, movesOutOfGraph: false },
+    { id: "c3", name: "Private", listing: "listed", access: "password", entryUrl: null, movesOutOfGraph: true },
+  ];
+  const tick = () => new Promise((r) => setImmediate(r));
+
+  test("isn't offered to someone with no collections", async () => {
+    server({ "POST /api/ext/publications": (b) => [200, { status: "created", url: "https://roam.pub/g/x", contentHash: b.contentHash, visibility: "unlisted", listing: "unlisted", collections: 0 }] });
+    await publish("page1");
+    assert.ok(!button("Add to collection…"));
+  });
+
+  test("the publish toast offers it; the dropdown says how the page starts in each, and adding moves it when stricter", async () => {
+    const calls = server({
+      "POST /api/ext/publications": (b) => [200, { status: "created", url: "https://roam.pub/g/x", contentHash: b.contentHash, visibility: "unlisted", listing: "unlisted", collections: 3 }],
+      "GET /api/ext/publications/page1/collections": () => [200, { collections: choices }],
+      "POST /api/ext/publications/page1/collections": () => [200, {
+        name: "Private", entryUrl: "https://roam.pub/c/bbb", listing: "listed", access: "password",
+        movedOutOfGraph: true, encrypted: false, url: "https://roam.pub/c/bbb",
+      }],
+    });
+    await publish("page1");
+    button("Add to collection…")!.click!();
+    await tick();
+    assert.match(toasts.at(-1)!, /Add “Page” to a collection/);
+    const sel = selects.at(-1)!;
+    const options = (sel.children as El[]).slice(1).map((o) => [o.textContent, !!o.disabled]);
+    assert.deepEqual(options, [
+      ["Writing (already there)", true],
+      ["Best of: listed and on Discover", false],
+      ["Private: password-protected, leaves your graph", false],
+    ]);
+    sel.value = "c3";
+    sel.click!();
+    await tick();
+    assert.deepEqual(calls.at(-1), { method: "POST", path: "/api/ext/publications/page1/collections", body: { collectionId: "c3" } });
+    assert.match(toasts.at(-1)!, /^Added to Private, password-protected there\. It left your graph, so its graph link can't get around the password\./);
+    assert.equal((settings.get("publications") as Record<string, { url: string }>).page1.url, "https://roam.pub/c/bbb");
+  });
+
+  test("the status toast offers it too", async () => {
+    server({
+      "GET /api/ext/publications": () => [200, {
+        collections: 1,
+        publications: [{ rootUid: "page1", kind: "page", title: "Page", url: "https://roam.pub/g/x", contentHash: "x", visibility: "unlisted", listing: "unlisted", updatedAt: "" }],
+      }],
+    });
+    await publishStatus("page1");
+    assert.ok(button("Add to collection…"));
   });
 });
 

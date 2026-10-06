@@ -3,12 +3,20 @@ let container: HTMLDivElement | null = null;
 
 type ToastAction = { label: string; onClick: () => void };
 
+/** A dropdown above the buttons; picking an option closes the toast and runs `onChoose`. */
+type ToastSelect = {
+  placeholder: string;
+  options: { value: string; label: string; disabled?: boolean }[];
+  onChoose: (value: string) => void;
+};
+
 type ToastOptions = {
   intent?: "success" | "danger" | "none";
   link?: string;
   action?: ToastAction;
   /** Several buttons in a row; `action` is the one-button shorthand. */
   actions?: ToastAction[];
+  select?: ToastSelect;
   durationMs?: number;
 };
 
@@ -43,6 +51,34 @@ export function toast(message: string, opts: ToastOptions = {}) {
     Object.assign(a.style, { color: "#fff", fontWeight: "600", marginLeft: "6px" });
     el.appendChild(a);
   }
+  if (opts.select) {
+    const { placeholder, options, onChoose } = opts.select;
+    const sel = document.createElement("select");
+    sel.setAttribute("aria-label", placeholder);
+    Object.assign(sel.style, {
+      display: "block", width: "100%", marginTop: "8px", padding: "4px 6px", fontSize: "13px",
+      color: "#1c2127", background: "#fff", border: "1px solid rgba(255,255,255,.4)", borderRadius: "2px",
+    });
+    const first = document.createElement("option");
+    first.textContent = placeholder;
+    first.value = "";
+    first.disabled = true;
+    first.selected = true;
+    sel.appendChild(first);
+    for (const o of options) {
+      const opt = document.createElement("option");
+      opt.value = o.value;
+      opt.textContent = o.label;
+      opt.disabled = !!o.disabled;
+      sel.appendChild(opt);
+    }
+    sel.addEventListener("change", () => {
+      if (!sel.value) return;
+      el.remove();
+      onChoose(sel.value);
+    });
+    el.appendChild(sel);
+  }
   const actions = [...(opts.action ? [opts.action] : []), ...(opts.actions ?? [])];
   // Every toast can be closed; Close sits at the right end of the button row.
   const row = document.createElement("div");
@@ -65,7 +101,20 @@ export function toast(message: string, opts: ToastOptions = {}) {
   }
   el.appendChild(row);
   container.appendChild(el);
-  setTimeout(() => el.remove(), opts.durationMs ?? (actions.length ? 12000 : opts.link ? 8000 : 4000));
+  // A toast stays while the pointer or focus is in it (picking from its dropdown, say), and closes
+  // its usual time after that.
+  const ms = opts.durationMs ?? (actions.length || opts.select ? 12000 : opts.link ? 8000 : 4000);
+  let timer = setTimeout(() => el.remove(), ms);
+  const hold = () => clearTimeout(timer);
+  const release = () => {
+    if (el.matches(":hover") || el.contains(document.activeElement)) return;
+    clearTimeout(timer);
+    timer = setTimeout(() => el.remove(), ms);
+  };
+  el.addEventListener("mouseenter", hold);
+  el.addEventListener("focusin", hold);
+  el.addEventListener("mouseleave", release);
+  el.addEventListener("focusout", () => setTimeout(release));
 }
 
 export function removeToasts() {
