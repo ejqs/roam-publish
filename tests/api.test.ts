@@ -27,6 +27,24 @@ describe("api", () => {
     assert.equal(calls[0].headers["x-api-key"], "rp_test");
   });
 
+  test("names the Roam graph it's in, so the server can refuse another graph's key", async () => {
+    const calls = respond(200, {});
+    await api("/x");
+    assert.equal(calls[0].headers["x-roam-graph"], undefined);
+    (globalThis as unknown as { window: unknown }).window = { roamAlphaAPI: { graph: { name: "my-graph" } } };
+    try {
+      await api("/x");
+      assert.equal(calls[1].headers["x-roam-graph"], "my-graph");
+    } finally {
+      delete (globalThis as unknown as { window?: unknown }).window;
+    }
+  });
+
+  test("a key for another graph shows the server's words", async () => {
+    respond(409, { error: "This API key is for the graph a, but you're in b.", keyGraph: "a" });
+    await assert.rejects(api("/x"), (e: InstanceType<typeof ApiError>) => e.status === 409 && /for the graph a/.test(e.message));
+  });
+
   test("an invalid key says to get a new one", async () => {
     respond(401, { error: "Invalid API key" });
     await assert.rejects(api("/x"), (e: InstanceType<typeof ApiError>) => e.status === 401 && /Get a new one/.test(e.message));

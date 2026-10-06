@@ -22,6 +22,9 @@ export async function api<T>(path: string, init: RequestInit & { auth?: boolean 
     const key = getApiKey();
     if (!key) throw new ApiError(0, "Add your API key first: Settings → Roam Publish → Open dashboard.");
     headers["x-api-key"] = key;
+    // The server refuses a key that belongs to another graph, so its pages never publish under that graph's name.
+    const graph = globalThis.window?.roamAlphaAPI?.graph?.name;
+    if (graph) headers["x-roam-graph"] = graph;
   }
   let res: Response;
   try {

@@ -209,6 +209,25 @@ describe("status", () => {
     assert.deepEqual(labels().filter((l) => l?.startsWith("Make")), ["Make unlisted"]);
   });
 
+  test("doesn't claim the front page lists a page when the graph's front page is off", async () => {
+    const note = "Your graph's front page is off, so nothing lists this page yet: only people with the link will find it.";
+    server({
+      ...remote({ visibility: "unlisted", listing: "unlisted", discoverBlocked: "Turn on this graph's front page in Sharing to make pages Discoverable.", listedNote: null }),
+      "PATCH /api/ext/publications/page1": (b) => [200, { visibility: "public", listing: b.listing, discoverBlocked: null, listedNote: note, url: "https://roam.pub/g/x" }],
+    });
+    await publishStatus("page1");
+    button("Make listed")!.click!();
+    await new Promise((r) => setImmediate(r));
+    assert.match(toasts.at(-1)!, /^Now listed, but your graph's front page is off/);
+    assert.doesNotMatch(toasts.at(-1)!, /on your graph's front page/);
+  });
+
+  test("the status of a listed page says when nothing lists it", async () => {
+    server(remote({ visibility: "public", listing: "listed", discoverBlocked: "x", listedNote: "Your graph's front page is off." }));
+    await publishStatus("page1");
+    assert.match(toasts.at(-1)!, /published \(listed\).*front page is off/);
+  });
+
   test("an older server that only says public still gets the new words", async () => {
     server(remote({ visibility: "public" }));
     await publishStatus("page1");

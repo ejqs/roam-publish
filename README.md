@@ -32,6 +32,9 @@ Roam Publish server. For how the extension and server fit together, see
 **Shared graphs:** whoever connects a graph first owns it on roam.pub and invites others by email from the dashboard.
 After you accept, you get your own key for that graph. Members can only change pages they published.
 
+**One key per graph.** A key only works in the graph it was made for. Pasted into another graph, publishing says
+which graph it belongs to, and nothing is published.
+
 **Lost your key?** Regenerate it at [roam.pub/dashboard/keys](https://roam.pub/dashboard/keys) and paste the new one.
 The old key stops working.
 
@@ -72,8 +75,8 @@ The page or block is published with all its children. Everything published can b
 check references, embeds and children first. Nothing else from your graph is sent.
 
 - **Text formatting:** bold, italics, ^^highlights^^, ~~strikethrough~~, `inline code`, headings and text alignment.
-- **Links:** `[[page links]]`, `#tags` and aliases. They link to the other page when it's also published, and show as
-  plain text when it isn't.
+- **Links:** `[[page links]]`, `#tags` and aliases. They link to the other page when it's also published and listed,
+  and show as plain text when it isn't (so an unlisted page's link is never handed out).
 - **Block references** `((…))`: shown as the referenced text, up to 3 levels deep, including blocks outside the
   published page.
 - **Embeds** `{{embed: …}}`: the embedded block or page with its children, up to 2 levels deep, and every embed when
