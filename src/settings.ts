@@ -94,10 +94,22 @@ export function createSettingsPanel(extensionAPI: ExtensionAPI) {
         action: {
           type: "button",
           content: "Reset",
+          // Asks first: it overwrites the tag, link text and position you set.
           onClick: () =>
-            void resetShortlinkSettings()
-              .then(() => toast("Defaults restored. Close and reopen settings to see them."))
-              .catch((e: Error) => toast(e.message, { intent: "danger" })),
+            toast("Reset the Roam Publish block settings to their defaults? Your tag, link text and position are replaced.", {
+              intent: "danger",
+              actions: [
+                {
+                  label: "Reset",
+                  onClick: () =>
+                    void resetShortlinkSettings()
+                      .then(() => toast("Defaults restored. Close and reopen settings to see them."))
+                      .catch((e: Error) => toast(e.message, { intent: "danger" })),
+                },
+                { label: "Cancel", onClick: () => {} },
+              ],
+              durationMs: 15000,
+            }),
         },
       },
     ],

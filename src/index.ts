@@ -9,10 +9,10 @@ const PAGE_MENU = "Roam Publish: Page…";
 /** Command palette: the current page, or the block being edited. */
 const PALETTE: { label: string; target: "page" | "block"; run: (uid: string) => Promise<void> }[] = [
   { label: "Roam Publish: Publish current page", target: "page", run: publish },
-  { label: "Roam Publish: Unpublish current page", target: "page", run: async (uid) => confirmUnpublish(uid) },
+  { label: "Roam Publish: Unpublish current page", target: "page", run: confirmUnpublish },
   { label: "Roam Publish: Current page status", target: "page", run: publishStatus },
   { label: "Roam Publish: Publish focused block", target: "block", run: publish },
-  { label: "Roam Publish: Unpublish focused block", target: "block", run: async (uid) => confirmUnpublish(uid) },
+  { label: "Roam Publish: Unpublish focused block", target: "block", run: confirmUnpublish },
   { label: "Roam Publish: Focused block status", target: "block", run: publishStatus },
 ];
 

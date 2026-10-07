@@ -20,7 +20,8 @@ export async function api<T>(path: string, init: RequestInit & { auth?: boolean 
     throw new ApiError(-1, `The Server URL must start with https:// (it's ${server}). Settings → Roam Publish → Server URL.`);
   if (init.auth !== false) {
     const key = getApiKey();
-    if (!key) throw new ApiError(0, "Add your API key first: Settings → Roam Publish → Open dashboard.");
+    // Not 0: that means the server couldn't be reached, and the status menu falls back to the last sync then.
+    if (!key) throw new ApiError(-1, "Add your API key first: Settings → Roam Publish → Open dashboard.");
     headers["x-api-key"] = key;
     // The server refuses a key that belongs to another graph, so its pages never publish under that graph's name.
     const graph = globalThis.window?.roamAlphaAPI?.graph?.name;

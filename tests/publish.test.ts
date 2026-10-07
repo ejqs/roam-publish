@@ -193,14 +193,45 @@ describe("add to collection", () => {
 });
 
 describe("unpublish", () => {
+  const published = (over: object = {}) => ({
+    "GET /api/ext/publications": (): [number, unknown] => [200, {
+      publications: [{ rootUid: "page1", kind: "page", title: "Page", url: "https://roam.pub/g/x", contentHash: "x",
+        visibility: "unlisted", updatedAt: "", ...over }],
+    }],
+  });
+  const deletes = (calls: { method: string }[]) => calls.filter((c) => c.method === "DELETE");
+
   test("asks first, and only unpublishes when confirmed", async () => {
-    const calls = server({ "DELETE /api/ext/publications/page1": () => [200, { deleted: true }] });
-    confirmUnpublish("page1");
-    assert.equal(calls.length, 0);
+    const calls = server({ ...published(), "DELETE /api/ext/publications/page1": () => [200, { deleted: true }] });
+    await confirmUnpublish("page1");
+    assert.equal(deletes(calls).length, 0);
     assert.match(toasts.at(-1)!, /Unpublish “Page”\? .*deleted/);
     button("Unpublish")!.click!();
     await new Promise((r) => setImmediate(r));
-    assert.deepEqual(calls.map((c) => `${c.method} ${c.path}`), ["DELETE /api/ext/publications/page1"]);
+    assert.deepEqual(deletes(calls).map((c) => `${c.method} ${c.path}`), ["DELETE /api/ext/publications/page1"]);
+  });
+
+  test("doesn't ask about a page that isn't published", async () => {
+    server({ "GET /api/ext/publications": () => [200, { publications: [] }] });
+    await confirmUnpublish("page1");
+    assert.match(toasts.at(-1)!, /isn't published/);
+    assert.equal(actions().length, 0);
+  });
+
+  test("doesn't ask about another member's page", async () => {
+    server(published({ mine: false }));
+    await confirmUnpublish("page1");
+    assert.match(toasts.at(-1)!, /Another member/);
+    assert.equal(actions().length, 0);
+  });
+});
+
+describe("no API key", () => {
+  test("status says to add the key instead of offering buttons from the last sync", async () => {
+    settings.delete("api-key");
+    await publishStatus("page1");
+    assert.match(toasts.at(-1)!, /Add your API key first/);
+    assert.equal(actions().length, 0);
   });
 });
 

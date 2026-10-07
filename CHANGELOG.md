@@ -26,6 +26,8 @@ First release.
   Discover by a stray click.
 - New: **Unpublish** asks first, and says what's deleted on roam.pub with the page (access settings, passwords, views,
   upvotes, places in collections). Confirm toasts have a **Cancel** button.
+- New: **Unpublish** from the command palette checks the page first: one that isn't published, or that another
+  member published, says so instead of asking you to confirm something that can't happen.
 - New: Every Roam Publish toast has a **Close** button, and toasts stay open while your pointer or keyboard focus is
   in them.
 - New: **Add to collection…** on the publish and status toasts puts a page in one of your collections, from a
@@ -68,6 +70,9 @@ First release.
 - New: Encrypted graphs are supported. On a shared graph, pages another member published show their status only.
 - New: Defaults to the `https://roam.pub` server (changeable under **Server URL**, which must use `https://`, so the
   key is never sent unencrypted).
+- New: **Reset Roam Publish block settings** asks before replacing your tag, link text and position.
+- New: Without an API key, the Page… and Block… menus say to add one, instead of showing an old status with buttons
+  that can't work.
 
 ### Docs
 - New: README covers setup, usage, settings and what the extension reads, sends and stores.
