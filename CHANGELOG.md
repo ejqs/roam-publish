@@ -3,18 +3,7 @@
 All notable changes to the Roam Publish extension. Each version is dated when it was sent to Roam Depot; roam.pub's
 What's new shows it once Roam Depot serves it. Every bullet starts with **New:**, **Improved:** or **Fixed:**.
 
-## Unreleased
-
-### Setup and settings
-- Fixed: **An API key from another graph** no longer publishes this graph's pages under the other graph's name.
-  The extension tells roam.pub which graph it's in, and publishing says which graph the key is for and how to
-  get the right one.
-
-### Publishing
-- Fixed: **Make listed** no longer says a page is on your graph's front page when the front page is turned off.
-  It says nothing lists the page yet, and the status toast says so too.
-
-## 0.1.0 (2026-10-04)
+## 0.1.0 (2026-10-06)
 
 First release.
 
@@ -38,6 +27,8 @@ First release.
 - New: **Unpublish** asks first, and says what's deleted on roam.pub with the page (access settings, passwords, views,
   upvotes, places in collections). Confirm toasts have a **Cancel** button.
 - New: Every Roam Publish toast has a **Close** button.
+- New: **Make listed** says what lists the page. When your graph's front page is turned off, it says nothing lists
+  the page yet, and the status toast says so too.
 - New: Embeds (every one, when a block has several), view types (numbered, document), text alignment and heading
   levels are sent. Block references are inlined, and references inside code and block-ref aliases are left as written.
 - New: Server moderation messages and reasons are shown when a publish is refused, and the Roam Publish block written
@@ -67,6 +58,8 @@ First release.
   **API key**; the extension doesn't read your daily notes.
 - New: **Author name**, shown as the byline where the graph or collection shows authors.
 - New: **Sync published list** refreshes what the extension knows you've published, if a status looks wrong.
+- New: The extension tells roam.pub which graph it's in, so an API key from another graph can't publish this graph's
+  pages under the other graph's name. Publishing says which graph the key is for and how to get the right one.
 - New: Encrypted graphs are supported. On a shared graph, pages another member published show their status only.
 - New: Defaults to the `https://roam.pub` server (changeable under **Server URL**, which must use `https://`, so the
   key is never sent unencrypted).
