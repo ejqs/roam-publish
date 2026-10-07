@@ -140,9 +140,9 @@ describe("publish", () => {
 
 describe("add to collection", () => {
   const choices = [
-    { id: "c1", name: "Writing", listing: "listed", access: "open", entryUrl: "https://roam.pub/c/aaa", movesOutOfGraph: false },
-    { id: "c2", name: "Best of", listing: "discover", access: "open", entryUrl: null, movesOutOfGraph: false },
-    { id: "c3", name: "Private", listing: "listed", access: "password", entryUrl: null, movesOutOfGraph: true },
+    { id: "c1", name: "Writing", listing: "listed", access: "open", entryUrl: "https://roam.pub/c/aaa" },
+    { id: "c2", name: "Best of", listing: "discover", access: "open", entryUrl: null },
+    { id: "c3", name: "Private", listing: "listed", access: "password", entryUrl: null },
   ];
   const tick = () => new Promise((r) => setImmediate(r));
 
@@ -152,13 +152,13 @@ describe("add to collection", () => {
     assert.ok(!button("Add to collection…"));
   });
 
-  test("the publish toast offers it; the dropdown says how the page starts in each, and adding moves it when stricter", async () => {
+  test("the publish toast offers it; the dropdown says how the page starts in each, and adding keeps the graph link", async () => {
     const calls = server({
       "POST /api/ext/publications": (b) => [200, { status: "created", url: "https://roam.pub/g/x", contentHash: b.contentHash, visibility: "unlisted", listing: "unlisted", collections: 3 }],
       "GET /api/ext/publications/page1/collections": () => [200, { collections: choices }],
       "POST /api/ext/publications/page1/collections": () => [200, {
         name: "Private", entryUrl: "https://roam.pub/c/bbb", listing: "listed", access: "password",
-        movedOutOfGraph: true, encrypted: false, url: "https://roam.pub/c/bbb",
+        url: "https://roam.pub/g/x",
       }],
     });
     await publish("page1");
@@ -170,14 +170,14 @@ describe("add to collection", () => {
     assert.deepEqual(options, [
       ["Writing (already there)", true],
       ["Best of: listed and on Discover", false],
-      ["Private: password-protected, leaves your graph", false],
+      ["Private: password-protected", false],
     ]);
     sel.value = "c3";
     sel.click!();
     await tick();
     assert.deepEqual(calls.at(-1), { method: "POST", path: "/api/ext/publications/page1/collections", body: { collectionId: "c3" } });
-    assert.match(toasts.at(-1)!, /^Added to Private, password-protected there\. It left your graph, so its graph link can't get around the password\./);
-    assert.equal((settings.get("publications") as Record<string, { url: string }>).page1.url, "https://roam.pub/c/bbb");
+    assert.match(toasts.at(-1)!, /^Added to Private, password-protected there\.$/);
+    assert.equal((settings.get("publications") as Record<string, { url: string }>).page1.url, "https://roam.pub/g/x");
   });
 
   test("the status toast offers it too", async () => {
