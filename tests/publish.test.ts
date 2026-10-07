@@ -162,6 +162,13 @@ describe("sync", () => {
     assert.deepEqual(Object.keys(settings.get("publications") as object), ["page2"]);
   });
 
+  test("the first publish in a new graph saves", async () => {
+    settings.delete("publications");
+    server({ "GET /api/ext/publications": () => [200, { publications: [] }] });
+    await publish("page1");
+    assert.deepEqual(Object.keys(settings.get("publications") as object), ["page1"]);
+  });
+
   test("publishing with no author name saves", async () => {
     server();
     await publish("page1");
