@@ -471,7 +471,6 @@ type CollectionChoice = {
   listing: Exclude<Listing, "unlisted">;
   access: "open" | "password" | "members";
   entryUrl: string | null;
-  movesOutOfGraph: boolean;
 };
 
 /** How a page starts out in a collection, as the dropdown says it. */
@@ -487,7 +486,7 @@ function startsAs(c: Pick<CollectionChoice, "listing" | "access">) {
 
 /**
  * Asks which collection to add a published page to. Each one says how the page will start out
- * there, from the collection's own defaults, and whether it leaves the graph.
+ * there, from the collection's own defaults. The page stays in its graph as it is.
  */
 export async function chooseCollection(uid: string) {
   try {
@@ -506,7 +505,7 @@ export async function chooseCollection(uid: string) {
           value: c.id,
           label: c.entryUrl
             ? `${c.name} (already there)`
-            : `${c.name}: ${startsAs(c)}${c.movesOutOfGraph ? ", leaves your graph" : ""}`,
+            : `${c.name}: ${startsAs(c)}`,
           disabled: !!c.entryUrl,
         })),
         onChoose: (id) => void addToCollection(uid, id),
@@ -525,7 +524,6 @@ export async function addToCollection(uid: string, collectionId: string) {
       entryUrl: string;
       listing: Listing;
       access: CollectionChoice["access"];
-      movedOutOfGraph: boolean;
       url: string;
     }>(`/api/ext/publications/${encodeURIComponent(uid)}/collections`, {
       method: "POST",
@@ -533,16 +531,9 @@ export async function addToCollection(uid: string, collectionId: string) {
     });
     const cache = getCache();
     if (cache[uid])
-      await setCache({ ...cache, [uid]: { ...cache[uid], url: res.url, places: (cache[uid].places ?? 1) + (res.movedOutOfGraph ? 0 : 1) } });
+      await setCache({ ...cache, [uid]: { ...cache[uid], url: res.url, places: (cache[uid].places ?? 1) + 1 } });
     const how = res.listing === "unlisted" ? "unlisted" : startsAs({ listing: res.listing, access: res.access });
-    toast(
-      `Added to ${res.name}, ${how} there.${
-        res.movedOutOfGraph
-          ? ` It left your graph, so its graph link can't get around ${res.access === "password" ? "the password" : "members-only access"}.`
-          : ""
-      }`,
-      { intent: "success", link: res.entryUrl, durationMs: res.movedOutOfGraph ? 15000 : undefined },
-    );
+    toast(`Added to ${res.name}, ${how} there.`, { intent: "success", link: res.entryUrl });
   } catch (e) {
     report(e);
   }
