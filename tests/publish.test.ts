@@ -51,7 +51,8 @@ async function refusingSet(k: string, v: unknown) {
 }
 initState({
   settings: {
-    get: (k: string) => settings.get(k),
+    // Roam returns null for a setting never saved.
+    get: (k: string) => settings.get(k) ?? null,
     set: refusingSet,
   },
 } as never);
@@ -159,9 +160,13 @@ describe("saved settings", () => {
     });
   });
 
-  test("setup and resetting the block settings save", async () => {
+  test("first-time setup saves the defaults, and resetting saves them again", async () => {
     settings.clear();
-    initState({ settings: { get: (k: string) => settings.get(k), set: refusingSet } } as never);
+    initState({ settings: { get: (k: string) => settings.get(k) ?? null, set: refusingSet } } as never);
+    // A new graph gets the defaults saved, so the settings panel shows them.
+    assert.equal(settings.get("shortlink-enabled"), true);
+    assert.equal(settings.get("shortlink-position"), "top");
+    settings.set("shortlink-tag", "#mine");
     await resetShortlinkSettings();
     assert.equal(settings.get("shortlink-tag"), "[[Roam Publish]]");
   });

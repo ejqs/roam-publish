@@ -41,13 +41,13 @@ export function initState(extensionAPI: ExtensionAPI) {
   api = extensionAPI;
   // Graphs set up before these defaults keep the labels their blocks already have.
   const existing = !!api.settings.get("api-key") || Object.keys(getCache()).length > 0;
-  if (api.settings.get("shortlink-tag") === undefined)
+  if (api.settings.get("shortlink-tag") == null)
     void save("shortlink-tag", existing ? "#published" : DEFAULT_SHORTLINK_TAG);
-  if (api.settings.get("shortlink-text") === undefined) void save("shortlink-text", DEFAULT_SHORTLINK_TEXT);
+  if (api.settings.get("shortlink-text") == null) void save("shortlink-text", DEFAULT_SHORTLINK_TEXT);
   // Store defaults so the settings panel's switch and select show them.
-  if (api.settings.get("shortlink-enabled") === undefined) void save("shortlink-enabled", true);
-  if (api.settings.get("shortlink-position") === undefined) void save("shortlink-position", "top");
-  if (api.settings.get("shortlink-blocks") === undefined) void save("shortlink-blocks", false);
+  if (api.settings.get("shortlink-enabled") == null) void save("shortlink-enabled", true);
+  if (api.settings.get("shortlink-position") == null) void save("shortlink-position", "top");
+  if (api.settings.get("shortlink-blocks") == null) void save("shortlink-blocks", false);
 }
 
 /**
