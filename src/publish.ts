@@ -550,9 +550,25 @@ export async function addToCollection(uid: string, collectionId: string) {
 
 /**
  * Asks before unpublishing: roam.pub deletes the page with everything attached to it there, and
- * publishing again starts from scratch.
+ * publishing again starts from scratch. From the command palette (`checked` false), it first checks
+ * the page is published and this key may unpublish it, so it never asks about something it can't do.
  */
-export function confirmUnpublish(uid: string) {
+export async function confirmUnpublish(uid: string, { checked = false } = {}) {
+  if (!checked) {
+    let cache: PublicationCache;
+    try {
+      cache = await syncPublications({ quiet: true });
+    } catch (e) {
+      if (!(e instanceof ApiError) || e.status !== 0) return report(e);
+      cache = getCache();
+    }
+    const c = cache[uid];
+    if (!c) return toast("That isn't published, so there's nothing to unpublish.");
+    if (c.mine === false)
+      return toast("Another member of this graph published that. Only they or the graph's owner can unpublish it.", {
+        link: openLink(c),
+      });
+  }
   const title = getCache()[uid]?.title;
   toast(
     `Unpublish ${title ? `“${title}”` : "this"}? Its link stops working, and its access settings, passwords, views, upvotes and places in collections on roam.pub are deleted. Publishing it again starts over.`,
@@ -619,7 +635,7 @@ export async function publishStatus(uid: string) {
       ...(upToDate ? [] : [{ label: "Republish", onClick: () => void publish(uid) }]),
       ...listingActions(uid, c),
       ...collectionAction(uid),
-      { label: "Unpublish", onClick: () => confirmUnpublish(uid) },
+      { label: "Unpublish", onClick: () => void confirmUnpublish(uid, { checked: true }) },
     ];
     // Roam's toasts can't grey a button out, so say why Make discoverable isn't there.
     const blocked =
