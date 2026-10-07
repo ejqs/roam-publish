@@ -3,6 +3,15 @@
 All notable changes to the Roam Publish extension. Each version is dated when it was sent to Roam Depot; roam.pub's
 What's new shows it once Roam Depot serves it. Every bullet starts with **New:**, **Improved:** or **Fixed:**.
 
+## Unreleased
+
+### Publishing
+- New: **Add to collection…** on the publish and status toasts puts a page in one of your collections, from a
+  dropdown that says how it starts out in each one (listed, on Discover, password-protected or members only). When
+  the collection is locked and your graph isn't, the page moves out of your graph so its graph link can't get
+  around the lock.
+- Improved: Toasts stay open while your pointer or keyboard focus is in them.
+
 ## 0.1.0 (2026-10-06)
 
 First release.

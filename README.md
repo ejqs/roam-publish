@@ -58,10 +58,16 @@ dashboard** in the extension settings.
 - **Bulk changes**: select many pages to change where they're listed, who can read them, or their tags.
 
 New pages and blocks are published **Unlisted**: only people with the link can see them. The toast offers **Make
-listed** and **Make discoverable** right away.
+listed** and **Make discoverable** right away, and **Add to collection…** when you're in a collection.
+
+**Add to collection…** lists your collections and how the page starts out in each one, using that collection's own
+defaults (listed, on Discover, password-protected or members only). When the collection is password-protected or
+members only and the page is more open in your graph, adding it takes it out of your graph, so the graph link can't
+get around the collection's lock. Encrypted pages are added on roam.pub, where you can enter their password.
 
 Open the same menu again to check whether it's published and where it's listed, or to **Republish** after edits,
-change where it's listed (**Make listed**, **Make discoverable**, **Make unlisted**) or **Unpublish**. A page can only
+change where it's listed (**Make listed**, **Make discoverable**, **Make unlisted**), **Add to collection…**, or
+**Unpublish**. A page can only
 be Discoverable when it's open to everyone, shown in your graph, and your graph's front page and search engines are
 on; otherwise the toast says what's stopping it. Unpublishing asks first: it deletes the page on roam.pub along with
 its access settings, passwords, views, upvotes and places in collections. On a shared graph, pages another member
