@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { beforeEach, describe, mock, test } from "node:test";
 import { confirmChangeLogBlocks, confirmUnpublish, publish, publishStatus, syncPublications } from "../src/publish";
 import { hashPayload, serialize } from "../src/serialize";
-import { initState } from "../src/state";
+import { initState, resetShortlinkSettings, withoutUndefined } from "../src/state";
 import { fakeRoam } from "./fake-roam";
 
 (globalThis as unknown as { __DEFAULT_SERVER__: string }).__DEFAULT_SERVER__ = "https://roam.pub";
@@ -45,13 +45,14 @@ const settings = new Map<string, unknown>();
 /** Like Roam, refuses a value holding undefined anywhere. */
 const holdsUndefined = (v: unknown): boolean =>
   v === undefined || (typeof v === "object" && v !== null && Object.values(v).some(holdsUndefined));
+async function refusingSet(k: string, v: unknown) {
+  if (holdsUndefined(v)) throw new Error(`transaction failed: Data returned contains undefined in ${k}`);
+  settings.set(k, v);
+}
 initState({
   settings: {
     get: (k: string) => settings.get(k),
-    set: async (k: string, v: unknown) => {
-      if (holdsUndefined(v)) throw new Error(`transaction failed: Data returned contains undefined in ${k}`);
-      settings.set(k, v);
-    },
+    set: refusingSet,
   },
 } as never);
 
@@ -149,7 +150,23 @@ describe("publish", () => {
   });
 });
 
-describe("sync", () => {
+describe("saved settings", () => {
+  test("leave out undefined at any depth, which Roam refuses", () => {
+    assert.deepEqual(withoutUndefined({ a: 1, b: undefined, c: { d: undefined, e: [1, undefined, { f: undefined }] }, g: null }), {
+      a: 1,
+      c: { e: [1, {}] },
+      g: null,
+    });
+  });
+
+  test("setup and resetting the block settings save", async () => {
+    settings.clear();
+    initState({ settings: { get: (k: string) => settings.get(k), set: refusingSet } } as never);
+    await resetShortlinkSettings();
+    assert.equal(settings.get("shortlink-tag"), "[[Roam Publish]]");
+  });
+
+
   test("saves pages with no byline and fields an older server leaves out", async () => {
     // Roam refuses settings holding undefined, which once failed every sync of a page published without an author.
     server({
