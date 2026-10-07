@@ -82,5 +82,15 @@ export const getCache = (): PublicationCache =>
   (api.settings.get("publications") as PublicationCache) ?? {};
 
 export async function setCache(cache: PublicationCache) {
-  await api.settings.set("publications", cache);
+  // Roam refuses to save settings holding undefined (a byline never sent, a field an older server
+  // leaves out), so those fields are left out rather than stored.
+  await api.settings.set("publications", withoutUndefined(cache));
 }
+
+const withoutUndefined = (cache: PublicationCache): PublicationCache =>
+  Object.fromEntries(
+    Object.entries(cache).map(([uid, c]) => [
+      uid,
+      Object.fromEntries(Object.entries(c).filter(([, v]) => v !== undefined)) as CachedPublication,
+    ]),
+  );
