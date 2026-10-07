@@ -41,13 +41,13 @@ export function initState(extensionAPI: ExtensionAPI) {
   api = extensionAPI;
   // Graphs set up before these defaults keep the labels their blocks already have.
   const existing = !!api.settings.get("api-key") || Object.keys(getCache()).length > 0;
-  if (api.settings.get("shortlink-tag") === undefined)
-    void api.settings.set("shortlink-tag", existing ? "#published" : DEFAULT_SHORTLINK_TAG);
-  if (api.settings.get("shortlink-text") === undefined) void api.settings.set("shortlink-text", DEFAULT_SHORTLINK_TEXT);
+  if (api.settings.get("shortlink-tag") == null)
+    void save("shortlink-tag", existing ? "#published" : DEFAULT_SHORTLINK_TAG);
+  if (api.settings.get("shortlink-text") == null) void save("shortlink-text", DEFAULT_SHORTLINK_TEXT);
   // Store defaults so the settings panel's switch and select show them.
-  if (api.settings.get("shortlink-enabled") === undefined) void api.settings.set("shortlink-enabled", true);
-  if (api.settings.get("shortlink-position") === undefined) void api.settings.set("shortlink-position", "top");
-  if (api.settings.get("shortlink-blocks") === undefined) void api.settings.set("shortlink-blocks", false);
+  if (api.settings.get("shortlink-enabled") == null) void save("shortlink-enabled", true);
+  if (api.settings.get("shortlink-position") == null) void save("shortlink-position", "top");
+  if (api.settings.get("shortlink-blocks") == null) void save("shortlink-blocks", false);
 }
 
 /**
@@ -56,11 +56,11 @@ export function initState(extensionAPI: ExtensionAPI) {
  */
 export async function resetShortlinkSettings() {
   await Promise.all([
-    api.settings.set("shortlink-enabled", true),
-    api.settings.set("shortlink-blocks", false),
-    api.settings.set("shortlink-tag", DEFAULT_SHORTLINK_TAG),
-    api.settings.set("shortlink-text", DEFAULT_SHORTLINK_TEXT),
-    api.settings.set("shortlink-position", "top"),
+    save("shortlink-enabled", true),
+    save("shortlink-blocks", false),
+    save("shortlink-tag", DEFAULT_SHORTLINK_TAG),
+    save("shortlink-text", DEFAULT_SHORTLINK_TEXT),
+    save("shortlink-position", "top"),
   ]);
 }
 
@@ -82,5 +82,22 @@ export const getCache = (): PublicationCache =>
   (api.settings.get("publications") as PublicationCache) ?? {};
 
 export async function setCache(cache: PublicationCache) {
-  await api.settings.set("publications", cache);
+  await save("publications", cache);
+}
+
+/**
+ * Every setting is written through here. Roam refuses to save a value holding undefined anywhere
+ * (a byline never sent, a field an older server leaves out, a count a new page doesn't have yet),
+ * so undefined fields and array entries are left out rather than stored.
+ */
+function save(key: string, value: unknown) {
+  return api.settings.set(key, withoutUndefined(value));
+}
+
+export function withoutUndefined<T>(value: T): T {
+  if (Array.isArray(value)) return value.filter((v) => v !== undefined).map(withoutUndefined) as T;
+  if (value === null || typeof value !== "object") return value;
+  return Object.fromEntries(
+    Object.entries(value).filter(([, v]) => v !== undefined).map(([k, v]) => [k, withoutUndefined(v)]),
+  ) as T;
 }

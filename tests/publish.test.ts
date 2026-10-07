@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { beforeEach, describe, mock, test } from "node:test";
-import { confirmChangeLogBlocks, confirmUnpublish, publish, publishStatus } from "../src/publish";
+import { confirmChangeLogBlocks, confirmUnpublish, publish, publishStatus, syncPublications } from "../src/publish";
 import { hashPayload, serialize } from "../src/serialize";
-import { initState } from "../src/state";
+import { initState, resetShortlinkSettings, withoutUndefined } from "../src/state";
 import { fakeRoam } from "./fake-roam";
 
 (globalThis as unknown as { __DEFAULT_SERVER__: string }).__DEFAULT_SERVER__ = "https://roam.pub";
@@ -42,7 +42,20 @@ const button = (label: string) => buttons.find((b) => b.textContent === label);
 const actions = () => buttons.filter((b) => b.textContent !== "Close");
 
 const settings = new Map<string, unknown>();
-initState({ settings: { get: (k: string) => settings.get(k), set: async (k: string, v: unknown) => void settings.set(k, v) } } as never);
+/** Like Roam, refuses a value holding undefined anywhere. */
+const holdsUndefined = (v: unknown): boolean =>
+  v === undefined || (typeof v === "object" && v !== null && Object.values(v).some(holdsUndefined));
+async function refusingSet(k: string, v: unknown) {
+  if (holdsUndefined(v)) throw new Error(`transaction failed: Data returned contains undefined in ${k}`);
+  settings.set(k, v);
+}
+initState({
+  settings: {
+    // Roam returns null for a setting never saved.
+    get: (k: string) => settings.get(k) ?? null,
+    set: refusingSet,
+  },
+} as never);
 
 const SHORT = "https://roam.pub/p/abcd2345";
 let roam: ReturnType<typeof fakeRoam>;
@@ -135,6 +148,53 @@ describe("publish", () => {
     const tree = calls.at(-1)!.body.tree as { children: { uid: string; children: unknown[] }[] };
     assert.equal(rel.uid, "rel");
     assert.deepEqual(tree.children.map((c) => [c.uid, c.children.length]), [["rel", 0]]);
+  });
+});
+
+describe("saved settings", () => {
+  test("leave out undefined at any depth, which Roam refuses", () => {
+    assert.deepEqual(withoutUndefined({ a: 1, b: undefined, c: { d: undefined, e: [1, undefined, { f: undefined }] }, g: null }), {
+      a: 1,
+      c: { e: [1, {}] },
+      g: null,
+    });
+  });
+
+  test("first-time setup saves the defaults, and resetting saves them again", async () => {
+    settings.clear();
+    initState({ settings: { get: (k: string) => settings.get(k) ?? null, set: refusingSet } } as never);
+    // A new graph gets the defaults saved, so the settings panel shows them.
+    assert.equal(settings.get("shortlink-enabled"), true);
+    assert.equal(settings.get("shortlink-position"), "top");
+    settings.set("shortlink-tag", "#mine");
+    await resetShortlinkSettings();
+    assert.equal(settings.get("shortlink-tag"), "[[Roam Publish]]");
+  });
+
+
+  test("saves pages with no byline and fields an older server leaves out", async () => {
+    // Roam refuses settings holding undefined, which once failed every sync of a page published without an author.
+    server({
+      "GET /api/ext/publications": () => [
+        200,
+        { publications: [{ rootUid: "page2", kind: "page", title: "Other", url: "https://roam.pub/g/y", contentHash: "y", visibility: "unlisted", updatedAt: "" }] },
+      ],
+    });
+    await syncPublications({ quiet: true });
+    assert.deepEqual(Object.keys(settings.get("publications") as object), ["page2"]);
+  });
+
+  test("the first publish in a new graph saves", async () => {
+    settings.delete("publications");
+    server({ "GET /api/ext/publications": () => [200, { publications: [] }] });
+    await publish("page1");
+    assert.deepEqual(Object.keys(settings.get("publications") as object), ["page1"]);
+  });
+
+  test("publishing with no author name saves", async () => {
+    server();
+    await publish("page1");
+    assert.equal((settings.get("publications") as Record<string, { author?: string }>).page1.author, "");
   });
 });
 

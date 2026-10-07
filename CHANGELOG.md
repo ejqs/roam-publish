@@ -3,6 +3,12 @@
 All notable changes to the Roam Publish extension. Each version is dated when it was sent to Roam Depot; roam.pub's
 What's new shows it once Roam Depot serves it. Every bullet starts with **New:**, **Improved:** or **Fixed:**.
 
+## Unreleased
+
+### Publishing
+- Fixed: Publishing and syncing no longer fail with "transaction failed: Data returned contains undefined" when a
+  page has no author name saved with it.
+
 ## 0.1.0 (2026-10-07)
 
 First release.

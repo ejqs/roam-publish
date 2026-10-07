@@ -5,7 +5,7 @@ import { initState } from "../src/state";
 
 /** Settings the extension reads through Roam Depot's extensionAPI. */
 const settings = new Map<string, unknown>([["api-key", "rp_test"], ["server-url", "https://srv.example/"]]);
-const extensionAPI = { settings: { get: (k: string) => settings.get(k), set: async (k: string, v: unknown) => void settings.set(k, v) } };
+const extensionAPI = { settings: { get: (k: string) => settings.get(k) ?? null, set: async (k: string, v: unknown) => void settings.set(k, v) } };
 (globalThis as unknown as { __DEFAULT_SERVER__: string }).__DEFAULT_SERVER__ = "https://roam.pub";
 
 initState(extensionAPI as never);
