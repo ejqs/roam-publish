@@ -338,6 +338,9 @@ function askRepublishFolds(uid: string, kind: "page" | "block") {
   );
 }
 
+/** For when only which blocks are collapsed changed: makes the website's match Roam's. */
+const syncFoldsAction = (uid: string) => ({ label: "Sync open/collapsed blocks", onClick: () => void publish(uid, { folds: "asIs" }) });
+
 const republishActions = (uid: string) => [
   { label: "Republish as is", onClick: () => void publish(uid, { folds: "asIs" }) },
   { label: "Republish, keep open/collapsed", onClick: () => void publish(uid, { folds: "keep" }) },
@@ -362,7 +365,15 @@ export async function publish(uid: string, opts: { folds?: Folds } = {}) {
       const inRoam = first ? foldedUids(first.tree) : [];
       const kept = first && published ? foldedUids(refold(first.tree, new Set(published))) : [];
       if (first && inRoam.length && !published) return askFirstFolds(uid, inRoam.length, first.kind, !!cache[uid]);
-      if (first && published && !sameFolds(inRoam, kept)) return askRepublishFolds(uid, first.kind);
+      if (first && published && !sameFolds(inRoam, kept)) {
+        // Nothing but collapsed blocks changed: there's only one thing to do.
+        if ((await hashPayload(folded(first, "keep", published))) === cache[uid]?.hash)
+          return toast(
+            `Only which blocks are collapsed changed since this ${first.kind} was published. Sync them to the website?`,
+            { actions: [syncFoldsAction(uid), CANCEL], durationMs: 15000 },
+          );
+        return askRepublishFolds(uid, first.kind);
+      }
       folds = "asIs";
     }
     link = await ensureShortlinkBlock(uid, cache[uid]);
@@ -712,7 +723,9 @@ export async function publishStatus(uid: string) {
         ? []
         : [{ label: "Republish", onClick: () => void publish(uid, { folds: "asIs" }) }]
       : published
-        ? republishActions(uid).slice(0, upToDate ? 1 : 2)
+        ? upToDate
+          ? [syncFoldsAction(uid)]
+          : republishActions(uid)
         : [
             { label: "Republish as is (Collapsed)", onClick: () => void publish(uid, { folds: "asIs" }) },
             ...(upToDate ? [] : [{ label: "Republish expanded", onClick: () => void publish(uid, { folds: "expanded" }) }]),

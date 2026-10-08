@@ -177,7 +177,7 @@ describe("collapsed blocks", () => {
       status: "updated", url: "https://roam.pub/g/x", contentHash: body.contentHash, visibility: "unlisted",
     }],
   });
-  const labels = () => actions().map((b) => b.textContent).filter((l) => l?.startsWith("Republish") || l?.startsWith("Publish"));
+  const labels = () => actions().map((b) => b.textContent).filter((l) => /^(Republish|Publish|Sync)/.test(l ?? ""));
 
   test("the first publish asks, writes nothing until answered, and remembers what's collapsed", async () => {
     settings.set("publications", {});
@@ -237,7 +237,13 @@ describe("collapsed blocks", () => {
     server(routes(asPublished));
     await publishStatus("page1");
     assert.match(toasts.at(-1)!, /up to date.*aren't the ones collapsed/);
-    assert.deepEqual(labels(), ["Republish as is"]);
+    assert.deepEqual(labels(), ["Sync open/collapsed blocks"]);
+
+    // Publishing then only offers the sync.
+    buttons = [];
+    await publish("page1");
+    assert.match(toasts.at(-1)!, /Only which blocks are collapsed changed/);
+    assert.deepEqual(labels(), ["Sync open/collapsed blocks"]);
 
     buttons = [];
     settings.set("publications", cached({ hash: "old", folded: [] }));
