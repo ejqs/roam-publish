@@ -152,70 +152,84 @@ describe("publish", () => {
 });
 
 describe("collapsed blocks", () => {
-  const folded = () =>
+  const folded = (open = false) =>
     fakeRoam([
-      { uid: "page1", title: "Page", children: [{ uid: "b1", string: "hello", open: false, children: [{ uid: "b2", string: "inside" }] }] },
+      {
+        uid: "page1",
+        title: "Page",
+        children: [
+          { uid: "b1", string: "hello", open, children: [{ uid: "b2", string: "inside" }] },
+          { uid: "b3", string: "other", children: [{ uid: "b4", string: "inside" }] },
+        ],
+      },
     ]);
   const settle = async () => {
     for (let i = 0; i < 20; i++) await new Promise((r) => setImmediate(r));
   };
-  const sentTree = (calls: { method: string; body: Record<string, unknown> }[]) =>
-    JSON.stringify(calls.filter((c) => c.method === "POST").at(-1)?.body.tree);
+  const posts = (calls: { method: string; body: Record<string, unknown> }[]) => calls.filter((c) => c.method === "POST");
+  const sentTree = (calls: { method: string; body: Record<string, unknown> }[]) => JSON.stringify(posts(calls).at(-1)?.body.tree);
+  const routes = (hash = "old") => ({
+    "GET /api/ext/publications": (): [number, unknown] => [200, {
+      publications: hash ? [{ rootUid: "page1", kind: "page", title: "Page", url: "https://roam.pub/g/x", contentHash: hash,
+        visibility: "unlisted", listing: "unlisted", updatedAt: "" }] : [],
+    }],
+    "POST /api/ext/publications": (body: Record<string, unknown>): [number, unknown] => [200, {
+      status: "updated", url: "https://roam.pub/g/x", contentHash: body.contentHash, visibility: "unlisted",
+    }],
+  });
+  const labels = () => actions().map((b) => b.textContent).filter((l) => l?.startsWith("Republish") || l?.startsWith("Publish"));
 
-  test("the first publish asks, writes nothing until answered, and remembers the answer", async () => {
+  test("the first publish asks, writes nothing until answered, and remembers what's collapsed", async () => {
     settings.set("publications", {});
     roam = folded();
-    const calls = server({
-      "GET /api/ext/publications": () => [200, { publications: [] }],
-      "POST /api/ext/publications": (body) => [200, { status: "created", url: "https://roam.pub/g/x", contentHash: body.contentHash, visibility: "unlisted" }],
-    });
+    const calls = server(routes(""));
     await publish("page1");
-    assert.equal(calls.filter((c) => c.method === "POST").length, 0);
-    assert.deepEqual(roam.blocks.get("page1")!.children!.map((c) => c.uid), ["b1"]);
+    assert.equal(posts(calls).length, 0);
+    assert.deepEqual(roam.blocks.get("page1")!.children!.map((c) => c.uid), ["b1", "b3"]);
     assert.match(toasts.at(-1)!, /1 block on this page is collapsed in Roam/);
-    assert.deepEqual(actions().map((b) => b.textContent), ["Publish as is (Collapsed)", "Publish expanded"]);
+    assert.deepEqual(labels(), ["Publish as is (Collapsed)", "Publish expanded"]);
     button("Publish as is (Collapsed)")!.click!();
     await settle();
     assert.match(sentTree(calls), /"collapsed":true/);
-    assert.equal((settings.get("publications") as Record<string, { folds?: boolean }>).page1.folds, true);
-    // Republishing keeps the choice without asking again.
+    assert.deepEqual((settings.get("publications") as Record<string, { folded?: string[] }>).page1.folded, ["b1"]);
+    // Nothing changed in Roam since: republishing doesn't ask again.
     buttons = [];
     await publish("page1");
-    assert.equal(actions().filter((b) => /collapsed|expanded/.test(b.textContent ?? "")).length, 0);
-    assert.match(sentTree(calls), /"collapsed":true/);
+    assert.deepEqual(labels(), []);
+    assert.equal(posts(calls).length, 2);
   });
 
-  test("published expanded, folding in Roam isn't a change, and the status offers the other way", async () => {
+  test("when Roam's collapsed blocks differ, republishing asks: as is, or keep the published page's", async () => {
     roam = folded();
-    const expanded = await hashPayload({ ...(await serialize("page1"))!, tree: JSON.parse(JSON.stringify((await serialize("page1"))!.tree).replace(',"collapsed":true', "")) });
-    settings.set("publications", cached({ hash: expanded, folds: false }));
-    server({
-      "GET /api/ext/publications": () => [200, {
-        publications: [{ rootUid: "page1", kind: "page", title: "Page", url: "https://roam.pub/g/x", contentHash: expanded,
-          visibility: "unlisted", listing: "unlisted", updatedAt: "" }],
-      }],
-    });
-    await publishStatus("page1");
-    assert.match(toasts.at(-1)!, /up to date.*published expanded/);
-    assert.deepEqual(actions().map((b) => b.textContent).filter((l) => l?.startsWith("Republish")), ["Republish as is (Collapsed)"]);
-  });
-
-  test("after an edit, Republish keeps the page's choice and the other button switches", async () => {
-    roam = folded();
-    settings.set("publications", cached({ hash: "old", folds: true }));
-    const calls = server({
-      "GET /api/ext/publications": () => [200, {
-        publications: [{ rootUid: "page1", kind: "page", title: "Page", url: "https://roam.pub/g/x", contentHash: "old",
-          visibility: "unlisted", listing: "unlisted", updatedAt: "" }],
-      }],
-      "POST /api/ext/publications": (body) => [200, { status: "updated", url: "https://roam.pub/g/x", contentHash: body.contentHash, visibility: "unlisted" }],
-    });
-    await publishStatus("page1");
-    assert.match(toasts.at(-1)!, /has changed.*published collapsed, as in Roam/);
-    assert.deepEqual(actions().map((b) => b.textContent).filter((l) => l?.startsWith("Republish")), ["Republish", "Republish expanded"]);
-    button("Republish")!.click!();
+    settings.set("publications", cached({ hash: "old", folded: [] }));
+    const calls = server(routes());
+    await publish("page1");
+    assert.equal(posts(calls).length, 0);
+    assert.match(toasts.at(-1)!, /aren't the ones collapsed on the published page/);
+    assert.deepEqual(labels(), ["Republish as is", "Republish, keep open/collapsed"]);
+    button("Republish, keep open/collapsed")!.click!();
     await settle();
+    assert.doesNotMatch(sentTree(calls), /collapsed/);
+    buttons = [];
+    await publish("page1", { folds: "asIs" });
     assert.match(sentTree(calls), /"collapsed":true/);
+  });
+
+  test("the status says when only collapsed blocks differ, and offers both after an edit", async () => {
+    roam = folded();
+    const asPublished = await hashPayload({ ...(await serialize("page1"))!, tree: JSON.parse(JSON.stringify((await serialize("page1"))!.tree).replace(',"collapsed":true', "")) });
+    settings.set("publications", cached({ hash: asPublished, folded: [] }));
+    server(routes(asPublished));
+    await publishStatus("page1");
+    assert.match(toasts.at(-1)!, /up to date.*aren't the ones collapsed/);
+    assert.deepEqual(labels(), ["Republish as is"]);
+
+    buttons = [];
+    settings.set("publications", cached({ hash: "old", folded: [] }));
+    server(routes("old"));
+    await publishStatus("page1");
+    assert.match(toasts.at(-1)!, /has changed/);
+    assert.deepEqual(labels(), ["Republish as is", "Republish, keep open/collapsed"]);
   });
 });
 

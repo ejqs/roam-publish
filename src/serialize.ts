@@ -105,20 +105,24 @@ async function toNode(b: PullBlock, isPageRoot: boolean, chain: EmbedChain, skip
   return node;
 }
 
-/** How many blocks are collapsed in Roam, embeds included. */
-export function foldCount(n: Node): number {
+/** The uids of collapsed blocks, embeds included, in order. */
+export function foldedUids(n: Node): string[] {
   const embeds = [n.embed, ...(n.moreEmbeds ?? [])].filter((e): e is Node => !!e);
-  return (n.collapsed ? 1 : 0) + [...n.children, ...embeds].reduce((sum, c) => sum + foldCount(c), 0);
+  return [...(n.collapsed ? [n.uid] : []), ...[...n.children, ...embeds].flatMap(foldedUids)];
 }
 
-/** The tree with every block open, as published before collapsed blocks were sent; hashes the same as then. */
-export function unfolded(n: Node): Node {
+/**
+ * The tree with exactly these blocks collapsed (those that still have children). With none, every
+ * block is open, which hashes the same as trees published before collapsed blocks were sent.
+ */
+export function refold(n: Node, folded: ReadonlySet<string>): Node {
   const { collapsed: _, embed, moreEmbeds, children, ...rest } = n;
   return {
     ...rest,
-    ...(embed && { embed: unfolded(embed) }),
-    ...(moreEmbeds && { moreEmbeds: moreEmbeds.map(unfolded) }),
-    children: children.map(unfolded),
+    ...(folded.has(n.uid) && children.length > 0 && { collapsed: true as const }),
+    ...(embed && { embed: refold(embed, folded) }),
+    ...(moreEmbeds && { moreEmbeds: moreEmbeds.map((e) => refold(e, folded)) }),
+    children: children.map((c) => refold(c, folded)),
   };
 }
 
