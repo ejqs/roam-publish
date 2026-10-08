@@ -4,10 +4,11 @@ Publish Roam Research pages and blocks to the web as clean, shareable pages on [
 
 **[See an example page →](https://roam.pub/ejqs/DyEQxo40V/roam-publish-kitchen-sink)**
 
-- **Share it your way.** Keep a page **Unlisted** so only people with the link can read it, make it **Listed** on your
-  graph's blog-style front page, or **Discoverable** on [Discover](https://roam.pub/discover) for everyone on roam.pub
-  to find.
-- **Lock it down.** Protect a page with a password, or limit it to members of your graph.
+- **Share it your way.** Every page has a **Visibility**: **Unlisted** so only people with the link can read it,
+  **Public** on your graph's blog-style front page, or **Discover** on [Discover](https://roam.pub/discover) for
+  everyone on roam.pub to find. (The extension's buttons still call Public "listed" and Discover "discoverable".)
+- **Lock it down.** Make a page **Password** or **Members**. Password pages can also be encrypted, and from
+  Roam Publish 0.2.0 they're encrypted in Roam before they're sent, so roam.pub never sees their text.
 - **Publish together.** Collections gather pages from different graphs and people in one place.
 
 > Roam Publish is a third-party service made by [@ejqs](https://ejqs.net). It is not affiliated with Roam Research.
@@ -55,25 +56,41 @@ dashboard** in the extension settings.
 - **Page history**: each page's permanent short link (`roam.pub/p/…`) shows your graph's members what happened to it
   and when. The same change log is also written back into your Roam page.
 - **A public profile** at `roam.pub/u/{username}`.
-- **Bulk changes**: select many pages to change where they're listed, who can read them, or their tags.
+- **Bulk changes**: select many pages to change their Visibility or their tags.
+- **Front pages** you can browse as cards or a folder tree, with folders you arrange on the website.
+- **What's new** at [roam.pub/updates](https://roam.pub/updates), with this extension's release notes, and
+  [Upcoming changes](https://roam.pub/updates/upcoming) for anything you'll need to act on, such as updating the
+  extension.
 
 New pages and blocks are published **Unlisted**: only people with the link can see them. The toast offers **Make
 listed** and **Make discoverable** right away, and **Add to collection…** when you're in a collection.
 
 **Add to collection…** lists your collections and how the page starts out in each one, using that collection's own
 defaults (listed, on Discover, password-protected or members only). When the collection is password-protected or
-members only and the page is more open in your graph, adding it takes it out of your graph, so the graph link can't
-get around the collection's lock. Encrypted pages are added on roam.pub, where you can enter their password.
+members only and the page is more open in your graph, or the collection takes the pages added to it out of their
+graph, adding it takes it out of your graph, so the graph link can't get around the collection's lock. Encrypted pages
+can be added too, with no password to type: Roam Publish adds the page and republishes it, so it opens in the
+collection with the collection's password. Collections without a password that can encrypt are greyed out.
+
+**Collapsed blocks.** The first time you publish a page with collapsed blocks, Roam Publish asks whether to publish
+it as is (those blocks start collapsed) or expanded. Readers can open and close blocks either way. Later, when the
+blocks collapsed in Roam aren't the ones collapsed on the published page, republishing asks: **Republish as is**, or
+**Republish, keep open/collapsed** to update the content and leave the published page's blocks as they are. If only
+which blocks are collapsed changed, the status toast offers **Sync open/collapsed blocks** instead.
 
 Open the same menu again to check whether it's published and where it's listed, or to **Republish** after edits,
 change where it's listed (**Make listed**, **Make discoverable**, **Make unlisted**), **Add to collection…**, or
-**Unpublish**. A page can only
-be Discoverable when it's open to everyone, shown in your graph, and your graph's front page and search engines are
-on; otherwise the toast says what's stopping it. Unpublishing asks first: it deletes the page on roam.pub along with
+**Unpublish**. A page that's only in collections has no graph listing to change, so the toast says each of its
+collections sets how it's listed. A page can only be Discoverable when it's open to everyone, shown in your graph,
+and your graph's front page and search engines are on; otherwise the toast says what's stopping it. Unpublishing asks first: it deletes the page on roam.pub along with
 its access settings, passwords, views, upvotes and places in collections. On a shared graph, pages another member
 published show their status only; only they or the graph's owner can change them.
 
 You can also do all of this from the command palette: type "Roam Publish".
+
+**Keeping up to date.** When roam.pub changes in a way that needs a newer Roam Publish, the extension says so once and
+tells you where to update it (Settings → Roam Depot → Installed extensions), instead of failing with a confusing
+error.
 
 ### Supported blocks
 
@@ -83,6 +100,8 @@ check references, embeds and children first. Nothing else from your graph is sen
 - **Text formatting:** bold, italics, ^^highlights^^, ~~strikethrough~~, `inline code`, headings and text alignment.
 - **Links:** `[[page links]]`, `#tags` and aliases. They link to the other page when it's also published and listed,
   and show as plain text when it isn't (so an unlisted page's link is never handed out).
+- **Collapsing and zooming:** readers fold any block with children, fold a whole page from its thread line, and
+  click a bullet or number to zoom into a block, as in Roam. Pages with headings get an outline.
 - **Block references** `((…))`: shown as the referenced text, up to 3 levels deep, including blocks outside the
   published page.
 - **Embeds** `{{embed: …}}`: the embedded block or page with its children, up to 2 levels deep, and every embed when
@@ -90,14 +109,15 @@ check references, embeds and children first. Nothing else from your graph is sen
 - **Views:** bullets, numbered lists and document view.
 - **Tables** `{{table}}` and **kanban boards** `{{kanban}}`.
 - **Math** `$$…$$`, rendered with KaTeX.
-- **Code blocks** with syntax highlighting.
+- **Code blocks** with syntax highlighting, a language label and a copy button. Click inline code to copy it.
+- **Mermaid diagrams** (`{{mermaid}}`, or a code block set to Mermaid) are drawn, with a button to see the source.
 - **Quotes** `>`, **attributes** `Key:: value`, **TODO / DONE** checkboxes (read-only) and **horizontal rules** `---`.
 - **Images**, **video** (YouTube, Vimeo, Loom and video files), **audio**, **PDFs** and **iframes**.
 - **Tweets** show as a link to the post.
 
 ### Unsupported blocks
 
-- **Diagrams and drawings** (`{{mermaid}}`, `{{diagram}}`, `{{drawing}}`, Excalidraw) show a "Diagram not shown"
+- **Diagrams and drawings** other than Mermaid (`{{diagram}}`, `{{drawing}}`, Excalidraw) show a "Diagram not shown"
   placeholder.
 - **Queries and mentions** (`{{query}}`, `{{mentions}}`) show a placeholder. Their results aren't published.
 - **Interactive components** such as buttons, sliders, timers, counters and `roam/js` aren't shown.
@@ -133,6 +153,14 @@ Changing the tag or the link text edits existing blocks in place the next time y
 - **Written to your graph:** the Roam Publish block when you publish, and change log entries if you kept an
   append-only token. Nothing else.
 - **Encrypted graphs** are supported. The extension only sends the data you choose to publish.
+- **Encrypted pages:** a Password page that roam.pub encrypts is encrypted in Roam before it's sent (from 0.2.0), so
+  roam.pub only gets the encrypted page and never sees its text. The extension asks roam.pub for the passwords'
+  public keys first; it never sees a password. Readers' browsers decrypt the page with the password. This needs a
+  Roam recent enough to have X25519 encryption; on an older one, the page is sent as before and roam.pub encrypts it
+  when it arrives. Each encrypted page says which way it was encrypted: see
+  [Encryption versions](https://roam.pub/privacy/encryption/versions).
+- **Your extension's version** is sent with every request, so roam.pub knows which versions are still in use before
+  it retires anything older ones rely on.
 
 ### Use of the Append API
 
@@ -174,7 +202,7 @@ npm install
 ROAM_PUBLISH_SERVER=http://localhost:3000 npm run dev   # rebuilds extension.js on change
 npm run build       # production build
 npm run typecheck
-npm test            # serializer, hash parity with the server, API errors
+npm test            # serializer, hash parity with the server, encryption, API errors
 ```
 
 In Roam: Settings → Roam Depot → enable Developer mode → load this folder.
