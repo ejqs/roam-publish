@@ -196,8 +196,26 @@ describe("collapsed blocks", () => {
       }],
     });
     await publishStatus("page1");
-    assert.match(toasts.at(-1)!, /up to date.*start expanded there/);
+    assert.match(toasts.at(-1)!, /up to date.*published expanded/);
     assert.deepEqual(actions().map((b) => b.textContent).filter((l) => l?.startsWith("Republish")), ["Republish as is (Collapsed)"]);
+  });
+
+  test("after an edit, Republish keeps the page's choice and the other button switches", async () => {
+    roam = folded();
+    settings.set("publications", cached({ hash: "old", folds: true }));
+    const calls = server({
+      "GET /api/ext/publications": () => [200, {
+        publications: [{ rootUid: "page1", kind: "page", title: "Page", url: "https://roam.pub/g/x", contentHash: "old",
+          visibility: "unlisted", listing: "unlisted", updatedAt: "" }],
+      }],
+      "POST /api/ext/publications": (body) => [200, { status: "updated", url: "https://roam.pub/g/x", contentHash: body.contentHash, visibility: "unlisted" }],
+    });
+    await publishStatus("page1");
+    assert.match(toasts.at(-1)!, /has changed.*published collapsed, as in Roam/);
+    assert.deepEqual(actions().map((b) => b.textContent).filter((l) => l?.startsWith("Republish")), ["Republish", "Republish expanded"]);
+    button("Republish")!.click!();
+    await settle();
+    assert.match(sentTree(calls), /"collapsed":true/);
   });
 });
 

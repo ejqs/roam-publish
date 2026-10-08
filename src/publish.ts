@@ -673,17 +673,25 @@ export async function publishStatus(uid: string) {
     // Only known for items published from this graph's extension settings.
     const bylineChanged = c.author !== undefined && c.author !== getAuthor();
     const upToDate = !changed && !bylineChanged;
-    // With collapsed blocks, Republish says which way, and offers the other way even when up to date.
-    const republish = folds
-      ? ([true, false] as const)
-          .filter((keep) => !upToDate || publishedAs !== keep)
-          .map((keep) => ({
-            label: keep ? "Republish as is (Collapsed)" : "Republish expanded",
-            onClick: () => void publish(uid, { folds: keep }),
-          }))
-      : upToDate
+    // With collapsed blocks: Republish keeps this page's choice (updating which blocks are collapsed
+    // when it's "as is"), and a second button switches to the other way, even when up to date.
+    const current = c.folds ?? publishedAs;
+    const keepLabel = "Republish as is (Collapsed)";
+    const republish = !folds
+      ? upToDate
         ? []
-        : [{ label: "Republish", onClick: () => void publish(uid) }];
+        : [{ label: "Republish", onClick: () => void publish(uid) }]
+      : current === undefined
+        ? [
+            { label: keepLabel, onClick: () => void publish(uid, { folds: true }) },
+            { label: "Republish expanded", onClick: () => void publish(uid, { folds: false }) },
+          ]
+        : [
+            ...(upToDate ? [] : [{ label: "Republish", onClick: () => void publish(uid, { folds: current }) }]),
+            current
+              ? { label: "Republish expanded", onClick: () => void publish(uid, { folds: false }) }
+              : { label: keepLabel, onClick: () => void publish(uid, { folds: true }) },
+          ];
     const actions = [
       ...republish,
       ...listingActions(uid, c),
@@ -691,7 +699,11 @@ export async function publishStatus(uid: string) {
       { label: "Unpublish", onClick: () => void confirmUnpublish(uid, { checked: true }) },
     ];
     const foldsNote =
-      folds && publishedAs !== undefined ? ` Its collapsed blocks start ${publishedAs ? "collapsed" : "expanded"} there.` : "";
+      folds && current !== undefined
+        ? current
+          ? " Collapsed blocks are published collapsed, as in Roam."
+          : " Its blocks are published expanded."
+        : "";
     // Roam's toasts can't grey a button out, so say why Make discoverable isn't there.
     const blocked =
       (listingOf(c) !== "unlisted" && c.listedNote ? ` ${c.listedNote}` : "") ||
@@ -699,7 +711,7 @@ export async function publishStatus(uid: string) {
     toast(
       upToDate
         ? `${label} is published (${where}) and up to date. Last published ${since}.${foldsNote}${offline}${blocked}`
-        : `${label} is published (${where}) but ${changed ? "has changed" : "has a new author name"} since it was last published on ${since}.${offline}${blocked}`,
+        : `${label} is published (${where}) but ${changed ? "has changed" : "has a new author name"} since it was last published on ${since}.${foldsNote}${offline}${blocked}`,
       { intent: upToDate ? "success" : "none", link: openLink(c), actions, durationMs: 15000 },
     );
   } catch (e) {
