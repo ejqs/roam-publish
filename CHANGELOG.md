@@ -18,8 +18,9 @@ What's new shows it once Roam Depot serves it. Every bullet starts with **New:**
   which did nothing, and called it unlisted. It now says the page is only in collections, where each collection sets
   how it's listed.
 - Improved: The status toast is shorter, for example "Unlisted page, up to date. Last published Oct 8, 2026, 1:14 PM."
-- Improved: An encrypted page's toasts no longer offer **Add to collection…**, which couldn't add it; they say to add
-  it on roam.pub, where you can enter its password.
+- New: **Add to collection…** works for encrypted pages too, with no password to type. Roam Publish adds the page
+  and republishes it, so it opens in the collection with the collection's password. If the page changed in Roam since
+  you last published it, it asks first. Collections without a password that can encrypt are greyed out.
 
 ## 0.1.1 (2026-10-07)
 

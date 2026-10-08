@@ -356,7 +356,7 @@ const republishActions = (uid: string) => [
  * Without it, the user is asked when it matters: the first time something with collapsed blocks is
  * published, and when the blocks collapsed in Roam differ from the published page's.
  */
-export async function publish(uid: string, opts: { folds?: Folds } = {}) {
+export async function publish(uid: string, opts: { folds?: Folds; addedTo?: { name: string; entryUrl: string } } = {}) {
   if (publishing.has(uid)) return toast("Already publishing that. One moment…");
   publishing.add(uid);
   let link: Awaited<ReturnType<typeof ensureShortlinkBlock>> = null;
@@ -440,8 +440,9 @@ export async function publish(uid: string, opts: { folds?: Folds } = {}) {
     const copiedNote = copied ? " Link copied." : "";
 
     const unlisted = listingOf(res) === "unlisted";
-    const msg =
-      res.status === "unchanged"
+    const msg = opts.addedTo
+      ? `Added to ${opts.addedTo.name} and republished, so it opens there with ${opts.addedTo.name}'s password.`
+      : res.status === "unchanged"
         ? `${label} is already published with no changes.`
         : res.status === "updated"
           ? `${label} republished with your changes.${copiedNote}`
@@ -451,12 +452,12 @@ export async function publish(uid: string, opts: { folds?: Folds } = {}) {
               ? `${label} published as unlisted: only people with the link can see it.${copiedNote}`
               : `${label} published!${copiedNote}`;
     toast(msg, {
-      intent: res.status === "unchanged" ? "none" : "success",
-      link: res.url,
+      intent: res.status === "unchanged" && !opts.addedTo ? "none" : "success",
+      link: opts.addedTo?.entryUrl ?? res.url,
       // New items start unlisted; offer the one-click upgrades, and collections, right where they'll see it.
       actions:
         res.status === "created"
-          ? [...(unlisted ? listingActions(uid, res) : []), ...collectionAction(uid, res)]
+          ? [...(unlisted ? listingActions(uid, res) : []), ...collectionAction(uid)]
           : undefined,
     });
     warnIfBroken(res.changeLog);
@@ -557,18 +558,10 @@ export async function setListing(uid: string, listing: Listing) {
 let collectionCount: number | undefined;
 
 /**
- * "Add to collection…", when there's a collection to add to. Not for encrypted pages: they're added
- * on roam.pub, which can ask for their password.
+ * "Add to collection…", when there's a collection to add to.
  */
-const collectionAction = (uid: string, c: { encrypted?: boolean }) =>
-  collectionCount && !c.encrypted ? [{ label: "Add to collection…", onClick: () => void chooseCollection(uid) }] : [];
-
-/**
- * Why the status toast has no "Add to collection…" for an encrypted page: its content is locked with
- * a password, and a new collection needs that password to unlock it there.
- */
-const ENCRYPTED_COLLECTIONS =
-  " It's encrypted: only its password unlocks it, and a new collection needs that password, so add it to collections on roam.pub.";
+const collectionAction = (uid: string) =>
+  collectionCount ? [{ label: "Add to collection…", onClick: () => void chooseCollection(uid) }] : [];
 
 type CollectionChoice = {
   id: string;
@@ -577,6 +570,8 @@ type CollectionChoice = {
   access: "open" | "password" | "members";
   entryUrl: string | null;
   movesOutOfGraph: boolean;
+  /** Why it can't be added there (an encrypted page in a collection without a usable password), from servers that say. */
+  blocked?: string | null;
 };
 
 /** How a page starts out in a collection, as the dropdown says it. */
@@ -611,8 +606,10 @@ export async function chooseCollection(uid: string) {
           value: c.id,
           label: c.entryUrl
             ? `${c.name} (already there)`
-            : `${c.name}: ${startsAs(c)}${c.movesOutOfGraph ? ", leaves your graph" : ""}`,
-          disabled: !!c.entryUrl,
+            : c.blocked
+              ? `${c.name} (needs a password that can encrypt)`
+              : `${c.name}: ${startsAs(c)}${c.movesOutOfGraph ? ", leaves your graph" : ""}`,
+          disabled: !!c.entryUrl || !!c.blocked,
         })),
         onChoose: (id) => void addToCollection(uid, id),
       },
@@ -623,8 +620,35 @@ export async function chooseCollection(uid: string) {
   }
 }
 
-export async function addToCollection(uid: string, collectionId: string) {
+/** Whether the page in Roam differs from what's published, apart from which blocks are collapsed. */
+async function changedInRoam(uid: string) {
+  const cache = getCache();
+  const c = cache[uid];
+  const payload = c && (await serialize(uid, shortlinksOf(cache)));
+  if (!c || !payload) return false;
+  return c.hash !== (await hashPayload(folded(payload, "keep", c.folded))) && c.hash !== (await hashPayload(payload));
+}
+
+/**
+ * Adds a published page to a collection. An encrypted page is added waiting for a republish (only
+ * its passwords open it, and a new collection's can't without one), so it's republished right
+ * after: that locks it for every place's password, the new collection's included. When the page
+ * changed in Roam since it was published, that republish would publish the changes too, so it asks
+ * first (`confirmed`).
+ */
+export async function addToCollection(uid: string, collectionId: string, { confirmed = false } = {}) {
   try {
+    if (getCache()[uid]?.encrypted && !confirmed && (await changedInRoam(uid)))
+      return toast(
+        "This page is encrypted, so adding it republishes it, and it changed in Roam since it was last published. Add it and publish your changes?",
+        {
+          actions: [
+            { label: "Add and republish", onClick: () => void addToCollection(uid, collectionId, { confirmed: true }) },
+            CANCEL,
+          ],
+          durationMs: 20000,
+        },
+      );
     const res = await api<{
       name: string;
       entryUrl: string;
@@ -632,6 +656,8 @@ export async function addToCollection(uid: string, collectionId: string) {
       access: CollectionChoice["access"];
       movedOutOfGraph: boolean;
       encrypted?: boolean;
+      /** Encrypted: it opens there once republished (from servers that add encrypted pages). */
+      needsRepublish?: boolean;
       url: string;
     }>(`/api/ext/publications/${encodeURIComponent(uid)}/collections`, {
       method: "POST",
@@ -649,6 +675,12 @@ export async function addToCollection(uid: string, collectionId: string) {
           // The collection may have encrypted it.
           encrypted: res.encrypted || cache[uid].encrypted,
         },
+      });
+    if (res.needsRepublish)
+      return publish(uid, {
+        // Without the published page's collapsed blocks (older servers), as in Roam.
+        folds: getCache()[uid]?.folded ? "keep" : "asIs",
+        addedTo: { name: res.name, entryUrl: res.entryUrl },
       });
     const how = res.listing === "unlisted" ? "unlisted" : startsAs({ listing: res.listing, access: res.access });
     toast(
@@ -774,17 +806,15 @@ export async function publishStatus(uid: string) {
     const actions = [
       ...republish,
       ...listingActions(uid, c),
-      ...collectionAction(uid, c),
+      ...collectionAction(uid),
       { label: "Unpublish", onClick: () => void confirmUnpublish(uid, { checked: true }) },
     ];
     const foldsNote = foldsDiffer ? ` Collapsed blocks differ from the published ${payload.kind}.` : "";
-    // Roam's toasts can't grey a button out, so say why Make … or Add to collection… isn't there.
-    const blocked =
-      (onlyInCollections
-        ? " Each collection sets its listing."
-        : (listingOf(c) !== "unlisted" && c.listedNote ? ` ${c.listedNote}` : "") ||
-          (c.discoverBlocked && listingOf(c) !== "discover" ? ` ${c.discoverBlocked}` : "")) +
-      (c.encrypted && collectionCount ? ENCRYPTED_COLLECTIONS : "");
+    // Roam's toasts can't grey a button out, so say why a Make … button isn't there.
+    const blocked = onlyInCollections
+      ? " Each collection sets its listing."
+      : (listingOf(c) !== "unlisted" && c.listedNote ? ` ${c.listedNote}` : "") ||
+        (c.discoverBlocked && listingOf(c) !== "discover" ? ` ${c.discoverBlocked}` : "");
     toast(
       upToDate
         ? `${what}, up to date. Last published ${since}.${foldsNote}${offline}${blocked}`

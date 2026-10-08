@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import { beforeEach, describe, mock, test } from "node:test";
-import { confirmChangeLogBlocks, confirmUnpublish, publish, publishStatus, syncPublications } from "../src/publish";
+import {
+  addToCollection,
+  chooseCollection,
+  confirmChangeLogBlocks,
+  confirmUnpublish,
+  publish,
+  publishStatus,
+  syncPublications,
+} from "../src/publish";
 import { hashPayload, serialize } from "../src/serialize";
 import { initState, resetShortlinkSettings, withoutUndefined } from "../src/state";
 import { fakeRoam } from "./fake-roam";
@@ -347,7 +355,60 @@ describe("add to collection", () => {
     server({ "POST /api/ext/publications": (b) => [200, { status: "created", url: "https://roam.pub/c/aaa", contentHash: b.contentHash, visibility: "unlisted", listing: "unlisted", inGraph: false, encrypted: true, collections: 2 }] });
     await publish("page1");
     assert.match(toasts.at(-1)!, /^Page published to collections only\./);
-    assert.deepEqual(actions().map((b) => b.textContent), []);
+    assert.deepEqual(actions().map((b) => b.textContent), ["Add to collection…"]);
+  });
+
+  describe("an encrypted page", () => {
+    const added = {
+      name: "Private", entryUrl: "https://roam.pub/c/bbb", listing: "listed", access: "password",
+      movedOutOfGraph: false, encrypted: true, needsRepublish: true, url: "https://roam.pub/g/x",
+    };
+    const encryptedCache = async (hash?: string) => {
+      const payload = (await serialize("page1", new Set()))!;
+      settings.set("publications", cached({ hash: hash ?? (await hashPayload(payload)), encrypted: true, folded: [] }));
+    };
+
+    test("the dropdown leaves out collections whose password can't encrypt", async () => {
+      await encryptedCache();
+      server({
+        "GET /api/ext/publications/page1/collections": () => [200, { collections: [
+          { ...choices[1], blocked: "This page is encrypted. Give Best of a password first." },
+          { ...choices[2], movesOutOfGraph: false, blocked: null },
+        ] }],
+      });
+      await chooseCollection("page1");
+      const options = (selects.at(-1)!.children as El[]).slice(1).map((o) => [o.textContent, !!o.disabled]);
+      assert.deepEqual(options, [
+        ["Best of (needs a password that can encrypt)", true],
+        ["Private: password-protected", false],
+      ]);
+    });
+
+    test("is added and republished in one go, so it opens in the new collection", async () => {
+      await encryptedCache();
+      const calls = server({
+        "POST /api/ext/publications/page1/collections": () => [200, added],
+        "POST /api/ext/publications": (b) => [200, { status: "updated", url: "https://roam.pub/g/x", contentHash: b.contentHash, visibility: "unlisted", listing: "unlisted", encrypted: true }],
+      });
+      await addToCollection("page1", "c3");
+      assert.deepEqual(calls.map((c) => `${c.method} ${c.path}`), ["POST /api/ext/publications/page1/collections", "POST /api/ext/publications"]);
+      assert.match(toasts.at(-1)!, /^Added to Private and republished, so it opens there with Private's password\./);
+    });
+
+    test("asks first when the page changed in Roam, since republishing publishes the changes", async () => {
+      await encryptedCache("not-the-hash");
+      const calls = server({
+        "POST /api/ext/publications/page1/collections": () => [200, added],
+        "POST /api/ext/publications": (b) => [200, { status: "updated", url: "https://roam.pub/g/x", contentHash: b.contentHash, visibility: "unlisted" }],
+      });
+      await addToCollection("page1", "c3");
+      assert.equal(calls.length, 0);
+      assert.match(toasts.at(-1)!, /changed in Roam since it was last published/);
+      button("Add and republish")!.click!();
+      // Adding, then republishing (which reads and hashes the page), each take a few turns.
+      for (let i = 0; i < 50 && !/^Added to/.test(toasts.at(-1)!); i++) await tick();
+      assert.deepEqual(calls.map((c) => c.path), ["/api/ext/publications/page1/collections", "/api/ext/publications"]);
+    });
   });
 
   test("the status toast offers it too", async () => {
@@ -504,7 +565,7 @@ describe("status", () => {
     assert.deepEqual(labels().filter((l) => l !== "Republish"), ["Add to collection…", "Unpublish"]);
   });
 
-  test("an encrypted page is added to collections on roam.pub, so the toast says so instead", async () => {
+  test("an encrypted page can be added to collections from Roam too", async () => {
     server({
       "GET /api/ext/publications": () => [200, {
         collections: 2,
@@ -513,8 +574,8 @@ describe("status", () => {
       }],
     });
     await publishStatus("page1");
-    assert.match(toasts.at(-1)!, /It's encrypted: .*needs that password, so add it to collections on roam\.pub\./);
-    assert.deepEqual(labels().filter((l) => l !== "Republish"), ["Unpublish"]);
+    assert.doesNotMatch(toasts.at(-1)!, /roam\.pub/);
+    assert.deepEqual(labels().filter((l) => l !== "Republish"), ["Add to collection…", "Unpublish"]);
   });
 
   test("an older server that only says public still gets the new words", async () => {
