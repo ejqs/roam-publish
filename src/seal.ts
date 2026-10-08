@@ -57,14 +57,21 @@ export async function sealContentKey(publicKey: string, contentKey: Bytes) {
   return ["v1", b64(ephPub), ...(await gcmSeal(key, contentKey, "content-key"))].join(".");
 }
 
-/** Whether this browser (or Roam desktop) has X25519. Without it, pages are sent as before and roam.pub encrypts them. */
-export async function canSeal() {
-  try {
-    await crypto.subtle.generateKey({ name: "X25519" }, false, ["deriveBits"]);
-    return true;
-  } catch {
-    return false;
-  }
+let sealSupport: Promise<boolean> | null = null;
+/**
+ * Whether this browser (or Roam desktop) has X25519, checked once. Without it, pages are sent as before
+ * and roam.pub encrypts them.
+ */
+export function canSeal() {
+  sealSupport ??= (async () => {
+    try {
+      await crypto.subtle.generateKey({ name: "X25519" }, false, ["deriveBits"]);
+      return true;
+    } catch {
+      return false;
+    }
+  })();
+  return sealSupport;
 }
 
 /** Encrypts the tree and seals its key to every password in the plan that has a key pair. */

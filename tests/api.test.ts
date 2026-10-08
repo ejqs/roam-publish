@@ -53,6 +53,13 @@ describe("api", () => {
     }
   });
 
+  test("says whether Roam can encrypt pages here, which version alone doesn't", async () => {
+    const calls = respond(200, {});
+    await api("/x");
+    // Node has X25519, like current browsers; older Roam desktop apps don't, and send "0".
+    assert.equal(calls[0].headers["x-roam-publish-can-seal"], "1");
+  });
+
   test("asks once to update when roam.pub needs a newer version than this one", async () => {
     const shown: string[] = [];
     updateNotice.show = (m) => void shown.push(m);

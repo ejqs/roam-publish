@@ -1,3 +1,4 @@
+import { canSeal } from "./seal";
 import { getApiKey, getServer } from "./state";
 import { toast } from "./toast";
 
@@ -51,6 +52,9 @@ export async function api<T>(path: string, init: RequestInit & { auth?: boolean 
   const headers: Record<string, string> = { "content-type": "application/json" };
   // Lets roam.pub see which versions are still in use, so it knows when an older API can be retired.
   if (typeof __VERSION__ === "string") headers["x-roam-publish-version"] = __VERSION__;
+  // And whether Roam can encrypt pages here, which version alone doesn't say (older desktop apps can't), so
+  // roam.pub only requires it once everyone can.
+  headers["x-roam-publish-can-seal"] = (await canSeal()) ? "1" : "0";
   const server = getServer();
   if (!isSafeServer(server))
     throw new ApiError(-1, `The Server URL must start with https:// (it's ${server}). Settings → Roam Publish → Server URL.`);
