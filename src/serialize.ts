@@ -105,6 +105,23 @@ async function toNode(b: PullBlock, isPageRoot: boolean, chain: EmbedChain, skip
   return node;
 }
 
+/** How many blocks are collapsed in Roam, embeds included. */
+export function foldCount(n: Node): number {
+  const embeds = [n.embed, ...(n.moreEmbeds ?? [])].filter((e): e is Node => !!e);
+  return (n.collapsed ? 1 : 0) + [...n.children, ...embeds].reduce((sum, c) => sum + foldCount(c), 0);
+}
+
+/** The tree with every block open, as published before collapsed blocks were sent; hashes the same as then. */
+export function unfolded(n: Node): Node {
+  const { collapsed: _, embed, moreEmbeds, children, ...rest } = n;
+  return {
+    ...rest,
+    ...(embed && { embed: unfolded(embed) }),
+    ...(moreEmbeds && { moreEmbeds: moreEmbeds.map(unfolded) }),
+    children: children.map(unfolded),
+  };
+}
+
 /** "{server}/p/{id}" at the start of a block, bare or as `[text]({server}/p/{id})`. */
 export const isShortlinkText = (s: string | undefined, shortIds: Set<string>) => {
   const m = s && /^(?:\[[^\]\n]*\]\()?https?:\/\/[^\s)]+?\/p\/([2-9A-HJ-NP-Za-km-z]{8})(?=[\s)]|$)/.exec(s);

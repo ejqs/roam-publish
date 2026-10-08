@@ -13,6 +13,8 @@ export type CachedPublication = {
   updatedAt: string;
   /** Author name sent with the last publish; republishing with a new one updates the byline. */
   author?: string;
+  /** Whether it was last published with Roam's collapsed blocks kept collapsed; unset until there were any. */
+  folds?: boolean;
   /** Permanent {server}/p/{id} link, from servers that have shortlinks. */
   shortUrl?: string | null;
   /** How many places (its graph, collections) it's published in, as of the last sync (from servers that say). */
