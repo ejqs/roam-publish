@@ -307,7 +307,7 @@ function askFolds(uid: string, folds: number, kind: "page" | "block", republish:
     `${blocksWord(folds)} on this ${kind} ${folds === 1 ? "is" : "are"} collapsed in Roam. Should ${folds === 1 ? "it" : "they"} start collapsed on the published ${kind} too? Readers can open and close blocks either way.`,
     {
       actions: [
-        { label: `${verb} collapsed`, onClick: () => void publish(uid, { folds: true }) },
+        { label: `${verb} as is (Collapsed)`, onClick: () => void publish(uid, { folds: true }) },
         { label: `${verb} expanded`, onClick: () => void publish(uid, { folds: false }) },
       ],
       durationMs: 20000,
@@ -678,7 +678,7 @@ export async function publishStatus(uid: string) {
       ? ([true, false] as const)
           .filter((keep) => !upToDate || publishedAs !== keep)
           .map((keep) => ({
-            label: `Republish ${keep ? "collapsed" : "expanded"}`,
+            label: keep ? "Republish as is (Collapsed)" : "Republish expanded",
             onClick: () => void publish(uid, { folds: keep }),
           }))
       : upToDate

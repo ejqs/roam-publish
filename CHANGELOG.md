@@ -9,7 +9,7 @@ What's new shows it once Roam Depot serves it. Every bullet starts with **New:**
 - New: Pages with collapsed blocks can be published with those blocks collapsed, as you have them in Roam. The first
   time you publish a page with collapsed blocks, Roam Publish asks whether they should start collapsed or expanded,
   and remembers your answer for that page. Readers can open and close blocks either way.
-- New: The status toast for a page with collapsed blocks offers **Republish collapsed** and **Republish expanded**.
+- New: The status toast for a page with collapsed blocks offers **Republish as is (Collapsed)** and **Republish expanded**.
   On a page published expanded, collapsing or expanding blocks in Roam doesn't count as a change.
 
 ## 0.1.1 (2026-10-07)

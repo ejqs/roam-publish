@@ -173,8 +173,8 @@ describe("collapsed blocks", () => {
     assert.equal(calls.filter((c) => c.method === "POST").length, 0);
     assert.deepEqual(roam.blocks.get("page1")!.children!.map((c) => c.uid), ["b1"]);
     assert.match(toasts.at(-1)!, /1 block on this page is collapsed in Roam/);
-    assert.deepEqual(actions().map((b) => b.textContent), ["Publish collapsed", "Publish expanded"]);
-    button("Publish collapsed")!.click!();
+    assert.deepEqual(actions().map((b) => b.textContent), ["Publish as is (Collapsed)", "Publish expanded"]);
+    button("Publish as is (Collapsed)")!.click!();
     await settle();
     assert.match(sentTree(calls), /"collapsed":true/);
     assert.equal((settings.get("publications") as Record<string, { folds?: boolean }>).page1.folds, true);
@@ -197,7 +197,7 @@ describe("collapsed blocks", () => {
     });
     await publishStatus("page1");
     assert.match(toasts.at(-1)!, /up to date.*start expanded there/);
-    assert.deepEqual(actions().map((b) => b.textContent).filter((l) => l?.startsWith("Republish")), ["Republish collapsed"]);
+    assert.deepEqual(actions().map((b) => b.textContent).filter((l) => l?.startsWith("Republish")), ["Republish as is (Collapsed)"]);
   });
 });
 
