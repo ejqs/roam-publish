@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { api, ApiError } from "../src/api";
+import { api, ApiError, MIN_VERSION_HEADER, olderThan, updateNotice } from "../src/api";
 import { initState } from "../src/state";
 
 /** Settings the extension reads through Roam Depot's extensionAPI. */
@@ -10,11 +10,11 @@ const extensionAPI = { settings: { get: (k: string) => settings.get(k) ?? null, 
 
 initState(extensionAPI as never);
 
-function respond(status: number, body: unknown) {
+function respond(status: number, body: unknown, headers: Record<string, string> = {}) {
   const calls: { url: string; headers: Record<string, string> }[] = [];
   globalThis.fetch = (async (url: string, init: RequestInit) => {
     calls.push({ url, headers: init.headers as Record<string, string> });
-    return new Response(JSON.stringify(body), { status });
+    return new Response(JSON.stringify(body), { status, headers });
   }) as never;
   return calls;
 }
@@ -51,6 +51,33 @@ describe("api", () => {
     } finally {
       delete (globalThis as unknown as { __VERSION__?: string }).__VERSION__;
     }
+  });
+
+  test("asks once to update when roam.pub needs a newer version than this one", async () => {
+    const shown: string[] = [];
+    updateNotice.show = (m) => void shown.push(m);
+    const g = globalThis as unknown as { __VERSION__?: string };
+    g.__VERSION__ = "0.2.0";
+    try {
+      respond(200, {}, { [MIN_VERSION_HEADER]: "0.2.0" });
+      await api("/x");
+      assert.deepEqual(shown, []);
+      respond(200, {}, { [MIN_VERSION_HEADER]: "0.3.0" });
+      await api("/x");
+      await api("/x");
+      assert.equal(shown.length, 1);
+      assert.match(shown[0], /this is 0\.2\.0; it needs 0\.3\.0/);
+    } finally {
+      delete g.__VERSION__;
+      updateNotice.asked = false;
+    }
+  });
+
+  test("compares versions part by part", () => {
+    assert.equal(olderThan("0.9.0", "0.10.0"), true);
+    assert.equal(olderThan("0.10.0", "0.9.0"), false);
+    assert.equal(olderThan("1.0.0", "1.0.0"), false);
+    assert.equal(olderThan("dev", "1.0.0"), false);
   });
 
   test("a key for another graph shows the server's words", async () => {

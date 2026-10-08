@@ -22,6 +22,10 @@ What's new shows it once Roam Depot serves it. Every bullet starts with **New:**
   and republishes it, so it opens in the collection with the collection's password. If the page changed in Roam since
   you last published it, it asks first. Collections without a password that can encrypt are greyed out.
 
+### Setup and settings
+- New: When roam.pub changes in a way that needs a newer Roam Publish, the extension says so and tells you where to
+  update it, instead of failing with a confusing error.
+
 ## 0.1.1 (2026-10-07)
 
 ### Publishing
