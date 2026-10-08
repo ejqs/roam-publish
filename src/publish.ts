@@ -18,6 +18,7 @@ import {
   type Visibility,
 } from "./state";
 import { toast } from "./toast";
+import { canSeal, hashLike, keyedHash, type SealPlan, sealTree } from "./seal";
 
 type Remote = {
   rootUid: string;
@@ -351,6 +352,37 @@ const republishActions = (uid: string) => [
   { label: "Republish, keep open/collapsed", onClick: () => void publish(uid, { folds: "keep" }) },
 ];
 
+type PublishResponse = {
+  status: "created" | "updated" | "unchanged";
+  url: string;
+  shortUrl?: string;
+  contentHash: string;
+  visibility: Visibility;
+  listing?: Listing;
+  discoverBlocked?: string | null;
+  inGraph?: boolean;
+  encrypted?: boolean;
+  changeLog?: ChangeLog;
+  collections?: number;
+};
+
+/**
+ * The page encrypted for roam.pub, when it's a Password page there (it says, for a new page, whether it
+ * will be), with its keyed hash. Null to send it as before: not encrypted, a roam.pub from before
+ * encryption in Roam, or a Roam without X25519, where roam.pub encrypts it on arrival as it used to.
+ */
+async function sealFor(uid: string, payload: Payload) {
+  let plan: SealPlan;
+  try {
+    plan = await api<SealPlan>(`/api/ext/publications/${encodeURIComponent(uid)}/seal`);
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404) return null;
+    throw e;
+  }
+  if (!plan.encrypt || !(await canSeal())) return null;
+  return { sealed: await sealTree(plan, payload.tree), contentHash: await keyedHash(await hashPayload(payload)) };
+}
+
 /**
  * Publishes or republishes. `folds` says which blocks start collapsed on the website (see Folds).
  * Without it, the user is asked when it matters: the first time something with collapsed blocks is
@@ -372,7 +404,7 @@ export async function publish(uid: string, opts: { folds?: Folds; addedTo?: { na
       if (first && inRoam.length && !published) return askFirstFolds(uid, inRoam.length, first.kind, !!cache[uid]);
       if (first && published && !sameFolds(inRoam, kept)) {
         // Nothing but collapsed blocks changed: there's only one thing to do.
-        if ((await hashPayload(folded(first, "keep", published))) === cache[uid]?.hash)
+        if ((await hashLike(cache[uid]?.hash, folded(first, "keep", published))) === cache[uid]?.hash)
           return toast(
             `Only which blocks are collapsed changed since this ${first.kind} was published. Sync them to the website?`,
             { actions: [syncFoldsAction(uid), CANCEL], durationMs: 15000 },
@@ -397,31 +429,29 @@ export async function publish(uid: string, opts: { folds?: Folds; addedTo?: { na
 
     // Always asked, even when the cache has this hash: the cache can be stale (unpublished or
     // removed on the website), and the server answers "unchanged" itself.
-    const res = await api<{
-      status: "created" | "updated" | "unchanged";
-      url: string;
-      shortUrl?: string;
-      contentHash: string;
-      visibility: Visibility;
-      listing?: Listing;
-      discoverBlocked?: string | null;
-      inGraph?: boolean;
-      encrypted?: boolean;
-      changeLog?: ChangeLog;
-      collections?: number;
-    }>(
-      "/api/ext/publications",
-      {
-        method: "POST",
-        body: JSON.stringify({
-          ...payload,
-          contentHash: hash,
-          author,
-          anchorUid: link?.anchorUid,
-          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        }),
-      },
-    );
+    const send = async (retry = true): Promise<PublishResponse> => {
+      // Password pages are encrypted here, so roam.pub only gets the cipher (see seal.ts).
+      const sealed = await sealFor(uid, payload);
+      const body = sealed
+        ? { rootUid: payload.rootUid, kind: payload.kind, title: payload.title, folded: foldedUids(payload.tree), ...sealed }
+        : { ...payload, contentHash: hash };
+      try {
+        return await api<PublishResponse>("/api/ext/publications", {
+          method: "POST",
+          body: JSON.stringify({
+            ...body,
+            author,
+            anchorUid: link?.anchorUid,
+            timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          }),
+        });
+      } catch (e) {
+        // Where it's shown, or a password, changed while it was being encrypted: encrypt it again.
+        if (sealed && retry && e instanceof ApiError && e.status === 409) return send(false);
+        throw e;
+      }
+    };
+    const res = await send();
     await setCache({
       ...getCache(),
       [uid]: {
@@ -626,7 +656,7 @@ async function changedInRoam(uid: string) {
   const c = cache[uid];
   const payload = c && (await serialize(uid, shortlinksOf(cache)));
   if (!c || !payload) return false;
-  return c.hash !== (await hashPayload(folded(payload, "keep", c.folded))) && c.hash !== (await hashPayload(payload));
+  return c.hash !== (await hashLike(c.hash, folded(payload, "keep", c.folded))) && c.hash !== (await hashLike(c.hash, payload));
 }
 
 /**
@@ -783,8 +813,8 @@ export async function publishStatus(uid: string) {
     const published = c.folded;
     const inRoam = foldedUids(payload.tree);
     const keptPayload = folded(payload, published ? "keep" : "expanded", published);
-    const asIsHash = await hashPayload(payload);
-    const keptHash = await hashPayload(keptPayload);
+    const asIsHash = await hashLike(c.hash, payload);
+    const keptHash = await hashLike(c.hash, keptPayload);
     // From an older server that doesn't say, published elsewhere, the collapsed blocks aren't known: either way matches.
     const changed = c.hash !== keptHash && c.hash !== asIsHash;
     const foldsDiffer = published ? !sameFolds(inRoam, foldedUids(keptPayload.tree)) : inRoam.length > 0 && c.hash !== asIsHash;

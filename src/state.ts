@@ -92,6 +92,19 @@ export async function setCache(cache: PublicationCache) {
 }
 
 /**
+ * The key for encrypted pages' content hashes (seal.ts `keyedHash`), made the first time it's needed.
+ * Kept in the graph's extension settings, so every device publishing this graph shares it.
+ */
+export async function getHashKey() {
+  const saved = api.settings.get("hash-key");
+  if (typeof saved === "string" && /^[\w-]{43}$/.test(saved)) return saved;
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  const key = btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  await save("hash-key", key);
+  return key;
+}
+
+/**
  * Every setting is written through here. Roam refuses to save a value holding undefined anywhere
  * (a byline never sent, a field an older server leaves out, a count a new page doesn't have yet),
  * so undefined fields and array entries are left out rather than stored.

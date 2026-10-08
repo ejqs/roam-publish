@@ -6,6 +6,11 @@ What's new shows it once Roam Depot serves it. Every bullet starts with **Breaki
 
 ## Unreleased
 
+### Security
+- New: **Password pages are encrypted in Roam before they're published.** roam.pub only gets the encrypted page and
+  never sees its text, not even while publishing, and readers' browsers decrypt it with the password. Needs a Roam
+  (browser or desktop app) recent enough to have X25519 encryption; on an older one, pages are published as before.
+
 ### Publishing
 - New: Pages with collapsed blocks can be published with those blocks collapsed, as you have them in Roam. The first
   time you publish a page with collapsed blocks, Roam Publish asks: **Publish as is (Collapsed)** or **Publish
