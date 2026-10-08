@@ -40,6 +40,19 @@ describe("api", () => {
     }
   });
 
+  test("says which extension version is calling, so roam.pub knows when an older API can go", async () => {
+    const calls = respond(200, {});
+    await api("/x");
+    assert.equal(calls[0].headers["x-roam-publish-version"], undefined);
+    (globalThis as unknown as { __VERSION__?: string }).__VERSION__ = "0.2.0";
+    try {
+      await api("/x");
+      assert.equal(calls[1].headers["x-roam-publish-version"], "0.2.0");
+    } finally {
+      delete (globalThis as unknown as { __VERSION__?: string }).__VERSION__;
+    }
+  });
+
   test("a key for another graph shows the server's words", async () => {
     respond(409, { error: "This API key is for the graph a, but you're in b.", keyGraph: "a" });
     await assert.rejects(api("/x"), (e: InstanceType<typeof ApiError>) => e.status === 409 && /for the graph a/.test(e.message));

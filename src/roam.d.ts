@@ -2,6 +2,8 @@
 // Reference: https://roamdocs.fyi/types/roam-alpha-api.d.ts
 
 declare const __DEFAULT_SERVER__: string;
+/** package.json's version, set at build time. */
+declare const __VERSION__: string;
 
 type PullBlock = {
   ":block/uid"?: string;

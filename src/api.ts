@@ -15,6 +15,8 @@ const isSafeServer = (server: string) =>
 
 export async function api<T>(path: string, init: RequestInit & { auth?: boolean } = {}): Promise<T> {
   const headers: Record<string, string> = { "content-type": "application/json" };
+  // Lets roam.pub see which versions are still in use, so it knows when an older API can be retired.
+  if (typeof __VERSION__ === "string") headers["x-roam-publish-version"] = __VERSION__;
   const server = getServer();
   if (!isSafeServer(server))
     throw new ApiError(-1, `The Server URL must start with https:// (it's ${server}). Settings → Roam Publish → Server URL.`);
