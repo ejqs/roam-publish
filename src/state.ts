@@ -13,7 +13,7 @@ export type CachedPublication = {
   updatedAt: string;
   /** Author name sent with the last publish; republishing with a new one updates the byline. */
   author?: string;
-  /** Uids of the blocks collapsed on the published page, as last published from here; unknown when published elsewhere. */
+  /** Uids of the blocks collapsed on the published page, as the server last said (or as last published from here). */
   folded?: string[];
   /** Permanent {server}/p/{id} link, from servers that have shortlinks. */
   shortUrl?: string | null;

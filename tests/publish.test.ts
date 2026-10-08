@@ -215,6 +215,21 @@ describe("collapsed blocks", () => {
     assert.match(sentTree(calls), /"collapsed":true/);
   });
 
+  test("which blocks are collapsed on the website comes from the server, so another computer knows too", async () => {
+    roam = folded();
+    settings.set("publications", {});
+    const calls = server({
+      "GET /api/ext/publications": () => [200, {
+        publications: [{ rootUid: "page1", kind: "page", title: "Page", url: "https://roam.pub/g/x", contentHash: "old",
+          visibility: "unlisted", listing: "unlisted", updatedAt: "", folded: [] }],
+      }],
+    });
+    await syncPublications({ quiet: true });
+    await publish("page1");
+    assert.equal(posts(calls).length, 0);
+    assert.deepEqual(labels(), ["Republish as is", "Republish, keep open/collapsed"]);
+  });
+
   test("the status says when only collapsed blocks differ, and offers both after an edit", async () => {
     roam = folded();
     const asPublished = await hashPayload({ ...(await serialize("page1"))!, tree: JSON.parse(JSON.stringify((await serialize("page1"))!.tree).replace(',"collapsed":true', "")) });

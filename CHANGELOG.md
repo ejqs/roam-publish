@@ -12,7 +12,8 @@ What's new shows it once Roam Depot serves it. Every bullet starts with **New:**
 - New: When the blocks collapsed in Roam aren't the ones collapsed on the published page, republishing asks:
   **Republish as is**, exactly as you see it in Roam, or **Republish, keep open/collapsed** to update the content and
   leave the published page's blocks open and collapsed as they are. Collapsing or expanding blocks alone doesn't make
-  a page show as changed; the status toast says so separately.
+  a page show as changed; the status toast says so separately. roam.pub remembers which blocks it has collapsed, so
+  this works from any computer.
 
 ## 0.1.1 (2026-10-07)
 

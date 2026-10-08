@@ -37,6 +37,8 @@ type Remote = {
   removed?: boolean;
   /** Whether this key may change it: the owner's, or published by this member (from servers that say). */
   mine?: boolean;
+  /** Uids of the blocks collapsed on the website (from servers that say). */
+  folded?: string[];
 };
 
 let syncedThisSession = false;
@@ -172,9 +174,10 @@ export async function syncPublications(opts: { quiet?: boolean } = {}) {
       hash: p.contentHash, url: p.url, title: p.title, kind: p.kind, visibility: p.visibility, updatedAt: p.updatedAt,
       listing: p.listing, discoverBlocked: p.discoverBlocked, listedNote: p.listedNote,
       shortUrl: p.shortUrl, anchorUid: p.anchorUid, places: p.places, removed: p.removed, mine: p.mine,
-      // The server doesn't send bylines or which blocks are collapsed; keep the ones last published from here.
+      // The server doesn't send bylines; keep the one sent with the last publish from here.
       author: previous[p.rootUid]?.author,
-      folded: previous[p.rootUid]?.folded,
+      // Older servers don't say which blocks are collapsed; then it's what was last published from here.
+      folded: p.folded ?? previous[p.rootUid]?.folded,
     };
   }
   await setCache(cache);
@@ -698,7 +701,7 @@ export async function publishStatus(uid: string) {
     const keptPayload = folded(payload, published ? "keep" : "expanded", published);
     const asIsHash = await hashPayload(payload);
     const keptHash = await hashPayload(keptPayload);
-    // Published from elsewhere, the published page's collapsed blocks aren't known: either way matches.
+    // From an older server that doesn't say, published elsewhere, the collapsed blocks aren't known: either way matches.
     const changed = c.hash !== keptHash && c.hash !== asIsHash;
     const foldsDiffer = published ? !sameFolds(inRoam, foldedUids(keptPayload.tree)) : inRoam.length > 0 && c.hash !== asIsHash;
     // Only known for items published from this graph's extension settings.
