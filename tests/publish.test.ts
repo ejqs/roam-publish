@@ -236,7 +236,7 @@ describe("collapsed blocks", () => {
     settings.set("publications", cached({ hash: asPublished, folded: [] }));
     server(routes(asPublished));
     await publishStatus("page1");
-    assert.match(toasts.at(-1)!, /up to date.*aren't the ones collapsed/);
+    assert.match(toasts.at(-1)!, /up to date.*Collapsed blocks differ/);
     assert.deepEqual(labels(), ["Sync open/collapsed blocks"]);
 
     // Publishing then only offers the sync.
@@ -249,7 +249,7 @@ describe("collapsed blocks", () => {
     settings.set("publications", cached({ hash: "old", folded: [] }));
     server(routes("old"));
     await publishStatus("page1");
-    assert.match(toasts.at(-1)!, /has changed/);
+    assert.match(toasts.at(-1)!, /, changed since last published/);
     assert.deepEqual(labels(), ["Republish as is", "Republish, keep open/collapsed"]);
   });
 });
@@ -346,7 +346,7 @@ describe("add to collection", () => {
   test("a new page that went only to collections isn't called unlisted or offered Make listed", async () => {
     server({ "POST /api/ext/publications": (b) => [200, { status: "created", url: "https://roam.pub/c/aaa", contentHash: b.contentHash, visibility: "unlisted", listing: "unlisted", inGraph: false, encrypted: true, collections: 2 }] });
     await publish("page1");
-    assert.match(toasts.at(-1)!, /^Page published to your graph's collections only/);
+    assert.match(toasts.at(-1)!, /^Page published to collections only\./);
     assert.deepEqual(actions().map((b) => b.textContent), []);
   });
 
@@ -432,7 +432,7 @@ describe("status", () => {
       "PATCH /api/ext/publications/page1": (b) => [200, { visibility: "public", listing: b.listing, discoverBlocked: null, url: "https://roam.pub/g/x" }],
     });
     await publishStatus("page1");
-    assert.match(toasts.at(-1)!, /published \(unlisted\)/);
+    assert.match(toasts.at(-1)!, /^Unlisted page, /);
     assert.deepEqual(labels().filter((l) => l?.startsWith("Make")), ["Make listed", "Make discoverable"]);
     button("Make discoverable")!.click!();
     await new Promise((r) => setImmediate(r));
@@ -465,7 +465,7 @@ describe("status", () => {
   test("leaves out Make discoverable and says why when it can't be", async () => {
     server(remote({ visibility: "public", listing: "listed", discoverBlocked: "Turn on search engines in Sharing to make pages Discoverable." }));
     await publishStatus("page1");
-    assert.match(toasts.at(-1)!, /published \(listed\).*Turn on search engines/);
+    assert.match(toasts.at(-1)!, /^Listed page, .*Turn on search engines/);
     assert.deepEqual(labels().filter((l) => l?.startsWith("Make")), ["Make unlisted"]);
   });
 
@@ -485,7 +485,7 @@ describe("status", () => {
   test("the status of a listed page says when nothing lists it", async () => {
     server(remote({ visibility: "public", listing: "listed", discoverBlocked: "x", listedNote: "Your graph's front page is off." }));
     await publishStatus("page1");
-    assert.match(toasts.at(-1)!, /published \(listed\).*front page is off/);
+    assert.match(toasts.at(-1)!, /^Listed page, .*front page is off/);
   });
 
   test("a page only in collections offers no Make … buttons and says where it's listed", async () => {
@@ -498,8 +498,8 @@ describe("status", () => {
       }],
     });
     await publishStatus("page1");
-    assert.match(toasts.at(-1)!, /^Page is published only in collections /);
-    assert.match(toasts.at(-1)!, /set in each of its collections on roam\.pub/);
+    assert.match(toasts.at(-1)!, /^Page in collections only, /);
+    assert.match(toasts.at(-1)!, /Each collection sets its listing\./);
     assert.doesNotMatch(toasts.at(-1)!, /unlisted|Discoverable/);
     assert.deepEqual(labels().filter((l) => l !== "Republish"), ["Add to collection…", "Unpublish"]);
   });
@@ -513,14 +513,14 @@ describe("status", () => {
       }],
     });
     await publishStatus("page1");
-    assert.match(toasts.at(-1)!, /It's encrypted, so add it to collections on roam\.pub/);
+    assert.match(toasts.at(-1)!, /Encrypted, so add it to collections on roam\.pub/);
     assert.deepEqual(labels().filter((l) => l !== "Republish"), ["Unpublish"]);
   });
 
   test("an older server that only says public still gets the new words", async () => {
     server(remote({ visibility: "public" }));
     await publishStatus("page1");
-    assert.match(toasts.at(-1)!, /published \(listed\)/);
+    assert.match(toasts.at(-1)!, /^Listed page, /);
     assert.deepEqual(labels().filter((l) => l?.startsWith("Make")), ["Make unlisted"]);
   });
 });

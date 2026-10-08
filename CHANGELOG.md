@@ -17,6 +17,7 @@ What's new shows it once Roam Depot serves it. Every bullet starts with **New:**
 - Fixed: For a page that's only in collections, the status toast offered **Make listed** and **Make unlisted**,
   which did nothing, and called it unlisted. It now says the page is only in collections, where each collection sets
   how it's listed.
+- Improved: The status toast is shorter, for example "Unlisted page, up to date. Last published Oct 8, 2026, 1:14 PM."
 - Improved: An encrypted page's toasts no longer offer **Add to collection…**, which couldn't add it; they say to add
   it on roam.pub, where you can enter its password.
 

@@ -446,7 +446,7 @@ export async function publish(uid: string, opts: { folds?: Folds } = {}) {
         : res.status === "updated"
           ? `${label} republished with your changes.${copiedNote}`
           : res.inGraph === false
-            ? `${label} published to your graph's collections only, as its settings say.${copiedNote}`
+            ? `${label} published to collections only.${copiedNote}`
             : unlisted
               ? `${label} published as unlisted: only people with the link can see it.${copiedNote}`
               : `${label} published!${copiedNote}`;
@@ -502,6 +502,7 @@ function listingActions(
 }
 
 const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
+const upperFirst = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 const OFF_DISCOVER: Record<Exclude<Listing, "discover">, string> = {
   listed: "It stays on your graph's front page.",
@@ -563,7 +564,7 @@ const collectionAction = (uid: string, c: { encrypted?: boolean }) =>
   collectionCount && !c.encrypted ? [{ label: "Add to collection…", onClick: () => void chooseCollection(uid) }] : [];
 
 /** Why the status toast has no "Add to collection…" for an encrypted page. */
-const ENCRYPTED_COLLECTIONS = " It's encrypted, so add it to collections on roam.pub, where you can enter its password.";
+const ENCRYPTED_COLLECTIONS = " Encrypted, so add it to collections on roam.pub.";
 
 type CollectionChoice = {
   id: string;
@@ -733,13 +734,15 @@ export async function publishStatus(uid: string) {
     if (c.removed) return toast(`${label} was removed by a moderator.${offline}`, { intent: "danger", link: openLink(c) });
     // A page only in collections has no listing of its own: each collection lists it.
     const onlyInCollections = c.inGraph === false;
-    const where = onlyInCollections ? "only in collections" : `(${LISTING_LABEL[listingOf(c)]})`;
+    // "Unlisted page", "Discoverable block", "Page in collections only".
+    const what = onlyInCollections
+      ? `${label} in collections only`
+      : `${upperFirst(LISTING_LABEL[listingOf(c)])} ${payload.kind}`;
     if (c.mine === false)
-      return toast(
-        `${label} is published ${where} by another member of this graph. Only they or the graph's owner can change it.${offline}`,
-        { link: openLink(c) },
-      );
-    const since = new Date(c.updatedAt).toLocaleString();
+      return toast(`${what}, published by another member of this graph. Only they or the graph's owner can change it.${offline}`, {
+        link: openLink(c),
+      });
+    const since = new Date(c.updatedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
     // Only which blocks are collapsed changing isn't a change to the content; it's said separately.
     const published = c.folded;
     const inRoam = foldedUids(payload.tree);
@@ -770,18 +773,18 @@ export async function publishStatus(uid: string) {
       ...collectionAction(uid, c),
       { label: "Unpublish", onClick: () => void confirmUnpublish(uid, { checked: true }) },
     ];
-    const foldsNote = foldsDiffer ? ` The blocks collapsed in Roam aren't the ones collapsed on the published ${payload.kind}.` : "";
+    const foldsNote = foldsDiffer ? ` Collapsed blocks differ from the published ${payload.kind}.` : "";
     // Roam's toasts can't grey a button out, so say why Make … or Add to collection… isn't there.
     const blocked =
       (onlyInCollections
-        ? " Where it's listed is set in each of its collections on roam.pub."
+        ? " Each collection sets its listing."
         : (listingOf(c) !== "unlisted" && c.listedNote ? ` ${c.listedNote}` : "") ||
           (c.discoverBlocked && listingOf(c) !== "discover" ? ` ${c.discoverBlocked}` : "")) +
       (c.encrypted && collectionCount ? ENCRYPTED_COLLECTIONS : "");
     toast(
       upToDate
-        ? `${label} is published ${where} and up to date. Last published ${since}.${foldsNote}${offline}${blocked}`
-        : `${label} is published ${where} but ${changed ? "has changed" : "has a new author name"} since it was last published on ${since}.${foldsNote}${offline}${blocked}`,
+        ? `${what}, up to date. Last published ${since}.${foldsNote}${offline}${blocked}`
+        : `${what}, ${changed ? "changed" : "new author name"} since last published ${since}.${foldsNote}${offline}${blocked}`,
       { intent: upToDate ? "success" : "none", link: openLink(c), actions, durationMs: 15000 },
     );
   } catch (e) {
