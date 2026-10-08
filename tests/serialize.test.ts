@@ -42,6 +42,25 @@ describe("serialize", () => {
     });
   });
 
+  test("collapsed blocks with children are marked; open ones and childless ones aren't", async () => {
+    fakeRoam([
+      {
+        uid: "page1",
+        title: "P",
+        children: [
+          { uid: "b1", string: "folded", open: false, children: [{ uid: "b1c", string: "child" }] },
+          { uid: "b2", string: "folded, no children", open: false },
+          { uid: "b3", string: "open", open: true, children: [{ uid: "b3c", string: "child" }] },
+        ],
+      },
+    ]);
+    const { tree } = await serialize("page1");
+    assert.deepEqual(
+      tree.children.map((c) => [c.uid, c.collapsed]),
+      [["b1", true], ["b2", undefined], ["b3", undefined]],
+    );
+  });
+
   test("block refs are inlined up to 3 deep; refs in code and aliases stay", async () => {
     fakeRoam([
       {

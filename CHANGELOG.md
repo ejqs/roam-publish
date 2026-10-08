@@ -3,6 +3,12 @@
 All notable changes to the Roam Publish extension. Each version is dated when it was sent to Roam Depot; roam.pub's
 What's new shows it once Roam Depot serves it. Every bullet starts with **New:**, **Improved:** or **Fixed:**.
 
+## Unreleased
+
+### Publishing
+- New: Blocks you've collapsed in Roam start out collapsed on the published page too. Readers can still open them.
+  Collapsing or expanding a block counts as a change, so the page shows as changed until you republish it.
+
 ## 0.1.1 (2026-10-07)
 
 ### Publishing

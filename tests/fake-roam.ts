@@ -2,7 +2,7 @@
  * A tiny in-memory Roam graph behind the parts of window.roamAlphaAPI the extension uses. Blocks are
  * keyed by uid; pages have a title. `pull` answers `[:block/uid "x"]` and `[:node/title "x"]`.
  */
-type Block = { uid: string; string?: string; title?: string; order?: number; heading?: number; align?: string; view?: string; children?: Block[] };
+type Block = { uid: string; string?: string; title?: string; order?: number; heading?: number; align?: string; view?: string; open?: boolean; children?: Block[] };
 
 export function fakeRoam(pages: Block[]) {
   const byUid = new Map<string, Block>();
@@ -28,6 +28,7 @@ export function fakeRoam(pages: Block[]) {
     ...(b.heading && { ":block/heading": b.heading }),
     ...(b.align && { ":block/text-align": b.align }),
     ...(b.view && { ":children/view-type": b.view }),
+    ...(b.open !== undefined && { ":block/open": b.open }),
     ...(b.children?.length && { ":block/children": b.children.map(toPull) }),
   });
 

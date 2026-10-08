@@ -10,6 +10,8 @@ type PullBlock = {
   ":block/order"?: number;
   ":block/text-align"?: string;
   ":children/view-type"?: string;
+  /** False when the block is collapsed in Roam. */
+  ":block/open"?: boolean;
   ":node/title"?: string;
   ":block/children"?: PullBlock[];
   /** The page a block is on. */

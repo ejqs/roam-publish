@@ -6,6 +6,8 @@ export type Node = {
   heading?: 1 | 2 | 3;
   viewType?: "numbered" | "document";
   align?: "center" | "right" | "justify";
+  /** Set when the block is collapsed in Roam and has children; the website starts it folded. */
+  collapsed?: true;
   embed?: Node;
   /** Further embeds in the same block, in order; omitted when it has at most one. */
   moreEmbeds?: Node[];
@@ -15,7 +17,7 @@ export type Node = {
 export type Payload = { rootUid: string; kind: "page" | "block"; title: string; tree: Node };
 
 const PATTERN =
-  "[:block/uid :block/string :block/heading :block/text-align :children/view-type :node/title :block/order {:block/children ...}]";
+  "[:block/uid :block/string :block/heading :block/text-align :block/open :children/view-type :node/title :block/order {:block/children ...}]";
 const REF = /\(\(([\w-]{9,})\)\)/g;
 // Spans whose block refs stay as written: code, embeds, and block-ref aliases `[label](((uid)))`.
 const KEEP = /```[\s\S]*?```|`[^`\n]+`|\{\{(?:\[\[)?embed(?:-path|-children)?(?:\]\])?:[^}]*\}\}|\]\(\(\([\w-]{9,}\)\)\)/g;
@@ -94,6 +96,7 @@ async function toNode(b: PullBlock, isPageRoot: boolean, chain: EmbedChain, skip
   if (view === "numbered" || view === "document") node.viewType = view;
   const align = b[":block/text-align"];
   if (!isPageRoot && (align === "center" || align === "right" || align === "justify")) node.align = align;
+  if (!isPageRoot && b[":block/open"] === false && node.children.length) node.collapsed = true;
   if (!isPageRoot) {
     const [embed, ...more] = await embedsOf(node.string, chain, skip);
     if (embed) node.embed = embed;
