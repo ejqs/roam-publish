@@ -343,6 +343,13 @@ describe("add to collection", () => {
     assert.equal((settings.get("publications") as Record<string, { url: string }>).page1.url, "https://roam.pub/c/bbb");
   });
 
+  test("a new page that went only to collections isn't called unlisted or offered Make listed", async () => {
+    server({ "POST /api/ext/publications": (b) => [200, { status: "created", url: "https://roam.pub/c/aaa", contentHash: b.contentHash, visibility: "unlisted", listing: "unlisted", inGraph: false, encrypted: true, collections: 2 }] });
+    await publish("page1");
+    assert.match(toasts.at(-1)!, /^Page published to your graph's collections only/);
+    assert.deepEqual(actions().map((b) => b.textContent), []);
+  });
+
   test("the status toast offers it too", async () => {
     server({
       "GET /api/ext/publications": () => [200, {
@@ -479,6 +486,35 @@ describe("status", () => {
     server(remote({ visibility: "public", listing: "listed", discoverBlocked: "x", listedNote: "Your graph's front page is off." }));
     await publishStatus("page1");
     assert.match(toasts.at(-1)!, /published \(listed\).*front page is off/);
+  });
+
+  test("a page only in collections offers no Make … buttons and says where it's listed", async () => {
+    server({
+      "GET /api/ext/publications": () => [200, {
+        collections: 2,
+        publications: [{ rootUid: "page1", kind: "page", title: "Page", url: "https://roam.pub/c/aaa", contentHash: "x", updatedAt: "",
+          visibility: "unlisted", listing: "unlisted", inGraph: false,
+          discoverBlocked: "This page is only in collections, so it can't be Discoverable from its graph." }],
+      }],
+    });
+    await publishStatus("page1");
+    assert.match(toasts.at(-1)!, /^Page is published only in collections /);
+    assert.match(toasts.at(-1)!, /set in each of its collections on roam\.pub/);
+    assert.doesNotMatch(toasts.at(-1)!, /unlisted|Discoverable/);
+    assert.deepEqual(labels().filter((l) => l !== "Republish"), ["Add to collection…", "Unpublish"]);
+  });
+
+  test("an encrypted page is added to collections on roam.pub, so the toast says so instead", async () => {
+    server({
+      "GET /api/ext/publications": () => [200, {
+        collections: 2,
+        publications: [{ rootUid: "page1", kind: "page", title: "Page", url: "https://roam.pub/c/aaa", contentHash: "x", updatedAt: "",
+          visibility: "unlisted", listing: "unlisted", inGraph: false, encrypted: true }],
+      }],
+    });
+    await publishStatus("page1");
+    assert.match(toasts.at(-1)!, /It's encrypted, so add it to collections on roam\.pub/);
+    assert.deepEqual(labels().filter((l) => l !== "Republish"), ["Unpublish"]);
   });
 
   test("an older server that only says public still gets the new words", async () => {

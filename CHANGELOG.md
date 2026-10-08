@@ -14,6 +14,11 @@ What's new shows it once Roam Depot serves it. Every bullet starts with **New:**
   leave the published page's blocks open and collapsed as they are. Collapsing or expanding blocks alone doesn't make
   a page show as changed; instead the status toast offers **Sync open/collapsed blocks**. roam.pub remembers which blocks it has collapsed, so
   this works from any computer.
+- Fixed: For a page that's only in collections, the status toast offered **Make listed** and **Make unlisted**,
+  which did nothing, and called it unlisted. It now says the page is only in collections, where each collection sets
+  how it's listed.
+- Improved: An encrypted page's toasts no longer offer **Add to collection…**, which couldn't add it; they say to add
+  it on roam.pub, where you can enter its password.
 
 ## 0.1.1 (2026-10-07)
 

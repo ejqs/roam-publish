@@ -32,6 +32,10 @@ type Remote = {
   listing?: Listing;
   discoverBlocked?: string | null;
   listedNote?: string | null;
+  /** False when it's only in collections (from servers that say). */
+  inGraph?: boolean;
+  /** Sealed with a password (from servers that say). */
+  encrypted?: boolean;
   updatedAt: string;
   /** Taken down by a moderator (from servers that say). */
   removed?: boolean;
@@ -173,6 +177,7 @@ export async function syncPublications(opts: { quiet?: boolean } = {}) {
     cache[p.rootUid] = {
       hash: p.contentHash, url: p.url, title: p.title, kind: p.kind, visibility: p.visibility, updatedAt: p.updatedAt,
       listing: p.listing, discoverBlocked: p.discoverBlocked, listedNote: p.listedNote,
+      inGraph: p.inGraph, encrypted: p.encrypted,
       shortUrl: p.shortUrl, anchorUid: p.anchorUid, places: p.places, removed: p.removed, mine: p.mine,
       // The server doesn't send bylines; keep the one sent with the last publish from here.
       author: previous[p.rootUid]?.author,
@@ -400,6 +405,8 @@ export async function publish(uid: string, opts: { folds?: Folds } = {}) {
       visibility: Visibility;
       listing?: Listing;
       discoverBlocked?: string | null;
+      inGraph?: boolean;
+      encrypted?: boolean;
       changeLog?: ChangeLog;
       collections?: number;
     }>(
@@ -420,6 +427,7 @@ export async function publish(uid: string, opts: { folds?: Folds } = {}) {
       [uid]: {
         hash: res.contentHash, url: res.url, title: payload.title, kind: payload.kind,
         visibility: res.visibility, listing: res.listing, discoverBlocked: res.discoverBlocked,
+        inGraph: res.inGraph, encrypted: res.encrypted ?? cache[uid]?.encrypted,
         updatedAt: new Date().toISOString(), author,
         // Which blocks are collapsed on the website now, for "keep" and for telling when Roam differs.
         folded: foldedUids(payload.tree),
@@ -437,16 +445,18 @@ export async function publish(uid: string, opts: { folds?: Folds } = {}) {
         ? `${label} is already published with no changes.`
         : res.status === "updated"
           ? `${label} republished with your changes.${copiedNote}`
-          : unlisted
-            ? `${label} published as unlisted: only people with the link can see it.${copiedNote}`
-            : `${label} published!${copiedNote}`;
+          : res.inGraph === false
+            ? `${label} published to your graph's collections only, as its settings say.${copiedNote}`
+            : unlisted
+              ? `${label} published as unlisted: only people with the link can see it.${copiedNote}`
+              : `${label} published!${copiedNote}`;
     toast(msg, {
       intent: res.status === "unchanged" ? "none" : "success",
       link: res.url,
       // New items start unlisted; offer the one-click upgrades, and collections, right where they'll see it.
       actions:
         res.status === "created"
-          ? [...(unlisted ? listingActions(uid, res) : []), ...collectionAction(uid)]
+          ? [...(unlisted ? listingActions(uid, res) : []), ...collectionAction(uid, res)]
           : undefined,
     });
     warnIfBroken(res.changeLog);
@@ -473,9 +483,14 @@ const NOW: Record<Listing, string> = {
 /**
  * "Make …" buttons for every listing but the current one. Make discoverable only shows when the
  * server says it can be (older servers don't say, so it never shows there). Taking a page off
- * Discover asks first, as the website does.
+ * Discover asks first, as the website does. None for a page only in collections: it has no graph
+ * place to list, and each collection lists it its own way.
  */
-function listingActions(uid: string, c: { visibility: Visibility; listing?: Listing; discoverBlocked?: string | null }) {
+function listingActions(
+  uid: string,
+  c: { visibility: Visibility; listing?: Listing; discoverBlocked?: string | null; inGraph?: boolean },
+) {
+  if (c.inGraph === false) return [];
   const current = listingOf(c);
   const discoverOk = c.listing !== undefined && !c.discoverBlocked;
   return (["listed", "discover", "unlisted"] as const)
@@ -540,9 +555,15 @@ export async function setListing(uid: string, listing: Listing) {
 /** Collections the key's holder can add pages to, as the server last said; undefined on servers that don't. */
 let collectionCount: number | undefined;
 
-/** "Add to collection…", when there's a collection to add to. */
-const collectionAction = (uid: string) =>
-  collectionCount ? [{ label: "Add to collection…", onClick: () => void chooseCollection(uid) }] : [];
+/**
+ * "Add to collection…", when there's a collection to add to. Not for encrypted pages: they're added
+ * on roam.pub, which can ask for their password.
+ */
+const collectionAction = (uid: string, c: { encrypted?: boolean }) =>
+  collectionCount && !c.encrypted ? [{ label: "Add to collection…", onClick: () => void chooseCollection(uid) }] : [];
+
+/** Why the status toast has no "Add to collection…" for an encrypted page. */
+const ENCRYPTED_COLLECTIONS = " It's encrypted, so add it to collections on roam.pub, where you can enter its password.";
 
 type CollectionChoice = {
   id: string;
@@ -605,6 +626,7 @@ export async function addToCollection(uid: string, collectionId: string) {
       listing: Listing;
       access: CollectionChoice["access"];
       movedOutOfGraph: boolean;
+      encrypted?: boolean;
       url: string;
     }>(`/api/ext/publications/${encodeURIComponent(uid)}/collections`, {
       method: "POST",
@@ -612,7 +634,17 @@ export async function addToCollection(uid: string, collectionId: string) {
     });
     const cache = getCache();
     if (cache[uid])
-      await setCache({ ...cache, [uid]: { ...cache[uid], url: res.url, places: (cache[uid].places ?? 1) + (res.movedOutOfGraph ? 0 : 1) } });
+      await setCache({
+        ...cache,
+        [uid]: {
+          ...cache[uid],
+          url: res.url,
+          places: (cache[uid].places ?? 1) + (res.movedOutOfGraph ? 0 : 1),
+          inGraph: res.movedOutOfGraph ? false : cache[uid].inGraph,
+          // The collection may have encrypted it.
+          encrypted: res.encrypted || cache[uid].encrypted,
+        },
+      });
     const how = res.listing === "unlisted" ? "unlisted" : startsAs({ listing: res.listing, access: res.access });
     toast(
       `Added to ${res.name}, ${how} there.${
@@ -699,10 +731,12 @@ export async function publishStatus(uid: string) {
         action: { label: `Publish ${payload.kind}`, onClick: () => void publish(uid) },
       });
     if (c.removed) return toast(`${label} was removed by a moderator.${offline}`, { intent: "danger", link: openLink(c) });
-    const where = LISTING_LABEL[listingOf(c)];
+    // A page only in collections has no listing of its own: each collection lists it.
+    const onlyInCollections = c.inGraph === false;
+    const where = onlyInCollections ? "only in collections" : `(${LISTING_LABEL[listingOf(c)]})`;
     if (c.mine === false)
       return toast(
-        `${label} is published (${where}) by another member of this graph. Only they or the graph's owner can change it.${offline}`,
+        `${label} is published ${where} by another member of this graph. Only they or the graph's owner can change it.${offline}`,
         { link: openLink(c) },
       );
     const since = new Date(c.updatedAt).toLocaleString();
@@ -733,18 +767,21 @@ export async function publishStatus(uid: string) {
     const actions = [
       ...republish,
       ...listingActions(uid, c),
-      ...collectionAction(uid),
+      ...collectionAction(uid, c),
       { label: "Unpublish", onClick: () => void confirmUnpublish(uid, { checked: true }) },
     ];
     const foldsNote = foldsDiffer ? ` The blocks collapsed in Roam aren't the ones collapsed on the published ${payload.kind}.` : "";
-    // Roam's toasts can't grey a button out, so say why Make discoverable isn't there.
+    // Roam's toasts can't grey a button out, so say why Make … or Add to collection… isn't there.
     const blocked =
-      (listingOf(c) !== "unlisted" && c.listedNote ? ` ${c.listedNote}` : "") ||
-      (c.discoverBlocked && listingOf(c) !== "discover" ? ` ${c.discoverBlocked}` : "");
+      (onlyInCollections
+        ? " Where it's listed is set in each of its collections on roam.pub."
+        : (listingOf(c) !== "unlisted" && c.listedNote ? ` ${c.listedNote}` : "") ||
+          (c.discoverBlocked && listingOf(c) !== "discover" ? ` ${c.discoverBlocked}` : "")) +
+      (c.encrypted && collectionCount ? ENCRYPTED_COLLECTIONS : "");
     toast(
       upToDate
-        ? `${label} is published (${where}) and up to date. Last published ${since}.${foldsNote}${offline}${blocked}`
-        : `${label} is published (${where}) but ${changed ? "has changed" : "has a new author name"} since it was last published on ${since}.${foldsNote}${offline}${blocked}`,
+        ? `${label} is published ${where} and up to date. Last published ${since}.${foldsNote}${offline}${blocked}`
+        : `${label} is published ${where} but ${changed ? "has changed" : "has a new author name"} since it was last published on ${since}.${foldsNote}${offline}${blocked}`,
       { intent: upToDate ? "success" : "none", link: openLink(c), actions, durationMs: 15000 },
     );
   } catch (e) {

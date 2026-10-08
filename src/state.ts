@@ -10,6 +10,10 @@ export type CachedPublication = {
   discoverBlocked?: string | null;
   /** Why it's listed but nothing shows it (its graph's front page is off), in words (from servers that say). */
   listedNote?: string | null;
+  /** False when it's only in collections, so it has no listing of its own (from servers that say). */
+  inGraph?: boolean;
+  /** Sealed with a password, so collections are added on roam.pub (from servers that say). */
+  encrypted?: boolean;
   updatedAt: string;
   /** Author name sent with the last publish; republishing with a new one updates the byline. */
   author?: string;
