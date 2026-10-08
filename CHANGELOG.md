@@ -1,7 +1,8 @@
 # Changelog
 
 All notable changes to the Roam Publish extension. Each version is dated when it was sent to Roam Depot; roam.pub's
-What's new shows it once Roam Depot serves it. Every bullet starts with **New:**, **Improved:** or **Fixed:**.
+What's new shows it once Roam Depot serves it. Every bullet starts with **Breaking:**, **New:**, **Improved:** or
+**Fixed:**; a breaking change comes with a new major version.
 
 ## Unreleased
 
