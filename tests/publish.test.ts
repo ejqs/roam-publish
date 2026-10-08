@@ -513,7 +513,7 @@ describe("status", () => {
       }],
     });
     await publishStatus("page1");
-    assert.match(toasts.at(-1)!, /Encrypted, so add it to collections on roam\.pub/);
+    assert.match(toasts.at(-1)!, /It's encrypted: .*needs that password, so add it to collections on roam\.pub\./);
     assert.deepEqual(labels().filter((l) => l !== "Republish"), ["Unpublish"]);
   });
 

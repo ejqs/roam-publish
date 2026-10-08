@@ -563,8 +563,12 @@ let collectionCount: number | undefined;
 const collectionAction = (uid: string, c: { encrypted?: boolean }) =>
   collectionCount && !c.encrypted ? [{ label: "Add to collection…", onClick: () => void chooseCollection(uid) }] : [];
 
-/** Why the status toast has no "Add to collection…" for an encrypted page. */
-const ENCRYPTED_COLLECTIONS = " Encrypted, so add it to collections on roam.pub.";
+/**
+ * Why the status toast has no "Add to collection…" for an encrypted page: its content is locked with
+ * a password, and a new collection needs that password to unlock it there.
+ */
+const ENCRYPTED_COLLECTIONS =
+  " It's encrypted: only its password unlocks it, and a new collection needs that password, so add it to collections on roam.pub.";
 
 type CollectionChoice = {
   id: string;
