@@ -4,12 +4,14 @@ All notable changes to the Roam Publish extension. Each version is dated when it
 What's new shows it once Roam Depot serves it. Every bullet starts with **Breaking:**, **New:**, **Improved:** or
 **Fixed:**; a breaking change comes with a new major version.
 
-## Unreleased
+## 0.2.0 (2026-10-09)
 
 ### Security
-- New: **Password pages are encrypted in Roam before they're published.** roam.pub only gets the encrypted page and
-  never sees its text, not even while publishing, and readers' browsers decrypt it with the password. Needs a Roam
-  (browser or desktop app) recent enough to have X25519 encryption; on an older one, pages are published as before.
+- New: **Password pages are encrypted in Roam before they're published, title included.** roam.pub only gets the
+  encrypted page and never sees its text or title, not even while publishing; it calls it "Encrypted page", and
+  readers' browsers decrypt it with the password. Needs a Roam (browser or desktop app) recent enough to have X25519
+  encryption; on an older one, pages are published as before and roam.pub encrypts them, and the publish message
+  says so.
 
 ### Publishing
 - New: Pages with collapsed blocks can be published with those blocks collapsed, as you have them in Roam. The first

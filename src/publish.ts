@@ -176,7 +176,10 @@ export async function syncPublications(opts: { quiet?: boolean } = {}) {
   const cache: PublicationCache = {};
   for (const p of publications) {
     cache[p.rootUid] = {
-      hash: p.contentHash, url: p.url, title: p.title, kind: p.kind, visibility: p.visibility, updatedAt: p.updatedAt,
+      hash: p.contentHash, url: p.url, kind: p.kind,
+      // An encrypted page's title is encrypted on roam.pub, which only says "Encrypted page": keep the one
+      // last published from here.
+      title: (p.encrypted && previous[p.rootUid]?.title) || p.title, visibility: p.visibility, updatedAt: p.updatedAt,
       listing: p.listing, discoverBlocked: p.discoverBlocked, listedNote: p.listedNote,
       inGraph: p.inGraph, encrypted: p.encrypted,
       shortUrl: p.shortUrl, anchorUid: p.anchorUid, places: p.places, removed: p.removed, mine: p.mine,
@@ -367,9 +370,11 @@ type PublishResponse = {
 };
 
 /**
- * The page encrypted for roam.pub, when it's a Password page there (it says, for a new page, whether it
- * will be), with its keyed hash. Null to send it as before: not encrypted, a roam.pub from before
- * encryption in Roam, or a Roam without X25519, where roam.pub encrypts it on arrival as it used to.
+ * The page and its title encrypted for roam.pub, when it's a Password page there (it says, for a new
+ * page, whether it will be), with its keyed hash. Null to send it as before: not encrypted, or a
+ * roam.pub from before encryption in Roam. "roamCantEncrypt" when it's a Password page but this Roam
+ * has no X25519 (older desktop apps): it's sent as before, roam.pub encrypts it on arrival, and the
+ * toast says so.
  */
 async function sealFor(uid: string, payload: Payload) {
   let plan: SealPlan;
@@ -379,9 +384,17 @@ async function sealFor(uid: string, payload: Payload) {
     if (e instanceof ApiError && e.status === 404) return null;
     throw e;
   }
-  if (!plan.encrypt || !(await canSeal())) return null;
-  return { sealed: await sealTree(plan, payload.tree), contentHash: await keyedHash(await hashPayload(payload)) };
+  if (!plan.encrypt) return null;
+  if (!(await canSeal())) return "roamCantEncrypt" as const;
+  return {
+    sealed: await sealTree(plan, payload.tree, payload.title),
+    contentHash: (await keyedHash(await hashPayload(payload), { create: true }))!,
+  };
 }
+
+/** Said after publishing a Password page that roam.pub had to encrypt, because this Roam can't. */
+const encryptedByRoamPub = (unchanged: boolean) =>
+  ` ${unchanged ? "This Roam can't encrypt pages itself, so its text and title reached roam.pub to check that." : "roam.pub encrypted it, since this Roam can't encrypt pages itself, so its text and title reached roam.pub this time."} To encrypt in Roam, update Roam's desktop app or publish from roamresearch.com in a browser.`;
 
 /**
  * Publishes or republishes. `folds` says which blocks start collapsed on the website (see Folds).
@@ -429,11 +442,14 @@ export async function publish(uid: string, opts: { folds?: Folds; addedTo?: { na
 
     // Always asked, even when the cache has this hash: the cache can be stale (unpublished or
     // removed on the website), and the server answers "unchanged" itself.
+    let roamCantEncrypt = false;
     const send = async (retry = true): Promise<PublishResponse> => {
-      // Password pages are encrypted here, so roam.pub only gets the cipher (see seal.ts).
-      const sealed = await sealFor(uid, payload);
+      // Password pages are encrypted here, title included, so roam.pub only gets the cipher (see seal.ts).
+      const seal = await sealFor(uid, payload);
+      const sealed = seal === "roamCantEncrypt" ? null : seal;
+      roamCantEncrypt = seal === "roamCantEncrypt";
       const body = sealed
-        ? { rootUid: payload.rootUid, kind: payload.kind, title: payload.title, folded: foldedUids(payload.tree), ...sealed }
+        ? { rootUid: payload.rootUid, kind: payload.kind, folded: foldedUids(payload.tree), ...sealed }
         : { ...payload, contentHash: hash };
       try {
         return await api<PublishResponse>("/api/ext/publications", {
@@ -481,9 +497,10 @@ export async function publish(uid: string, opts: { folds?: Folds; addedTo?: { na
             : unlisted
               ? `${label} published as unlisted: only people with the link can see it.${copiedNote}`
               : `${label} published!${copiedNote}`;
-    toast(msg, {
+    toast(roamCantEncrypt ? msg + encryptedByRoamPub(res.status === "unchanged") : msg, {
       intent: res.status === "unchanged" && !opts.addedTo ? "none" : "success",
       link: opts.addedTo?.entryUrl ?? res.url,
+      durationMs: roamCantEncrypt ? 20000 : undefined,
       // New items start unlisted; offer the one-click upgrades, and collections, right where they'll see it.
       actions:
         res.status === "created"
@@ -815,6 +832,21 @@ export async function publishStatus(uid: string) {
     const keptPayload = folded(payload, published ? "keep" : "expanded", published);
     const asIsHash = await hashLike(c.hash, payload);
     const keptHash = await hashLike(c.hash, keptPayload);
+    // Encrypted in Roam elsewhere, and the graph's key for telling hasn't reached this Roam's settings.
+    if (asIsHash === null || keptHash === null)
+      return toast(
+        `${what}, last published ${since}. Can't tell on this device whether it changed since: this Roam doesn't have this graph's Roam Publish key for encrypted pages yet. Republish to be sure.${offline}`,
+        {
+          link: openLink(c),
+          actions: [
+            { label: "Republish", onClick: () => void publish(uid, { folds: "asIs" }) },
+            ...listingActions(uid, c),
+            ...collectionAction(uid),
+            { label: "Unpublish", onClick: () => void confirmUnpublish(uid, { checked: true }) },
+          ],
+          durationMs: 15000,
+        },
+      );
     // From an older server that doesn't say, published elsewhere, the collapsed blocks aren't known: either way matches.
     const changed = c.hash !== keptHash && c.hash !== asIsHash;
     const foldsDiffer = published ? !sameFolds(inRoam, foldedUids(keptPayload.tree)) : inRoam.length > 0 && c.hash !== asIsHash;

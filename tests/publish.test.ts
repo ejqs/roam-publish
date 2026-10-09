@@ -10,6 +10,7 @@ import {
   publishStatus,
   syncPublications,
 } from "../src/publish";
+import { recheckCanSeal } from "../src/seal";
 import { hashPayload, serialize } from "../src/serialize";
 import { initState, resetShortlinkSettings, withoutUndefined } from "../src/state";
 import { fakeRoam } from "./fake-roam";
@@ -175,15 +176,17 @@ describe("encrypted in Roam", () => {
       "GET /api/ext/publications/page1/seal": () => [200, plan],
       "POST /api/ext/publications": (b) => ((stored = b.contentHash as string), accept(b)),
       "GET /api/ext/publications": () => [200, {
-        publications: [{ rootUid: "page1", kind: "page", title: "Page", url: "https://roam.pub/g/x", contentHash: stored,
+        publications: [{ rootUid: "page1", kind: "page", title: "Encrypted page", url: "https://roam.pub/g/x", contentHash: stored,
           visibility: "unlisted", listing: "unlisted", updatedAt: "", folded: [], encrypted: true }],
       }],
     });
     await publish("page1");
     const post = calls.find((c) => c.method === "POST")!.body;
     assert.equal(post.tree, undefined);
-    assert.doesNotMatch(JSON.stringify(post), /hello/);
-    assert.deepEqual(Object.keys(post.sealed as object), ["publicationId", "cipher", "keys"]);
+    // The title is encrypted too.
+    assert.equal(post.title, undefined);
+    assert.doesNotMatch(JSON.stringify(post), /hello|Page/);
+    assert.deepEqual(Object.keys(post.sealed as object), ["publicationId", "cipher", "titleCipher", "keys"]);
     assert.match(post.contentHash as string, /^k1\.[0-9a-f]{64}$/);
     assert.deepEqual(post.folded, []);
     assert.equal((settings.get("publications") as Record<string, { hash: string }>).page1.hash, post.contentHash);
@@ -192,6 +195,39 @@ describe("encrypted in Roam", () => {
     await publishStatus("page1");
     assert.match(toasts.at(-1)!, /up to date/);
     assert.equal(button("Republish"), undefined);
+    // roam.pub only knows it as "Encrypted page"; the title published from here is kept.
+    assert.equal((settings.get("publications") as Record<string, { title: string }>).page1.title, "Page");
+  });
+
+  test("where Roam can't encrypt, it's sent as before and the toast says roam.pub encrypted it", async (t) => {
+    t.mock.method(crypto.subtle, "generateKey", async () => {
+      throw new Error("X25519 not supported");
+    });
+    recheckCanSeal();
+    t.after(recheckCanSeal);
+    const calls = server({
+      "GET /api/ext/publications/page1/seal": () => [200, plan],
+      "POST /api/ext/publications": accept,
+    });
+    await publish("page1");
+    const post = calls.find((c) => c.method === "POST")!.body;
+    assert.equal(post.sealed, undefined);
+    assert.ok(post.tree);
+    assert.match(toasts.at(-1)!, /republished.*roam\.pub encrypted it, since this Roam can't encrypt pages itself/);
+  });
+
+  test("a page encrypted elsewhere, without this graph's key here yet: can't tell, and no key is made", async () => {
+    settings.set("publications", cached({ hash: `k1.${"0".repeat(64)}`, encrypted: true, folded: [] }));
+    server({
+      "GET /api/ext/publications": () => [200, {
+        publications: [{ rootUid: "page1", kind: "page", title: "Encrypted page", url: "https://roam.pub/g/x", contentHash: `k1.${"0".repeat(64)}`,
+          visibility: "unlisted", listing: "unlisted", updatedAt: "", folded: [], encrypted: true }],
+      }],
+    });
+    await publishStatus("page1");
+    assert.match(toasts.at(-1)!, /Can't tell on this device whether it changed/);
+    assert.ok(button("Republish"));
+    assert.equal(settings.get("hash-key"), undefined);
   });
 
   test("encrypts again when the passwords changed while it was publishing", async () => {

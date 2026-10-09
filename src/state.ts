@@ -91,17 +91,27 @@ export async function setCache(cache: PublicationCache) {
   await save("publications", cache);
 }
 
+/** The key for encrypted pages' content hashes (seal.ts `keyedHash`), when this graph has one. */
+export function savedHashKey() {
+  const saved = api.settings.get("hash-key");
+  return typeof saved === "string" && /^[\w-]{43}$/.test(saved) ? saved : null;
+}
+
+let makingHashKey: Promise<string> | null = null;
 /**
- * The key for encrypted pages' content hashes (seal.ts `keyedHash`), made the first time it's needed.
- * Kept in the graph's extension settings, so every device publishing this graph shares it.
+ * The hash key, made the first time a page is encrypted. Kept in the graph's extension settings, so
+ * every device publishing this graph shares it. Made once even when two pages are published at once.
  */
 export async function getHashKey() {
-  const saved = api.settings.get("hash-key");
-  if (typeof saved === "string" && /^[\w-]{43}$/.test(saved)) return saved;
-  const bytes = crypto.getRandomValues(new Uint8Array(32));
-  const key = btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-  await save("hash-key", key);
-  return key;
+  const saved = savedHashKey();
+  if (saved) return saved;
+  makingHashKey ??= (async () => {
+    const bytes = crypto.getRandomValues(new Uint8Array(32));
+    const key = btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    await save("hash-key", key);
+    return key;
+  })().finally(() => (makingHashKey = null));
+  return makingHashKey;
 }
 
 /**
