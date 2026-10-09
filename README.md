@@ -8,7 +8,7 @@ Publish Roam Research pages and blocks to the web as clean, shareable pages on [
   **Public** on your graph's blog-style front page, or **Discover** on [Discover](https://roam.pub/discover) for
   everyone on roam.pub to find. (The extension's buttons still call Public "listed" and Discover "discoverable".)
 - **Lock it down.** Make a page **Password** or **Members**. Password pages can also be encrypted, and from
-  Roam Publish 0.2.0 they're encrypted in Roam before they're sent, so roam.pub never sees their text.
+  Roam Publish 0.2.0 they're encrypted in Roam before they're sent, so roam.pub never sees their text or title.
 - **Publish together.** Collections gather pages from different graphs and people in one place.
 
 > Roam Publish is a third-party service made by [@ejqs](https://ejqs.net). It is not affiliated with Roam Research.
@@ -154,10 +154,10 @@ Changing the tag or the link text edits existing blocks in place the next time y
   append-only token. Nothing else.
 - **Encrypted graphs** are supported. The extension only sends the data you choose to publish.
 - **Encrypted pages:** a Password page that roam.pub encrypts is encrypted in Roam before it's sent (from 0.2.0), so
-  roam.pub only gets the encrypted page and never sees its text. The extension asks roam.pub for the passwords'
-  public keys first; it never sees a password. Readers' browsers decrypt the page with the password. This needs a
-  Roam recent enough to have X25519 encryption; on an older one, the page is sent as before and roam.pub encrypts it
-  when it arrives. Each encrypted page says which way it was encrypted: see
+  roam.pub only gets the encrypted page and never sees its text or title (it calls it "Encrypted page"). The
+  extension asks roam.pub for the passwords' public keys first; it never sees a password. Readers' browsers decrypt
+  the page with the password. This needs a Roam recent enough to have X25519 encryption; on an older one, the page
+  is sent as before, roam.pub encrypts it when it arrives, and the publish message says so. Each encrypted page says which way it was encrypted: see
   [Encryption versions](https://roam.pub/privacy/encryption/versions).
 - **Your extension's version** is sent with every request, so roam.pub knows which versions are still in use before
   it retires anything older ones rely on.

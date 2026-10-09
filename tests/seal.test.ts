@@ -25,6 +25,11 @@ function openContentKey(sealed: string, privateKey: KeyObject) {
   const shared = diffieHellman({ privateKey, publicKey: createPublicKey({ key: ephPub, format: "der", type: "spki" }) });
   return gcmOpen(Buffer.from(hkdfSync("sha256", shared, ephPub, "roam-publish:content-key", 32)), parts, "content-key");
 }
+const decryptTitle = (ck: Buffer, cipher: string, id: string) => {
+  const [v, ...parts] = cipher.split(".");
+  assert.equal(v, "v1");
+  return gcmOpen(ck, parts, `title:${id}`).toString();
+};
 const decryptTree = (ck: Buffer, cipher: string, id: string) => {
   const [v, ...parts] = cipher.split(".");
   assert.equal(v, "v1");
@@ -52,26 +57,40 @@ describe("sealing a page", () => {
         { scope: "entry", id: "e1", publicKey: null },
       ],
     };
-    const sealed = await sealTree(plan, tree);
+    const sealed = await sealTree(plan, tree, "Zanzibar plans");
     assert.equal(sealed.publicationId, plan.publicationId);
     assert.deepEqual(sealed.keys.map((k) => [k.scope, k.id, k.publicKey]), [["graph", "g1", graph.publicKey], ["collection", "c1", coll.publicKey]]);
-    assert.doesNotMatch(JSON.stringify(sealed), /zanzibar/);
-    for (const [k, l] of [[sealed.keys[0], graph], [sealed.keys[1], coll]] as const)
-      assert.deepEqual(decryptTree(openContentKey(k.sealedKey, l.privateKey), sealed.cipher, plan.publicationId), tree);
+    assert.doesNotMatch(JSON.stringify(sealed), /zanzibar/i);
+    for (const [k, l] of [[sealed.keys[0], graph], [sealed.keys[1], coll]] as const) {
+      const ck = openContentKey(k.sealedKey, l.privateKey);
+      assert.deepEqual(decryptTree(ck, sealed.cipher, plan.publicationId), tree);
+      assert.equal(decryptTitle(ck, sealed.titleCipher, plan.publicationId), "Zanzibar plans");
+    }
     // Bound to the page: it doesn't open as another one.
     const ck = openContentKey(sealed.keys[0].sealedKey, graph.privateKey);
     assert.throws(() => decryptTree(ck, sealed.cipher, "another-page"));
+    assert.throws(() => decryptTitle(ck, sealed.titleCipher, "another-page"));
   });
 
   test("the keyed hash is stable per graph, and isn't the plain hash", async () => {
     const plain = "a".repeat(64);
-    const h = await keyedHash(plain);
+    // Only publishing makes the graph's key.
+    settings.clear();
+    assert.equal(await keyedHash(plain), null);
+    assert.equal(settings.get("hash-key"), undefined);
+    const h = (await keyedHash(plain, { create: true }))!;
     assert.match(h, /^k1\.[0-9a-f]{64}$/);
     assert.ok(isKeyedHash(h));
     assert.equal(await keyedHash(plain), h);
     assert.notEqual(await keyedHash("b".repeat(64)), h);
     // Another graph has its own key.
     settings.clear();
-    assert.notEqual(await keyedHash(plain), h);
+    assert.notEqual(await keyedHash(plain, { create: true }), h);
+  });
+
+  test("two pages encrypted at once make one key between them", async () => {
+    settings.clear();
+    const [a, b] = await Promise.all([keyedHash("a".repeat(64), { create: true }), keyedHash("a".repeat(64), { create: true })]);
+    assert.equal(a, b);
   });
 });
