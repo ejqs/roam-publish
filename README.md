@@ -45,22 +45,20 @@ The old key stops working.
 2. Choose **Roam Publish: Page…** or **Roam Publish: Block…**.
 3. Click **Publish**. The link is copied to your clipboard.
 
-On the website you also get these. Manage them from the [dashboard](https://roam.pub/dashboard), or click **Open
+**On roam.pub** you also get these. Manage them from the [dashboard](https://roam.pub/dashboard), or click **Open
 dashboard** in the extension settings.
 
-- **Passwords and members-only pages** for anything you don't want fully open.
-- **Collections** that gather pages from several graphs and people in one place, with their own members.
-- **Discover**, where readers upvote pages and browse them by recent, trending (most viewed this week) or top.
-- **Tags and search** on your graph's front page and in collections, plus site-wide search for verified accounts.
-- **RSS feeds** for your graph, your collections and Discover.
-- **Page history**: each page's permanent short link (`roam.pub/p/…`) shows your graph's members what happened to it
-  and when. The same change log is also written back into your Roam page.
-- **A public profile** at `roam.pub/u/{username}`.
-- **Bulk changes**: select many pages to change their Visibility or their tags.
-- **Front pages** you can browse as cards or a folder tree, with folders you arrange on the website.
-- **What's new** at [roam.pub/updates](https://roam.pub/updates), with this extension's release notes, and
-  [Upcoming changes](https://roam.pub/updates/upcoming) for anything you'll need to act on, such as updating the
-  extension.
+- **Who can read it:** Unlisted, Public or Discover, or lock it with a **Password** or to **Members**. Password pages
+  can be end-to-end encrypted, title included.
+- **Collections** that gather pages from several graphs and people, with their own members and settings.
+- **Discover**, where readers find and upvote pages and collections.
+- **Front pages** for your graph and collections, as cards or folders, with tags, search and RSS.
+- **Reading tools:** readers fold blocks, zoom into one and follow an outline, as in Roam, and can download a page as
+  a **PDF** when you turn it on.
+- **Pinned links:** pin a link you've shared, and roam.pub won't unpublish or lock that page while it's pinned.
+- **Link previews** with the page's title and opening lines when you share it in chat apps and social posts.
+- **Page history** on each page's status link, also written back into your Roam page.
+- **What's new** at [roam.pub/updates](https://roam.pub/updates), with this extension's release notes.
 
 New pages and blocks are published **Unlisted**: only people with the link can see them. The toast offers **Make
 listed** and **Make discoverable** right away, and **Add to collection…** when you're in a collection.
