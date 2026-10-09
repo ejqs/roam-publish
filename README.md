@@ -48,12 +48,13 @@ The old key stops working.
 **On roam.pub** you also get these. Manage them from the [dashboard](https://roam.pub/dashboard), or click **Open
 dashboard** in the extension settings.
 
-- **Access and visibility controls:** Unlisted, Public or Discover, or lock it with a **Password** or to **Members**. Password pages
-  can be end-to-end encrypted.
-- **Collections** that gather pages from several graphs and people in one place.
+- **Share pages easily.** Publish a page or block and get a link to share.
+- **Access and visibility controls.** Choose who finds your pages: Unlisted, Public or Discover, or lock them with a
+  Password or to Members.
+- **End-to-end encryption** for pages with a password.
+- **Download as PDF** for your readers, when you turn it on.
 - **Discover**, where readers find and upvote pages.
-- **Front pages** for your graph and collections.
-- **Download as PDF** for readers, when you turn it on.
+- **RSS** for your readers.
 
 New pages and blocks are published **Unlisted**: only people with the link can see them. The toast offers **Make
 listed** and **Make discoverable** right away, and **Add to collection…** when you're in a collection.
