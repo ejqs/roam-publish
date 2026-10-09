@@ -48,7 +48,7 @@ The old key stops working.
 **On roam.pub** you also get these. Manage them from the [dashboard](https://roam.pub/dashboard), or click **Open
 dashboard** in the extension settings.
 
-- **Who can read it:** Unlisted, Public or Discover, or lock it with a **Password** or to **Members**. Password pages
+- **Access and visibility controls:** Unlisted, Public or Discover, or lock it with a **Password** or to **Members**. Password pages
   can be end-to-end encrypted.
 - **Collections** that gather pages from several graphs and people in one place.
 - **Discover**, where readers find and upvote pages.
