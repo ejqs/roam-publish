@@ -49,16 +49,11 @@ The old key stops working.
 dashboard** in the extension settings.
 
 - **Who can read it:** Unlisted, Public or Discover, or lock it with a **Password** or to **Members**. Password pages
-  can be end-to-end encrypted, title included.
-- **Collections** that gather pages from several graphs and people, with their own members and settings.
-- **Discover**, where readers find and upvote pages and collections.
-- **Front pages** for your graph and collections, as cards or folders, with tags, search and RSS.
-- **Reading tools:** readers fold blocks, zoom into one and follow an outline, as in Roam, and can download a page as
-  a **PDF** when you turn it on.
-- **Pinned links:** pin a link you've shared, and roam.pub won't unpublish or lock that page while it's pinned.
-- **Link previews** with the page's title and opening lines when you share it in chat apps and social posts.
-- **Page history** on each page's status link, also written back into your Roam page.
-- **What's new** at [roam.pub/updates](https://roam.pub/updates), with this extension's release notes.
+  can be end-to-end encrypted.
+- **Collections** that gather pages from several graphs and people in one place.
+- **Discover**, where readers find and upvote pages.
+- **Front pages** for your graph and collections.
+- **Download as PDF** for readers, when you turn it on.
 
 New pages and blocks are published **Unlisted**: only people with the link can see them. The toast offers **Make
 listed** and **Make discoverable** right away, and **Add to collection…** when you're in a collection.
