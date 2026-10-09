@@ -14,6 +14,10 @@ What's new shows it once Roam Depot serves it. Every bullet starts with **Breaki
   says so.
 
 ### Publishing
+- New: **Publish with encryption.** The status pop-up for a page or block that isn't published yet has a **Publish
+  with encryption** button next to Publish. It publishes to your graph as a Password page, encrypted in Roam with
+  your graph password, whatever new pages usually start as. If your graph has no password that can encrypt yet,
+  nothing is published and the message says how to set one on roam.pub.
 - New: Pages with collapsed blocks can be published with those blocks collapsed, as you have them in Roam. The first
   time you publish a page with collapsed blocks, Roam Publish asks: **Publish as is (Collapsed)** or **Publish
   expanded**. Readers can open and close blocks either way.
