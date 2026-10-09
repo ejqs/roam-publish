@@ -1,7 +1,9 @@
 name: Release
 
-# Push a tag like v0.1.0 to publish a GitHub Release with the matching CHANGELOG.md notes.
-# Roam Depot still needs its source_commit bumped to the released commit.
+# Push a tag like v0.1.0 on a commit in main to publish a GitHub Release with the matching CHANGELOG.md notes,
+# and open the "Roam Publish v0.1.0" pull request to Roam-Research/roam-depot that pins that commit as its
+# source_commit. Opening that PR needs the ROAM_DEPOT_TOKEN secret: a classic token of EJ's with `public_repo`, which
+# can push to ejqs/roam-depot and open pull requests on Roam-Research/roam-depot. Without it, that job only says so.
 on:
   push:
     tags: ["v*"]
@@ -40,3 +42,57 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file notes.md --verify-tag
+
+  roam-depot:
+    needs: release
+    runs-on: ubuntu-latest
+    env:
+      TOKEN: ${{ secrets.ROAM_DEPOT_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: The tagged commit must be on main
+        # Roam Depot builds whatever commit it's pinned to; only main's are released.
+        run: |
+          git fetch origin main
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main \
+            || { echo "::error::$GITHUB_REF_NAME ($GITHUB_SHA) isn't on main, so it isn't sent to Roam Depot."; exit 1; }
+      - name: Release notes
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          {
+            echo "Updates Roam Publish to $version: \`source_commit\` is $GITHUB_SHA, tagged $GITHUB_REF_NAME on ejqs/roam-publish main."
+            echo
+            echo "Release notes: https://github.com/$GITHUB_REPOSITORY/releases/tag/$GITHUB_REF_NAME"
+            echo
+            awk -v v="$version" '
+              $0 ~ "^## " v "( |$)" { on = 1; next }
+              /^## / { on = 0 }
+              on
+            ' CHANGELOG.md
+          } > "$RUNNER_TEMP/body.md"
+      - name: Open the Roam Depot pull request
+        env:
+          GH_TOKEN: ${{ secrets.ROAM_DEPOT_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "::warning::No ROAM_DEPOT_TOKEN secret, so no Roam Depot pull request. Pin $GITHUB_SHA in Roam-Research/roam-depot by hand."
+            exit 0
+          fi
+          branch="roam-publish-$GITHUB_REF_NAME"
+          if [ -n "$(gh pr list --repo Roam-Research/roam-depot --head "$branch" --state open --json number --jq '.[].number')" ]; then
+            echo "A pull request from $branch is already open."
+            exit 0
+          fi
+          # One commit on Roam Depot's main that changes only source_commit.
+          git clone https://github.com/Roam-Research/roam-depot.git "$RUNNER_TEMP/depot"
+          cd "$RUNNER_TEMP/depot"
+          file=extensions/ejqs/roam-publish.json
+          sed -i -E "s/(\"source_commit\": *\")[0-9a-f]{40}\"/\1$GITHUB_SHA\"/" "$file"
+          grep -q "\"source_commit\": *\"$GITHUB_SHA\"" "$file" || { echo "::error::Couldn't set source_commit in $file"; exit 1; }
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -am "Roam Publish $GITHUB_REF_NAME"
+          git push --force "https://x-access-token:$TOKEN@github.com/ejqs/roam-depot.git" "HEAD:refs/heads/$branch"
+          gh pr create --repo Roam-Research/roam-depot --base main --head "ejqs:$branch" \
+            --title "Roam Publish $GITHUB_REF_NAME" --body-file "$RUNNER_TEMP/body.md"
