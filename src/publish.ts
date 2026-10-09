@@ -1,5 +1,5 @@
 import { api, ApiError } from "./api";
-import { hashPayload, isShortlinkText, serialize, type Shortlinks } from "./serialize";
+import { foldedUids, hashPayload, isShortlinkText, type Payload, refold, serialize, type Shortlinks } from "./serialize";
 import {
   getApiKey,
   getAuthor,
@@ -18,6 +18,7 @@ import {
   type Visibility,
 } from "./state";
 import { toast } from "./toast";
+import { canSeal, hashLike, keyedHash, type SealPlan, sealTree } from "./seal";
 
 type Remote = {
   rootUid: string;
@@ -32,11 +33,17 @@ type Remote = {
   listing?: Listing;
   discoverBlocked?: string | null;
   listedNote?: string | null;
+  /** False when it's only in collections (from servers that say). */
+  inGraph?: boolean;
+  /** Sealed with a password (from servers that say). */
+  encrypted?: boolean;
   updatedAt: string;
   /** Taken down by a moderator (from servers that say). */
   removed?: boolean;
   /** Whether this key may change it: the owner's, or published by this member (from servers that say). */
   mine?: boolean;
+  /** Uids of the blocks collapsed on the website (from servers that say). */
+  folded?: string[];
 };
 
 let syncedThisSession = false;
@@ -169,11 +176,17 @@ export async function syncPublications(opts: { quiet?: boolean } = {}) {
   const cache: PublicationCache = {};
   for (const p of publications) {
     cache[p.rootUid] = {
-      hash: p.contentHash, url: p.url, title: p.title, kind: p.kind, visibility: p.visibility, updatedAt: p.updatedAt,
+      hash: p.contentHash, url: p.url, kind: p.kind,
+      // An encrypted page's title is encrypted on roam.pub, which only says "Encrypted page": keep the one
+      // last published from here.
+      title: (p.encrypted && previous[p.rootUid]?.title) || p.title, visibility: p.visibility, updatedAt: p.updatedAt,
       listing: p.listing, discoverBlocked: p.discoverBlocked, listedNote: p.listedNote,
+      inGraph: p.inGraph, encrypted: p.encrypted,
       shortUrl: p.shortUrl, anchorUid: p.anchorUid, places: p.places, removed: p.removed, mine: p.mine,
       // The server doesn't send bylines; keep the one sent with the last publish from here.
       author: previous[p.rootUid]?.author,
+      // Older servers don't say which blocks are collapsed; then it's what was last published from here.
+      folded: p.folded ?? previous[p.rootUid]?.folded,
     };
   }
   await setCache(cache);
@@ -294,20 +307,144 @@ async function removeBlock(uid: string | undefined) {
 /** Pages and blocks being published right now: a second click would add a second Roam Publish block. */
 const publishing = new Set<string>();
 
-export async function publish(uid: string) {
+/**
+ * Which blocks the published page has collapsed:
+ * - "asIs": the ones collapsed in Roam right now, exactly as you see it;
+ * - "keep": the ones collapsed on the published page now (as last published from here);
+ * - "expanded": none.
+ */
+export type Folds = "asIs" | "keep" | "expanded";
+
+/** The payload as sent, with its blocks collapsed the chosen way. */
+function folded(p: Payload, folds: Folds, published?: string[]): Payload {
+  if (folds === "asIs") return p;
+  return { ...p, tree: refold(p.tree, new Set(folds === "keep" ? published : [])) };
+}
+
+const blocksWord = (n: number) => (n === 1 ? "1 block" : `${n} blocks`);
+const sameFolds = (a: string[], b: string[]) => a.length === b.length && a.every((u, i) => u === b[i]);
+
+/** The first publish of something with collapsed blocks: should they start collapsed on the website? */
+function askFirstFolds(uid: string, count: number, kind: "page" | "block", republish: boolean, encrypt?: boolean) {
+  const verb = republish ? "Republish" : "Publish";
+  toast(
+    `${blocksWord(count)} on this ${kind} ${count === 1 ? "is" : "are"} collapsed in Roam. Should ${count === 1 ? "it" : "they"} start collapsed on the published ${kind} too? Readers can open and close blocks either way.`,
+    {
+      actions: [
+        { label: `${verb} as is (Collapsed)`, onClick: () => void publish(uid, { folds: "asIs", encrypt }) },
+        { label: `${verb} expanded`, onClick: () => void publish(uid, { folds: "expanded", encrypt }) },
+      ],
+      durationMs: 20000,
+    },
+  );
+}
+
+/** Republishing when the blocks collapsed in Roam aren't the ones collapsed on the published page. */
+function askRepublishFolds(uid: string, kind: "page" | "block") {
+  toast(
+    `The blocks collapsed in Roam aren't the ones collapsed on the published ${kind}. Republish it exactly as you see it in Roam, or keep the published ${kind}'s open and collapsed blocks?`,
+    { actions: republishActions(uid), durationMs: 20000 },
+  );
+}
+
+/** For when only which blocks are collapsed changed: makes the website's match Roam's. */
+const syncFoldsAction = (uid: string) => ({ label: "Sync open/collapsed blocks", onClick: () => void publish(uid, { folds: "asIs" }) });
+
+const republishActions = (uid: string) => [
+  { label: "Republish as is", onClick: () => void publish(uid, { folds: "asIs" }) },
+  { label: "Republish, keep open/collapsed", onClick: () => void publish(uid, { folds: "keep" }) },
+];
+
+type PublishResponse = {
+  status: "created" | "updated" | "unchanged";
+  url: string;
+  shortUrl?: string;
+  contentHash: string;
+  visibility: Visibility;
+  listing?: Listing;
+  discoverBlocked?: string | null;
+  inGraph?: boolean;
+  encrypted?: boolean;
+  changeLog?: ChangeLog;
+  collections?: number;
+};
+
+/**
+ * The page and its title encrypted for roam.pub, when it's a Password page there (it says, for a new
+ * page, whether it will be), with its keyed hash. Null to send it as before: not encrypted, or a
+ * roam.pub from before encryption in Roam. "roamCantEncrypt" when it's a Password page but this Roam
+ * has no X25519 (older desktop apps): it's sent as before, roam.pub encrypts it on arrival, and the
+ * toast says so. `encrypt`: Publish with encryption, refused (nothing sent) when roam.pub says it can't be.
+ */
+async function sealFor(uid: string, payload: Payload, encrypt: boolean) {
+  let plan: SealPlan;
+  try {
+    plan = await api<SealPlan>(`/api/ext/publications/${encodeURIComponent(uid)}/seal${encrypt ? "?encrypt=1" : ""}`);
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404 && !encrypt) return null;
+    if (e instanceof ApiError && e.status === 404) throw new ApiError(400, CANT_ENCRYPT_YET);
+    throw e;
+  }
+  if (encrypt && !("encryptBlocked" in plan)) throw new ApiError(400, CANT_ENCRYPT_YET);
+  if (encrypt && plan.encryptBlocked) throw new ApiError(400, plan.encryptBlocked);
+  if (!plan.encrypt) return null;
+  if (!(await canSeal())) return "roamCantEncrypt" as const;
+  return {
+    sealed: await sealTree(plan, payload.tree, payload.title),
+    contentHash: (await keyedHash(await hashPayload(payload), { create: true }))!,
+  };
+}
+
+/** roam.pub doesn't have Publish with encryption yet. */
+const CANT_ENCRYPT_YET = "roam.pub can't publish with encryption yet. Nothing was published; try again later.";
+
+/** Said after publishing a Password page that roam.pub had to encrypt, because this Roam can't. */
+const encryptedByRoamPub = (unchanged: boolean) =>
+  ` ${unchanged ? "This Roam can't encrypt pages itself, so its text and title reached roam.pub to check that." : "roam.pub encrypted it, since this Roam can't encrypt pages itself, so its text and title reached roam.pub this time."} To encrypt in Roam, update Roam's desktop app or publish from roamresearch.com in a browser.`;
+
+/**
+ * Publishes or republishes. `folds` says which blocks start collapsed on the website (see Folds).
+ * Without it, the user is asked when it matters: the first time something with collapsed blocks is
+ * published, and when the blocks collapsed in Roam differ from the published page's. `encrypt`: Publish
+ * with encryption, for something not published yet: it goes to the graph as a Password page, encrypted.
+ */
+export async function publish(
+  uid: string,
+  opts: { folds?: Folds; addedTo?: { name: string; entryUrl: string }; encrypt?: boolean } = {},
+) {
   if (publishing.has(uid)) return toast("Already publishing that. One moment…");
   publishing.add(uid);
   let link: Awaited<ReturnType<typeof ensureShortlinkBlock>> = null;
   try {
     const cache = await ensureCache();
+    const published = cache[uid]?.folded;
+    let folds = opts.folds;
+    if (!folds) {
+      // Asked before writing anything to the graph.
+      const first = await serialize(uid, shortlinksOf(cache));
+      const inRoam = first ? foldedUids(first.tree) : [];
+      const kept = first && published ? foldedUids(refold(first.tree, new Set(published))) : [];
+      if (first && inRoam.length && !published) return askFirstFolds(uid, inRoam.length, first.kind, !!cache[uid], opts.encrypt);
+      if (first && published && !sameFolds(inRoam, kept)) {
+        // Nothing but collapsed blocks changed: there's only one thing to do.
+        if ((await hashLike(cache[uid]?.hash, folded(first, "keep", published))) === cache[uid]?.hash)
+          return toast(
+            `Only which blocks are collapsed changed since this ${first.kind} was published. Sync them to the website?`,
+            { actions: [syncFoldsAction(uid), CANCEL], durationMs: 15000 },
+          );
+        return askRepublishFolds(uid, first.kind);
+      }
+      folds = "asIs";
+    }
     link = await ensureShortlinkBlock(uid, cache[uid]);
     // Shortlink blocks (this page's, and those of blocks published from inside it) and their change
     // logs are never published or hashed.
-    const payload = await serialize(uid, shortlinksOf(cache, link));
-    if (!payload) {
+    const read = await serialize(uid, shortlinksOf(cache, link));
+    if (!read) {
       await removeBlock(link?.created);
       return toast("Couldn't read that page or block.", { intent: "danger" });
     }
+    const payload = folded(read, folds, published);
     const hash = await hashPayload(payload);
     const label = payload.kind === "page" ? "Page" : "Block";
     // Not part of the hash: changing only the author name still republishes.
@@ -315,35 +452,42 @@ export async function publish(uid: string) {
 
     // Always asked, even when the cache has this hash: the cache can be stale (unpublished or
     // removed on the website), and the server answers "unchanged" itself.
-    const res = await api<{
-      status: "created" | "updated" | "unchanged";
-      url: string;
-      shortUrl?: string;
-      contentHash: string;
-      visibility: Visibility;
-      listing?: Listing;
-      discoverBlocked?: string | null;
-      changeLog?: ChangeLog;
-      collections?: number;
-    }>(
-      "/api/ext/publications",
-      {
-        method: "POST",
-        body: JSON.stringify({
-          ...payload,
-          contentHash: hash,
-          author,
-          anchorUid: link?.anchorUid,
-          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        }),
-      },
-    );
+    let roamCantEncrypt = false;
+    const send = async (retry = true): Promise<PublishResponse> => {
+      // Password pages are encrypted here, title included, so roam.pub only gets the cipher (see seal.ts).
+      const seal = await sealFor(uid, payload, !!opts.encrypt);
+      const sealed = seal === "roamCantEncrypt" ? null : seal;
+      roamCantEncrypt = seal === "roamCantEncrypt";
+      const body = sealed
+        ? { rootUid: payload.rootUid, kind: payload.kind, folded: foldedUids(payload.tree), ...sealed }
+        : { ...payload, contentHash: hash };
+      try {
+        return await api<PublishResponse>("/api/ext/publications", {
+          method: "POST",
+          body: JSON.stringify({
+            ...body,
+            author,
+            anchorUid: link?.anchorUid,
+            timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            ...(opts.encrypt && { encrypt: true }),
+          }),
+        });
+      } catch (e) {
+        // Where it's shown, or a password, changed while it was being encrypted: encrypt it again.
+        if (sealed && retry && e instanceof ApiError && e.status === 409) return send(false);
+        throw e;
+      }
+    };
+    const res = await send();
     await setCache({
       ...getCache(),
       [uid]: {
         hash: res.contentHash, url: res.url, title: payload.title, kind: payload.kind,
         visibility: res.visibility, listing: res.listing, discoverBlocked: res.discoverBlocked,
+        inGraph: res.inGraph, encrypted: res.encrypted ?? cache[uid]?.encrypted,
         updatedAt: new Date().toISOString(), author,
+        // Which blocks are collapsed on the website now, for "keep" and for telling when Roam differs.
+        folded: foldedUids(payload.tree),
         shortUrl: res.shortUrl ?? link?.shortUrl ?? null, anchorUid: link?.anchorUid ?? cache[uid]?.anchorUid ?? null,
         places: cache[uid]?.places,
       },
@@ -353,17 +497,23 @@ export async function publish(uid: string) {
     const copiedNote = copied ? " Link copied." : "";
 
     const unlisted = listingOf(res) === "unlisted";
-    const msg =
-      res.status === "unchanged"
+    const msg = opts.addedTo
+      ? `Added to ${opts.addedTo.name} and republished, so it opens there with ${opts.addedTo.name}'s password.`
+      : res.status === "unchanged"
         ? `${label} is already published with no changes.`
         : res.status === "updated"
           ? `${label} republished with your changes.${copiedNote}`
-          : unlisted
-            ? `${label} published as unlisted: only people with the link can see it.${copiedNote}`
-            : `${label} published!${copiedNote}`;
-    toast(msg, {
-      intent: res.status === "unchanged" ? "none" : "success",
-      link: res.url,
+          : opts.encrypt && res.encrypted
+            ? `${label} published with encryption: it opens with your graph password.${copiedNote}`
+          : res.inGraph === false
+            ? `${label} published to collections only.${copiedNote}`
+            : unlisted
+              ? `${label} published as unlisted: only people with the link can see it.${copiedNote}`
+              : `${label} published!${copiedNote}`;
+    toast(roamCantEncrypt ? msg + encryptedByRoamPub(res.status === "unchanged") : msg, {
+      intent: res.status === "unchanged" && !opts.addedTo ? "none" : "success",
+      link: opts.addedTo?.entryUrl ?? res.url,
+      durationMs: roamCantEncrypt ? 20000 : undefined,
       // New items start unlisted; offer the one-click upgrades, and collections, right where they'll see it.
       actions:
         res.status === "created"
@@ -394,9 +544,14 @@ const NOW: Record<Listing, string> = {
 /**
  * "Make …" buttons for every listing but the current one. Make discoverable only shows when the
  * server says it can be (older servers don't say, so it never shows there). Taking a page off
- * Discover asks first, as the website does.
+ * Discover asks first, as the website does. None for a page only in collections: it has no graph
+ * place to list, and each collection lists it its own way.
  */
-function listingActions(uid: string, c: { visibility: Visibility; listing?: Listing; discoverBlocked?: string | null }) {
+function listingActions(
+  uid: string,
+  c: { visibility: Visibility; listing?: Listing; discoverBlocked?: string | null; inGraph?: boolean },
+) {
+  if (c.inGraph === false) return [];
   const current = listingOf(c);
   const discoverOk = c.listing !== undefined && !c.discoverBlocked;
   return (["listed", "discover", "unlisted"] as const)
@@ -408,6 +563,7 @@ function listingActions(uid: string, c: { visibility: Visibility; listing?: List
 }
 
 const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
+const upperFirst = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 const OFF_DISCOVER: Record<Exclude<Listing, "discover">, string> = {
   listed: "It stays on your graph's front page.",
@@ -461,7 +617,9 @@ export async function setListing(uid: string, listing: Listing) {
 /** Collections the key's holder can add pages to, as the server last said; undefined on servers that don't. */
 let collectionCount: number | undefined;
 
-/** "Add to collection…", when there's a collection to add to. */
+/**
+ * "Add to collection…", when there's a collection to add to.
+ */
 const collectionAction = (uid: string) =>
   collectionCount ? [{ label: "Add to collection…", onClick: () => void chooseCollection(uid) }] : [];
 
@@ -472,6 +630,8 @@ type CollectionChoice = {
   access: "open" | "password" | "members";
   entryUrl: string | null;
   movesOutOfGraph: boolean;
+  /** Why it can't be added there (an encrypted page in a collection without a usable password), from servers that say. */
+  blocked?: string | null;
 };
 
 /** How a page starts out in a collection, as the dropdown says it. */
@@ -506,8 +666,10 @@ export async function chooseCollection(uid: string) {
           value: c.id,
           label: c.entryUrl
             ? `${c.name} (already there)`
-            : `${c.name}: ${startsAs(c)}${c.movesOutOfGraph ? ", leaves your graph" : ""}`,
-          disabled: !!c.entryUrl,
+            : c.blocked
+              ? `${c.name} (needs a password that can encrypt)`
+              : `${c.name}: ${startsAs(c)}${c.movesOutOfGraph ? ", leaves your graph" : ""}`,
+          disabled: !!c.entryUrl || !!c.blocked,
         })),
         onChoose: (id) => void addToCollection(uid, id),
       },
@@ -518,14 +680,44 @@ export async function chooseCollection(uid: string) {
   }
 }
 
-export async function addToCollection(uid: string, collectionId: string) {
+/** Whether the page in Roam differs from what's published, apart from which blocks are collapsed. */
+async function changedInRoam(uid: string) {
+  const cache = getCache();
+  const c = cache[uid];
+  const payload = c && (await serialize(uid, shortlinksOf(cache)));
+  if (!c || !payload) return false;
+  return c.hash !== (await hashLike(c.hash, folded(payload, "keep", c.folded))) && c.hash !== (await hashLike(c.hash, payload));
+}
+
+/**
+ * Adds a published page to a collection. An encrypted page is added waiting for a republish (only
+ * its passwords open it, and a new collection's can't without one), so it's republished right
+ * after: that locks it for every place's password, the new collection's included. When the page
+ * changed in Roam since it was published, that republish would publish the changes too, so it asks
+ * first (`confirmed`).
+ */
+export async function addToCollection(uid: string, collectionId: string, { confirmed = false } = {}) {
   try {
+    if (getCache()[uid]?.encrypted && !confirmed && (await changedInRoam(uid)))
+      return toast(
+        "This page is encrypted, so adding it republishes it, and it changed in Roam since it was last published. Add it and publish your changes?",
+        {
+          actions: [
+            { label: "Add and republish", onClick: () => void addToCollection(uid, collectionId, { confirmed: true }) },
+            CANCEL,
+          ],
+          durationMs: 20000,
+        },
+      );
     const res = await api<{
       name: string;
       entryUrl: string;
       listing: Listing;
       access: CollectionChoice["access"];
       movedOutOfGraph: boolean;
+      encrypted?: boolean;
+      /** Encrypted: it opens there once republished (from servers that add encrypted pages). */
+      needsRepublish?: boolean;
       url: string;
     }>(`/api/ext/publications/${encodeURIComponent(uid)}/collections`, {
       method: "POST",
@@ -533,7 +725,23 @@ export async function addToCollection(uid: string, collectionId: string) {
     });
     const cache = getCache();
     if (cache[uid])
-      await setCache({ ...cache, [uid]: { ...cache[uid], url: res.url, places: (cache[uid].places ?? 1) + (res.movedOutOfGraph ? 0 : 1) } });
+      await setCache({
+        ...cache,
+        [uid]: {
+          ...cache[uid],
+          url: res.url,
+          places: (cache[uid].places ?? 1) + (res.movedOutOfGraph ? 0 : 1),
+          inGraph: res.movedOutOfGraph ? false : cache[uid].inGraph,
+          // The collection may have encrypted it.
+          encrypted: res.encrypted || cache[uid].encrypted,
+        },
+      });
+    if (res.needsRepublish)
+      return publish(uid, {
+        // Without the published page's collapsed blocks (older servers), as in Roam.
+        folds: getCache()[uid]?.folded ? "keep" : "asIs",
+        addedTo: { name: res.name, entryUrl: res.entryUrl },
+      });
     const how = res.listing === "unlisted" ? "unlisted" : startsAs({ listing: res.listing, access: res.access });
     toast(
       `Added to ${res.name}, ${how} there.${
@@ -617,34 +825,78 @@ export async function publishStatus(uid: string) {
     const label = payload.kind === "page" ? "Page" : "Block";
     if (!c)
       return toast(`${label} isn't published.${offline}`, {
-        action: { label: `Publish ${payload.kind}`, onClick: () => void publish(uid) },
+        actions: [
+          { label: `Publish ${payload.kind}`, onClick: () => void publish(uid) },
+          { label: "Publish with encryption", onClick: () => void publish(uid, { encrypt: true }) },
+        ],
       });
     if (c.removed) return toast(`${label} was removed by a moderator.${offline}`, { intent: "danger", link: openLink(c) });
-    const where = LISTING_LABEL[listingOf(c)];
+    // A page only in collections has no listing of its own: each collection lists it.
+    const onlyInCollections = c.inGraph === false;
+    // "Unlisted page", "Discoverable block", "Page in collections only".
+    const what = onlyInCollections
+      ? `${label} in collections only`
+      : `${upperFirst(LISTING_LABEL[listingOf(c)])} ${payload.kind}`;
     if (c.mine === false)
+      return toast(`${what}, published by another member of this graph. Only they or the graph's owner can change it.${offline}`, {
+        link: openLink(c),
+      });
+    const since = new Date(c.updatedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+    // Only which blocks are collapsed changing isn't a change to the content; it's said separately.
+    const published = c.folded;
+    const inRoam = foldedUids(payload.tree);
+    const keptPayload = folded(payload, published ? "keep" : "expanded", published);
+    const asIsHash = await hashLike(c.hash, payload);
+    const keptHash = await hashLike(c.hash, keptPayload);
+    // Encrypted in Roam elsewhere, and the graph's key for telling hasn't reached this Roam's settings.
+    if (asIsHash === null || keptHash === null)
       return toast(
-        `${label} is published (${where}) by another member of this graph. Only they or the graph's owner can change it.${offline}`,
-        { link: openLink(c) },
+        `${what}, last published ${since}. Can't tell on this device whether it changed since: this Roam doesn't have this graph's Roam Publish key for encrypted pages yet. Republish to be sure.${offline}`,
+        {
+          link: openLink(c),
+          actions: [
+            { label: "Republish", onClick: () => void publish(uid, { folds: "asIs" }) },
+            ...listingActions(uid, c),
+            ...collectionAction(uid),
+            { label: "Unpublish", onClick: () => void confirmUnpublish(uid, { checked: true }) },
+          ],
+          durationMs: 15000,
+        },
       );
-    const since = new Date(c.updatedAt).toLocaleString();
-    const changed = (await hashPayload(payload)) !== c.hash;
+    // From an older server that doesn't say, published elsewhere, the collapsed blocks aren't known: either way matches.
+    const changed = c.hash !== keptHash && c.hash !== asIsHash;
+    const foldsDiffer = published ? !sameFolds(inRoam, foldedUids(keptPayload.tree)) : inRoam.length > 0 && c.hash !== asIsHash;
     // Only known for items published from this graph's extension settings.
     const bylineChanged = c.author !== undefined && c.author !== getAuthor();
     const upToDate = !changed && !bylineChanged;
+    const republish = !foldsDiffer
+      ? upToDate
+        ? []
+        : [{ label: "Republish", onClick: () => void publish(uid, { folds: "asIs" }) }]
+      : published
+        ? upToDate
+          ? [syncFoldsAction(uid)]
+          : republishActions(uid)
+        : [
+            { label: "Republish as is (Collapsed)", onClick: () => void publish(uid, { folds: "asIs" }) },
+            ...(upToDate ? [] : [{ label: "Republish expanded", onClick: () => void publish(uid, { folds: "expanded" }) }]),
+          ];
     const actions = [
-      ...(upToDate ? [] : [{ label: "Republish", onClick: () => void publish(uid) }]),
+      ...republish,
       ...listingActions(uid, c),
       ...collectionAction(uid),
       { label: "Unpublish", onClick: () => void confirmUnpublish(uid, { checked: true }) },
     ];
-    // Roam's toasts can't grey a button out, so say why Make discoverable isn't there.
-    const blocked =
-      (listingOf(c) !== "unlisted" && c.listedNote ? ` ${c.listedNote}` : "") ||
-      (c.discoverBlocked && listingOf(c) !== "discover" ? ` ${c.discoverBlocked}` : "");
+    const foldsNote = foldsDiffer ? ` Collapsed blocks differ from the published ${payload.kind}.` : "";
+    // Roam's toasts can't grey a button out, so say why a Make … button isn't there.
+    const blocked = onlyInCollections
+      ? " Each collection sets its listing."
+      : (listingOf(c) !== "unlisted" && c.listedNote ? ` ${c.listedNote}` : "") ||
+        (c.discoverBlocked && listingOf(c) !== "discover" ? ` ${c.discoverBlocked}` : "");
     toast(
       upToDate
-        ? `${label} is published (${where}) and up to date. Last published ${since}.${offline}${blocked}`
-        : `${label} is published (${where}) but ${changed ? "has changed" : "has a new author name"} since it was last published on ${since}.${offline}${blocked}`,
+        ? `${what}, up to date. Last published ${since}.${foldsNote}${offline}${blocked}`
+        : `${what}, ${changed ? "changed" : "new author name"} since last published ${since}.${foldsNote}${offline}${blocked}`,
       { intent: upToDate ? "success" : "none", link: openLink(c), actions, durationMs: 15000 },
     );
   } catch (e) {

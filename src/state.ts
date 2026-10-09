@@ -10,9 +10,15 @@ export type CachedPublication = {
   discoverBlocked?: string | null;
   /** Why it's listed but nothing shows it (its graph's front page is off), in words (from servers that say). */
   listedNote?: string | null;
+  /** False when it's only in collections, so it has no listing of its own (from servers that say). */
+  inGraph?: boolean;
+  /** Sealed with a password, so collections are added on roam.pub (from servers that say). */
+  encrypted?: boolean;
   updatedAt: string;
   /** Author name sent with the last publish; republishing with a new one updates the byline. */
   author?: string;
+  /** Uids of the blocks collapsed on the published page, as the server last said (or as last published from here). */
+  folded?: string[];
   /** Permanent {server}/p/{id} link, from servers that have shortlinks. */
   shortUrl?: string | null;
   /** How many places (its graph, collections) it's published in, as of the last sync (from servers that say). */
@@ -83,6 +89,29 @@ export const getCache = (): PublicationCache =>
 
 export async function setCache(cache: PublicationCache) {
   await save("publications", cache);
+}
+
+/** The key for encrypted pages' content hashes (seal.ts `keyedHash`), when this graph has one. */
+export function savedHashKey() {
+  const saved = api.settings.get("hash-key");
+  return typeof saved === "string" && /^[\w-]{43}$/.test(saved) ? saved : null;
+}
+
+let makingHashKey: Promise<string> | null = null;
+/**
+ * The hash key, made the first time a page is encrypted. Kept in the graph's extension settings, so
+ * every device publishing this graph shares it. Made once even when two pages are published at once.
+ */
+export async function getHashKey() {
+  const saved = savedHashKey();
+  if (saved) return saved;
+  makingHashKey ??= (async () => {
+    const bytes = crypto.getRandomValues(new Uint8Array(32));
+    const key = btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    await save("hash-key", key);
+    return key;
+  })().finally(() => (makingHashKey = null));
+  return makingHashKey;
 }
 
 /**

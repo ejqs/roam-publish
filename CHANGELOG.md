@@ -1,7 +1,42 @@
 # Changelog
 
 All notable changes to the Roam Publish extension. Each version is dated when it was sent to Roam Depot; roam.pub's
-What's new shows it once Roam Depot serves it. Every bullet starts with **New:**, **Improved:** or **Fixed:**.
+What's new shows it once Roam Depot serves it. Every bullet starts with **Breaking:**, **New:**, **Improved:** or
+**Fixed:**; a breaking change comes with a new major version.
+
+## 0.2.0 (2026-10-09)
+
+### Security
+- New: **Password pages are encrypted in Roam before they're published, title included.** roam.pub only gets the
+  encrypted page and never sees its text or title, not even while publishing; it calls it "Encrypted page", and
+  readers' browsers decrypt it with the password. Needs a Roam (browser or desktop app) recent enough to have X25519
+  encryption; on an older one, pages are published as before and roam.pub encrypts them, and the publish message
+  says so.
+
+### Publishing
+- New: **Publish with encryption.** The status pop-up for a page or block that isn't published yet has a **Publish
+  with encryption** button next to Publish. It publishes to your graph as a Password page, encrypted in Roam with
+  your graph password, whatever new pages usually start as. If your graph has no password that can encrypt yet,
+  nothing is published and the message says how to set one on roam.pub.
+- New: Pages with collapsed blocks can be published with those blocks collapsed, as you have them in Roam. The first
+  time you publish a page with collapsed blocks, Roam Publish asks: **Publish as is (Collapsed)** or **Publish
+  expanded**. Readers can open and close blocks either way.
+- New: When the blocks collapsed in Roam aren't the ones collapsed on the published page, republishing asks:
+  **Republish as is**, exactly as you see it in Roam, or **Republish, keep open/collapsed** to update the content and
+  leave the published page's blocks open and collapsed as they are. Collapsing or expanding blocks alone doesn't make
+  a page show as changed; instead the status toast offers **Sync open/collapsed blocks**. roam.pub remembers which blocks it has collapsed, so
+  this works from any computer.
+- Fixed: For a page that's only in collections, the status toast offered **Make listed** and **Make unlisted**,
+  which did nothing, and called it unlisted. It now says the page is only in collections, where each collection sets
+  how it's listed.
+- Improved: The status toast is shorter, for example "Unlisted page, up to date. Last published Oct 8, 2026, 1:14 PM."
+- New: **Add to collection…** works for encrypted pages too, with no password to type. Roam Publish adds the page
+  and republishes it, so it opens in the collection with the collection's password. If the page changed in Roam since
+  you last published it, it asks first. Collections without a password that can encrypt are greyed out.
+
+### Setup and settings
+- New: When roam.pub changes in a way that needs a newer Roam Publish, the extension says so and tells you where to
+  update it, instead of failing with a confusing error.
 
 ## 0.1.1 (2026-10-07)
 

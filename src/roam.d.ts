@@ -2,6 +2,8 @@
 // Reference: https://roamdocs.fyi/types/roam-alpha-api.d.ts
 
 declare const __DEFAULT_SERVER__: string;
+/** package.json's version, set at build time. */
+declare const __VERSION__: string;
 
 type PullBlock = {
   ":block/uid"?: string;
@@ -10,6 +12,8 @@ type PullBlock = {
   ":block/order"?: number;
   ":block/text-align"?: string;
   ":children/view-type"?: string;
+  /** False when the block is collapsed in Roam. */
+  ":block/open"?: boolean;
   ":node/title"?: string;
   ":block/children"?: PullBlock[];
   /** The page a block is on. */

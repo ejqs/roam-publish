@@ -1,6 +1,16 @@
 import assert from "node:assert/strict";
+import { generateKeyPairSync } from "node:crypto";
 import { beforeEach, describe, mock, test } from "node:test";
-import { confirmChangeLogBlocks, confirmUnpublish, publish, publishStatus, syncPublications } from "../src/publish";
+import {
+  addToCollection,
+  chooseCollection,
+  confirmChangeLogBlocks,
+  confirmUnpublish,
+  publish,
+  publishStatus,
+  syncPublications,
+} from "../src/publish";
+import { recheckCanSeal } from "../src/seal";
 import { hashPayload, serialize } from "../src/serialize";
 import { initState, resetShortlinkSettings, withoutUndefined } from "../src/state";
 import { fakeRoam } from "./fake-roam";
@@ -62,13 +72,15 @@ let roam: ReturnType<typeof fakeRoam>;
 
 /** A fake roam.pub: answers by method and path, records each call. */
 function server(routes: Record<string, (body: Record<string, unknown>) => [number, unknown]> = {}) {
-  const calls: { method: string; path: string; body: Record<string, unknown> }[] = [];
+  const calls: { method: string; path: string; search?: string; body: Record<string, unknown> }[] = [];
   globalThis.fetch = (async (url: string, init: RequestInit) => {
     const method = init.method ?? "GET";
-    const path = new URL(url).pathname;
+    const { pathname: path, search } = new URL(url);
     const body = JSON.parse((init.body as string) ?? "{}");
-    calls.push({ method, path, body });
     const route = routes[`${method} ${path}`];
+    // Asked before every publish; unless a test says otherwise, nothing is encrypted, and it isn't listed.
+    if (!route && method === "GET" && path.endsWith("/seal")) return new Response(JSON.stringify({ encrypt: false }));
+    calls.push({ method, path, ...(search && { search }), body });
     const [status, res] = route
       ? route(body)
       : [200, { status: "created", url: "https://roam.pub/g/x", contentHash: body.contentHash, visibility: "unlisted" }];
@@ -148,6 +160,235 @@ describe("publish", () => {
     const tree = calls.at(-1)!.body.tree as { children: { uid: string; children: unknown[] }[] };
     assert.equal(rel.uid, "rel");
     assert.deepEqual(tree.children.map((c) => [c.uid, c.children.length]), [["rel", 0]]);
+  });
+});
+
+describe("encrypted in Roam", () => {
+  const publicKey = generateKeyPairSync("x25519").publicKey.export({ type: "spki", format: "der" }).toString("base64url");
+  const plan = { encrypt: true, publicationId: "3f0c8a62-0a3e-4a43-9b38-6a1f1b0e7d11", locks: [{ scope: "graph", id: "g1", publicKey }] };
+  const accept = (body: Record<string, unknown>): [number, unknown] => [200, {
+    status: "updated", url: "https://roam.pub/g/x", contentHash: body.contentHash, visibility: "unlisted", encrypted: true,
+  }];
+
+  test("a Password page reaches roam.pub only as a cipher, with a keyed hash", async () => {
+    let stored = "";
+    const calls = server({
+      "GET /api/ext/publications/page1/seal": () => [200, plan],
+      "POST /api/ext/publications": (b) => ((stored = b.contentHash as string), accept(b)),
+      "GET /api/ext/publications": () => [200, {
+        publications: [{ rootUid: "page1", kind: "page", title: "Encrypted page", url: "https://roam.pub/g/x", contentHash: stored,
+          visibility: "unlisted", listing: "unlisted", updatedAt: "", folded: [], encrypted: true }],
+      }],
+    });
+    await publish("page1");
+    const post = calls.find((c) => c.method === "POST")!.body;
+    assert.equal(post.tree, undefined);
+    // The title is encrypted too.
+    assert.equal(post.title, undefined);
+    assert.doesNotMatch(JSON.stringify(post), /hello|Page/);
+    assert.deepEqual(Object.keys(post.sealed as object), ["publicationId", "cipher", "titleCipher", "keys"]);
+    assert.match(post.contentHash as string, /^k1\.[0-9a-f]{64}$/);
+    assert.deepEqual(post.folded, []);
+    assert.equal((settings.get("publications") as Record<string, { hash: string }>).page1.hash, post.contentHash);
+    // The keyed hash still tells that nothing changed in Roam since.
+    buttons = [];
+    await publishStatus("page1");
+    assert.match(toasts.at(-1)!, /up to date/);
+    assert.equal(button("Republish"), undefined);
+    // roam.pub only knows it as "Encrypted page"; the title published from here is kept.
+    assert.equal((settings.get("publications") as Record<string, { title: string }>).page1.title, "Page");
+  });
+
+  test("where Roam can't encrypt, it's sent as before and the toast says roam.pub encrypted it", async (t) => {
+    t.mock.method(crypto.subtle, "generateKey", async () => {
+      throw new Error("X25519 not supported");
+    });
+    recheckCanSeal();
+    t.after(recheckCanSeal);
+    const calls = server({
+      "GET /api/ext/publications/page1/seal": () => [200, plan],
+      "POST /api/ext/publications": accept,
+    });
+    await publish("page1");
+    const post = calls.find((c) => c.method === "POST")!.body;
+    assert.equal(post.sealed, undefined);
+    assert.ok(post.tree);
+    assert.match(toasts.at(-1)!, /republished.*roam\.pub encrypted it, since this Roam can't encrypt pages itself/);
+  });
+
+  test("a page encrypted elsewhere, without this graph's key here yet: can't tell, and no key is made", async () => {
+    settings.set("publications", cached({ hash: `k1.${"0".repeat(64)}`, encrypted: true, folded: [] }));
+    server({
+      "GET /api/ext/publications": () => [200, {
+        publications: [{ rootUid: "page1", kind: "page", title: "Encrypted page", url: "https://roam.pub/g/x", contentHash: `k1.${"0".repeat(64)}`,
+          visibility: "unlisted", listing: "unlisted", updatedAt: "", folded: [], encrypted: true }],
+      }],
+    });
+    await publishStatus("page1");
+    assert.match(toasts.at(-1)!, /Can't tell on this device whether it changed/);
+    assert.ok(button("Republish"));
+    assert.equal(settings.get("hash-key"), undefined);
+  });
+
+  test("encrypts again when the passwords changed while it was publishing", async () => {
+    let first = true;
+    const calls = server({
+      "GET /api/ext/publications/page1/seal": () => [200, plan],
+      "POST /api/ext/publications": (b) => (first ? ((first = false), [409, { error: "changed", reseal: true }]) : accept(b)),
+    });
+    await publish("page1");
+    assert.deepEqual(calls.map((c) => c.method), ["GET", "POST", "GET", "POST"]);
+    assert.match(toasts.at(-1)!, /republished/);
+  });
+});
+
+describe("Publish with encryption", () => {
+  const publicKey = generateKeyPairSync("x25519").publicKey.export({ type: "spki", format: "der" }).toString("base64url");
+  const plan = { encrypt: true, publicationId: "3f0c8a62-0a3e-4a43-9b38-6a1f1b0e7d11", locks: [{ scope: "graph", id: "g1", publicKey }], encryptBlocked: null };
+  const created = (body: Record<string, unknown>): [number, unknown] => [200, {
+    status: "created", url: "https://roam.pub/g/x", contentHash: body.contentHash, visibility: "unlisted", listing: "unlisted", encrypted: true,
+  }];
+  const unpublished = { "GET /api/ext/publications": (): [number, unknown] => [200, { publications: [] }] };
+
+  test("the pop-up for a page that isn't published offers it next to Publish", async () => {
+    settings.set("publications", {});
+    server(unpublished);
+    await publishStatus("page1");
+    assert.deepEqual(actions().map((b) => b.textContent), ["Publish page", "Publish with encryption"]);
+  });
+
+  test("asks roam.pub for it, encrypts in Roam and says it opens with the graph password", async () => {
+    settings.set("publications", {});
+    const calls = server({ "GET /api/ext/publications/page1/seal": () => [200, plan], "POST /api/ext/publications": created });
+    await publish("page1", { encrypt: true });
+    assert.equal(calls.find((c) => c.path.endsWith("/seal"))!.search, "?encrypt=1");
+    const post = calls.find((c) => c.method === "POST")!.body;
+    assert.equal(post.encrypt, true);
+    assert.ok(post.sealed);
+    assert.doesNotMatch(JSON.stringify(post), /hello/);
+    assert.match(toasts.at(-1)!, /published with encryption: it opens with your graph password/);
+  });
+
+  test("when roam.pub says it can't be, nothing is published and it says why", async () => {
+    settings.set("publications", {});
+    const calls = server({
+      "GET /api/ext/publications/page1/seal": () => [200, { encrypt: false, encryptBlocked: "First set a graph password." }],
+    });
+    await publish("page1", { encrypt: true });
+    assert.equal(calls.filter((c) => c.method === "POST").length, 0);
+    assert.match(toasts.at(-1)!, /First set a graph password/);
+  });
+
+  test("a roam.pub without it: nothing is published", async () => {
+    settings.set("publications", {});
+    const calls = server();
+    await publish("page1", { encrypt: true });
+    assert.equal(calls.filter((c) => c.method === "POST").length, 0);
+    assert.match(toasts.at(-1)!, /can't publish with encryption yet/);
+  });
+});
+
+describe("collapsed blocks", () => {
+  const folded = (open = false) =>
+    fakeRoam([
+      {
+        uid: "page1",
+        title: "Page",
+        children: [
+          { uid: "b1", string: "hello", open, children: [{ uid: "b2", string: "inside" }] },
+          { uid: "b3", string: "other", children: [{ uid: "b4", string: "inside" }] },
+        ],
+      },
+    ]);
+  /** Lets a publish started by a click finish: until `done`, for as many turns as it takes. */
+  const settle = async (done: () => boolean) => {
+    for (let i = 0; i < 1000 && !done(); i++) await new Promise((r) => setImmediate(r));
+  };
+  const posts = (calls: { method: string; body: Record<string, unknown> }[]) => calls.filter((c) => c.method === "POST");
+  const sentTree = (calls: { method: string; body: Record<string, unknown> }[]) => JSON.stringify(posts(calls).at(-1)?.body.tree);
+  const routes = (hash = "old") => ({
+    "GET /api/ext/publications": (): [number, unknown] => [200, {
+      publications: hash ? [{ rootUid: "page1", kind: "page", title: "Page", url: "https://roam.pub/g/x", contentHash: hash,
+        visibility: "unlisted", listing: "unlisted", updatedAt: "" }] : [],
+    }],
+    "POST /api/ext/publications": (body: Record<string, unknown>): [number, unknown] => [200, {
+      status: "updated", url: "https://roam.pub/g/x", contentHash: body.contentHash, visibility: "unlisted",
+    }],
+  });
+  const labels = () => actions().map((b) => b.textContent).filter((l) => /^(Republish|Publish|Sync)/.test(l ?? ""));
+
+  test("the first publish asks, writes nothing until answered, and remembers what's collapsed", async () => {
+    settings.set("publications", {});
+    roam = folded();
+    const calls = server(routes(""));
+    await publish("page1");
+    assert.equal(posts(calls).length, 0);
+    assert.deepEqual(roam.blocks.get("page1")!.children!.map((c) => c.uid), ["b1", "b3"]);
+    assert.match(toasts.at(-1)!, /1 block on this page is collapsed in Roam/);
+    assert.deepEqual(labels(), ["Publish as is (Collapsed)", "Publish expanded"]);
+    button("Publish as is (Collapsed)")!.click!();
+    await settle(() => !!(settings.get("publications") as Record<string, { folded?: string[] }>).page1?.folded);
+    assert.match(sentTree(calls), /"collapsed":true/);
+    assert.deepEqual((settings.get("publications") as Record<string, { folded?: string[] }>).page1.folded, ["b1"]);
+    // Nothing changed in Roam since: republishing doesn't ask again.
+    buttons = [];
+    await publish("page1");
+    assert.deepEqual(labels(), []);
+    assert.equal(posts(calls).length, 2);
+  });
+
+  test("when Roam's collapsed blocks differ, republishing asks: as is, or keep the published page's", async () => {
+    roam = folded();
+    settings.set("publications", cached({ hash: "old", folded: [] }));
+    const calls = server(routes());
+    await publish("page1");
+    assert.equal(posts(calls).length, 0);
+    assert.match(toasts.at(-1)!, /aren't the ones collapsed on the published page/);
+    assert.deepEqual(labels(), ["Republish as is", "Republish, keep open/collapsed"]);
+    button("Republish, keep open/collapsed")!.click!();
+    await settle(() => (settings.get("publications") as Record<string, { hash: string }>).page1.hash !== "old");
+    assert.doesNotMatch(sentTree(calls), /collapsed/);
+    buttons = [];
+    await publish("page1", { folds: "asIs" });
+    assert.match(sentTree(calls), /"collapsed":true/);
+  });
+
+  test("which blocks are collapsed on the website comes from the server, so another computer knows too", async () => {
+    roam = folded();
+    settings.set("publications", {});
+    const calls = server({
+      "GET /api/ext/publications": () => [200, {
+        publications: [{ rootUid: "page1", kind: "page", title: "Page", url: "https://roam.pub/g/x", contentHash: "old",
+          visibility: "unlisted", listing: "unlisted", updatedAt: "", folded: [] }],
+      }],
+    });
+    await syncPublications({ quiet: true });
+    await publish("page1");
+    assert.equal(posts(calls).length, 0);
+    assert.deepEqual(labels(), ["Republish as is", "Republish, keep open/collapsed"]);
+  });
+
+  test("the status says when only collapsed blocks differ, and offers both after an edit", async () => {
+    roam = folded();
+    const asPublished = await hashPayload({ ...(await serialize("page1"))!, tree: JSON.parse(JSON.stringify((await serialize("page1"))!.tree).replace(',"collapsed":true', "")) });
+    settings.set("publications", cached({ hash: asPublished, folded: [] }));
+    server(routes(asPublished));
+    await publishStatus("page1");
+    assert.match(toasts.at(-1)!, /up to date.*Collapsed blocks differ/);
+    assert.deepEqual(labels(), ["Sync open/collapsed blocks"]);
+
+    // Publishing then only offers the sync.
+    buttons = [];
+    await publish("page1");
+    assert.match(toasts.at(-1)!, /Only which blocks are collapsed changed/);
+    assert.deepEqual(labels(), ["Sync open/collapsed blocks"]);
+
+    buttons = [];
+    settings.set("publications", cached({ hash: "old", folded: [] }));
+    server(routes("old"));
+    await publishStatus("page1");
+    assert.match(toasts.at(-1)!, /, changed since last published/);
+    assert.deepEqual(labels(), ["Republish as is", "Republish, keep open/collapsed"]);
   });
 });
 
@@ -240,6 +481,66 @@ describe("add to collection", () => {
     assert.equal((settings.get("publications") as Record<string, { url: string }>).page1.url, "https://roam.pub/c/bbb");
   });
 
+  test("a new page that went only to collections isn't called unlisted or offered Make listed", async () => {
+    server({ "POST /api/ext/publications": (b) => [200, { status: "created", url: "https://roam.pub/c/aaa", contentHash: b.contentHash, visibility: "unlisted", listing: "unlisted", inGraph: false, encrypted: true, collections: 2 }] });
+    await publish("page1");
+    assert.match(toasts.at(-1)!, /^Page published to collections only\./);
+    assert.deepEqual(actions().map((b) => b.textContent), ["Add to collection…"]);
+  });
+
+  describe("an encrypted page", () => {
+    const added = {
+      name: "Private", entryUrl: "https://roam.pub/c/bbb", listing: "listed", access: "password",
+      movedOutOfGraph: false, encrypted: true, needsRepublish: true, url: "https://roam.pub/g/x",
+    };
+    const encryptedCache = async (hash?: string) => {
+      const payload = (await serialize("page1", new Set()))!;
+      settings.set("publications", cached({ hash: hash ?? (await hashPayload(payload)), encrypted: true, folded: [] }));
+    };
+
+    test("the dropdown leaves out collections whose password can't encrypt", async () => {
+      await encryptedCache();
+      server({
+        "GET /api/ext/publications/page1/collections": () => [200, { collections: [
+          { ...choices[1], blocked: "This page is encrypted. Give Best of a password first." },
+          { ...choices[2], movesOutOfGraph: false, blocked: null },
+        ] }],
+      });
+      await chooseCollection("page1");
+      const options = (selects.at(-1)!.children as El[]).slice(1).map((o) => [o.textContent, !!o.disabled]);
+      assert.deepEqual(options, [
+        ["Best of (needs a password that can encrypt)", true],
+        ["Private: password-protected", false],
+      ]);
+    });
+
+    test("is added and republished in one go, so it opens in the new collection", async () => {
+      await encryptedCache();
+      const calls = server({
+        "POST /api/ext/publications/page1/collections": () => [200, added],
+        "POST /api/ext/publications": (b) => [200, { status: "updated", url: "https://roam.pub/g/x", contentHash: b.contentHash, visibility: "unlisted", listing: "unlisted", encrypted: true }],
+      });
+      await addToCollection("page1", "c3");
+      assert.deepEqual(calls.map((c) => `${c.method} ${c.path}`), ["POST /api/ext/publications/page1/collections", "POST /api/ext/publications"]);
+      assert.match(toasts.at(-1)!, /^Added to Private and republished, so it opens there with Private's password\./);
+    });
+
+    test("asks first when the page changed in Roam, since republishing publishes the changes", async () => {
+      await encryptedCache("not-the-hash");
+      const calls = server({
+        "POST /api/ext/publications/page1/collections": () => [200, added],
+        "POST /api/ext/publications": (b) => [200, { status: "updated", url: "https://roam.pub/g/x", contentHash: b.contentHash, visibility: "unlisted" }],
+      });
+      await addToCollection("page1", "c3");
+      assert.equal(calls.length, 0);
+      assert.match(toasts.at(-1)!, /changed in Roam since it was last published/);
+      button("Add and republish")!.click!();
+      // Adding, then republishing (which reads and hashes the page), each take a few turns.
+      for (let i = 0; i < 1000 && !/^Added to/.test(toasts.at(-1)!); i++) await tick();
+      assert.deepEqual(calls.map((c) => c.path), ["/api/ext/publications/page1/collections", "/api/ext/publications"]);
+    });
+  });
+
   test("the status toast offers it too", async () => {
     server({
       "GET /api/ext/publications": () => [200, {
@@ -322,7 +623,7 @@ describe("status", () => {
       "PATCH /api/ext/publications/page1": (b) => [200, { visibility: "public", listing: b.listing, discoverBlocked: null, url: "https://roam.pub/g/x" }],
     });
     await publishStatus("page1");
-    assert.match(toasts.at(-1)!, /published \(unlisted\)/);
+    assert.match(toasts.at(-1)!, /^Unlisted page, /);
     assert.deepEqual(labels().filter((l) => l?.startsWith("Make")), ["Make listed", "Make discoverable"]);
     button("Make discoverable")!.click!();
     await new Promise((r) => setImmediate(r));
@@ -355,7 +656,7 @@ describe("status", () => {
   test("leaves out Make discoverable and says why when it can't be", async () => {
     server(remote({ visibility: "public", listing: "listed", discoverBlocked: "Turn on search engines in Sharing to make pages Discoverable." }));
     await publishStatus("page1");
-    assert.match(toasts.at(-1)!, /published \(listed\).*Turn on search engines/);
+    assert.match(toasts.at(-1)!, /^Listed page, .*Turn on search engines/);
     assert.deepEqual(labels().filter((l) => l?.startsWith("Make")), ["Make unlisted"]);
   });
 
@@ -375,13 +676,42 @@ describe("status", () => {
   test("the status of a listed page says when nothing lists it", async () => {
     server(remote({ visibility: "public", listing: "listed", discoverBlocked: "x", listedNote: "Your graph's front page is off." }));
     await publishStatus("page1");
-    assert.match(toasts.at(-1)!, /published \(listed\).*front page is off/);
+    assert.match(toasts.at(-1)!, /^Listed page, .*front page is off/);
+  });
+
+  test("a page only in collections offers no Make … buttons and says where it's listed", async () => {
+    server({
+      "GET /api/ext/publications": () => [200, {
+        collections: 2,
+        publications: [{ rootUid: "page1", kind: "page", title: "Page", url: "https://roam.pub/c/aaa", contentHash: "x", updatedAt: "",
+          visibility: "unlisted", listing: "unlisted", inGraph: false,
+          discoverBlocked: "This page is only in collections, so it can't be Discoverable from its graph." }],
+      }],
+    });
+    await publishStatus("page1");
+    assert.match(toasts.at(-1)!, /^Page in collections only, /);
+    assert.match(toasts.at(-1)!, /Each collection sets its listing\./);
+    assert.doesNotMatch(toasts.at(-1)!, /unlisted|Discoverable/);
+    assert.deepEqual(labels().filter((l) => l !== "Republish"), ["Add to collection…", "Unpublish"]);
+  });
+
+  test("an encrypted page can be added to collections from Roam too", async () => {
+    server({
+      "GET /api/ext/publications": () => [200, {
+        collections: 2,
+        publications: [{ rootUid: "page1", kind: "page", title: "Page", url: "https://roam.pub/c/aaa", contentHash: "x", updatedAt: "",
+          visibility: "unlisted", listing: "unlisted", inGraph: false, encrypted: true }],
+      }],
+    });
+    await publishStatus("page1");
+    assert.doesNotMatch(toasts.at(-1)!, /roam\.pub/);
+    assert.deepEqual(labels().filter((l) => l !== "Republish"), ["Add to collection…", "Unpublish"]);
   });
 
   test("an older server that only says public still gets the new words", async () => {
     server(remote({ visibility: "public" }));
     await publishStatus("page1");
-    assert.match(toasts.at(-1)!, /published \(listed\)/);
+    assert.match(toasts.at(-1)!, /^Listed page, /);
     assert.deepEqual(labels().filter((l) => l?.startsWith("Make")), ["Make unlisted"]);
   });
 });
