@@ -45,22 +45,16 @@ The old key stops working.
 2. Choose **Roam Publish: Page…** or **Roam Publish: Block…**.
 3. Click **Publish**. The link is copied to your clipboard.
 
-On the website you also get these. Manage them from the [dashboard](https://roam.pub/dashboard), or click **Open
+**On roam.pub** you also get these. Manage them from the [dashboard](https://roam.pub/dashboard), or click **Open
 dashboard** in the extension settings.
 
-- **Passwords and members-only pages** for anything you don't want fully open.
-- **Collections** that gather pages from several graphs and people in one place, with their own members.
-- **Discover**, where readers upvote pages and browse them by recent, trending (most viewed this week) or top.
-- **Tags and search** on your graph's front page and in collections, plus site-wide search for verified accounts.
-- **RSS feeds** for your graph, your collections and Discover.
-- **Page history**: each page's permanent short link (`roam.pub/p/…`) shows your graph's members what happened to it
-  and when. The same change log is also written back into your Roam page.
-- **A public profile** at `roam.pub/u/{username}`.
-- **Bulk changes**: select many pages to change their Visibility or their tags.
-- **Front pages** you can browse as cards or a folder tree, with folders you arrange on the website.
-- **What's new** at [roam.pub/updates](https://roam.pub/updates), with this extension's release notes, and
-  [Upcoming changes](https://roam.pub/updates/upcoming) for anything you'll need to act on, such as updating the
-  extension.
+- **Share pages easily.** Publish a page or block and get a link to share.
+- **Access and visibility controls.** Choose who finds your pages: Unlisted, Public or Discover, or lock them with a
+  Password or to Members.
+- **End-to-end encryption** for pages with a password.
+- **Download as PDF** for your readers, when you turn it on.
+- **Discover**, where readers find and upvote pages.
+- **RSS** for your readers.
 
 New pages and blocks are published **Unlisted**: only people with the link can see them. The toast offers **Make
 listed** and **Make discoverable** right away, and **Add to collection…** when you're in a collection.
