@@ -11,7 +11,10 @@ import { getHashKey, savedHashKey } from "./state";
  */
 
 export type SealTarget = { scope: "graph" | "collection" | "publication" | "entry"; id: string; publicKey: string | null };
-export type SealPlan = { encrypt: false } | { encrypt: true; publicationId: string; locks: SealTarget[] };
+export type SealPlan = ({ encrypt: false } | { encrypt: true; publicationId: string; locks: SealTarget[] }) & {
+  /** Asked for Publish with encryption: why it can't be, or null. Missing from roam.pubs without it. */
+  encryptBlocked?: string | null;
+};
 export type Sealed = {
   publicationId: string;
   cipher: string;

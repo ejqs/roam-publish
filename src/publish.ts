@@ -325,14 +325,14 @@ const blocksWord = (n: number) => (n === 1 ? "1 block" : `${n} blocks`);
 const sameFolds = (a: string[], b: string[]) => a.length === b.length && a.every((u, i) => u === b[i]);
 
 /** The first publish of something with collapsed blocks: should they start collapsed on the website? */
-function askFirstFolds(uid: string, count: number, kind: "page" | "block", republish: boolean) {
+function askFirstFolds(uid: string, count: number, kind: "page" | "block", republish: boolean, encrypt?: boolean) {
   const verb = republish ? "Republish" : "Publish";
   toast(
     `${blocksWord(count)} on this ${kind} ${count === 1 ? "is" : "are"} collapsed in Roam. Should ${count === 1 ? "it" : "they"} start collapsed on the published ${kind} too? Readers can open and close blocks either way.`,
     {
       actions: [
-        { label: `${verb} as is (Collapsed)`, onClick: () => void publish(uid, { folds: "asIs" }) },
-        { label: `${verb} expanded`, onClick: () => void publish(uid, { folds: "expanded" }) },
+        { label: `${verb} as is (Collapsed)`, onClick: () => void publish(uid, { folds: "asIs", encrypt }) },
+        { label: `${verb} expanded`, onClick: () => void publish(uid, { folds: "expanded", encrypt }) },
       ],
       durationMs: 20000,
     },
@@ -374,16 +374,19 @@ type PublishResponse = {
  * page, whether it will be), with its keyed hash. Null to send it as before: not encrypted, or a
  * roam.pub from before encryption in Roam. "roamCantEncrypt" when it's a Password page but this Roam
  * has no X25519 (older desktop apps): it's sent as before, roam.pub encrypts it on arrival, and the
- * toast says so.
+ * toast says so. `encrypt`: Publish with encryption, refused (nothing sent) when roam.pub says it can't be.
  */
-async function sealFor(uid: string, payload: Payload) {
+async function sealFor(uid: string, payload: Payload, encrypt: boolean) {
   let plan: SealPlan;
   try {
-    plan = await api<SealPlan>(`/api/ext/publications/${encodeURIComponent(uid)}/seal`);
+    plan = await api<SealPlan>(`/api/ext/publications/${encodeURIComponent(uid)}/seal${encrypt ? "?encrypt=1" : ""}`);
   } catch (e) {
-    if (e instanceof ApiError && e.status === 404) return null;
+    if (e instanceof ApiError && e.status === 404 && !encrypt) return null;
+    if (e instanceof ApiError && e.status === 404) throw new ApiError(400, CANT_ENCRYPT_YET);
     throw e;
   }
+  if (encrypt && !("encryptBlocked" in plan)) throw new ApiError(400, CANT_ENCRYPT_YET);
+  if (encrypt && plan.encryptBlocked) throw new ApiError(400, plan.encryptBlocked);
   if (!plan.encrypt) return null;
   if (!(await canSeal())) return "roamCantEncrypt" as const;
   return {
@@ -392,6 +395,9 @@ async function sealFor(uid: string, payload: Payload) {
   };
 }
 
+/** roam.pub doesn't have Publish with encryption yet. */
+const CANT_ENCRYPT_YET = "roam.pub can't publish with encryption yet. Nothing was published; try again later.";
+
 /** Said after publishing a Password page that roam.pub had to encrypt, because this Roam can't. */
 const encryptedByRoamPub = (unchanged: boolean) =>
   ` ${unchanged ? "This Roam can't encrypt pages itself, so its text and title reached roam.pub to check that." : "roam.pub encrypted it, since this Roam can't encrypt pages itself, so its text and title reached roam.pub this time."} To encrypt in Roam, update Roam's desktop app or publish from roamresearch.com in a browser.`;
@@ -399,9 +405,13 @@ const encryptedByRoamPub = (unchanged: boolean) =>
 /**
  * Publishes or republishes. `folds` says which blocks start collapsed on the website (see Folds).
  * Without it, the user is asked when it matters: the first time something with collapsed blocks is
- * published, and when the blocks collapsed in Roam differ from the published page's.
+ * published, and when the blocks collapsed in Roam differ from the published page's. `encrypt`: Publish
+ * with encryption, for something not published yet: it goes to the graph as a Password page, encrypted.
  */
-export async function publish(uid: string, opts: { folds?: Folds; addedTo?: { name: string; entryUrl: string } } = {}) {
+export async function publish(
+  uid: string,
+  opts: { folds?: Folds; addedTo?: { name: string; entryUrl: string }; encrypt?: boolean } = {},
+) {
   if (publishing.has(uid)) return toast("Already publishing that. One moment…");
   publishing.add(uid);
   let link: Awaited<ReturnType<typeof ensureShortlinkBlock>> = null;
@@ -414,7 +424,7 @@ export async function publish(uid: string, opts: { folds?: Folds; addedTo?: { na
       const first = await serialize(uid, shortlinksOf(cache));
       const inRoam = first ? foldedUids(first.tree) : [];
       const kept = first && published ? foldedUids(refold(first.tree, new Set(published))) : [];
-      if (first && inRoam.length && !published) return askFirstFolds(uid, inRoam.length, first.kind, !!cache[uid]);
+      if (first && inRoam.length && !published) return askFirstFolds(uid, inRoam.length, first.kind, !!cache[uid], opts.encrypt);
       if (first && published && !sameFolds(inRoam, kept)) {
         // Nothing but collapsed blocks changed: there's only one thing to do.
         if ((await hashLike(cache[uid]?.hash, folded(first, "keep", published))) === cache[uid]?.hash)
@@ -445,7 +455,7 @@ export async function publish(uid: string, opts: { folds?: Folds; addedTo?: { na
     let roamCantEncrypt = false;
     const send = async (retry = true): Promise<PublishResponse> => {
       // Password pages are encrypted here, title included, so roam.pub only gets the cipher (see seal.ts).
-      const seal = await sealFor(uid, payload);
+      const seal = await sealFor(uid, payload, !!opts.encrypt);
       const sealed = seal === "roamCantEncrypt" ? null : seal;
       roamCantEncrypt = seal === "roamCantEncrypt";
       const body = sealed
@@ -459,6 +469,7 @@ export async function publish(uid: string, opts: { folds?: Folds; addedTo?: { na
             author,
             anchorUid: link?.anchorUid,
             timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            ...(opts.encrypt && { encrypt: true }),
           }),
         });
       } catch (e) {
@@ -492,6 +503,8 @@ export async function publish(uid: string, opts: { folds?: Folds; addedTo?: { na
         ? `${label} is already published with no changes.`
         : res.status === "updated"
           ? `${label} republished with your changes.${copiedNote}`
+          : opts.encrypt && res.encrypted
+            ? `${label} published with encryption: it opens with your graph password.${copiedNote}`
           : res.inGraph === false
             ? `${label} published to collections only.${copiedNote}`
             : unlisted
@@ -812,7 +825,10 @@ export async function publishStatus(uid: string) {
     const label = payload.kind === "page" ? "Page" : "Block";
     if (!c)
       return toast(`${label} isn't published.${offline}`, {
-        action: { label: `Publish ${payload.kind}`, onClick: () => void publish(uid) },
+        actions: [
+          { label: `Publish ${payload.kind}`, onClick: () => void publish(uid) },
+          { label: "Publish with encryption", onClick: () => void publish(uid, { encrypt: true }) },
+        ],
       });
     if (c.removed) return toast(`${label} was removed by a moderator.${offline}`, { intent: "danger", link: openLink(c) });
     // A page only in collections has no listing of its own: each collection lists it.

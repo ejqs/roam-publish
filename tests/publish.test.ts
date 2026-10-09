@@ -72,15 +72,15 @@ let roam: ReturnType<typeof fakeRoam>;
 
 /** A fake roam.pub: answers by method and path, records each call. */
 function server(routes: Record<string, (body: Record<string, unknown>) => [number, unknown]> = {}) {
-  const calls: { method: string; path: string; body: Record<string, unknown> }[] = [];
+  const calls: { method: string; path: string; search?: string; body: Record<string, unknown> }[] = [];
   globalThis.fetch = (async (url: string, init: RequestInit) => {
     const method = init.method ?? "GET";
-    const path = new URL(url).pathname;
+    const { pathname: path, search } = new URL(url);
     const body = JSON.parse((init.body as string) ?? "{}");
     const route = routes[`${method} ${path}`];
     // Asked before every publish; unless a test says otherwise, nothing is encrypted, and it isn't listed.
     if (!route && method === "GET" && path.endsWith("/seal")) return new Response(JSON.stringify({ encrypt: false }));
-    calls.push({ method, path, body });
+    calls.push({ method, path, ...(search && { search }), body });
     const [status, res] = route
       ? route(body)
       : [200, { status: "created", url: "https://roam.pub/g/x", contentHash: body.contentHash, visibility: "unlisted" }];
@@ -239,6 +239,52 @@ describe("encrypted in Roam", () => {
     await publish("page1");
     assert.deepEqual(calls.map((c) => c.method), ["GET", "POST", "GET", "POST"]);
     assert.match(toasts.at(-1)!, /republished/);
+  });
+});
+
+describe("Publish with encryption", () => {
+  const publicKey = generateKeyPairSync("x25519").publicKey.export({ type: "spki", format: "der" }).toString("base64url");
+  const plan = { encrypt: true, publicationId: "3f0c8a62-0a3e-4a43-9b38-6a1f1b0e7d11", locks: [{ scope: "graph", id: "g1", publicKey }], encryptBlocked: null };
+  const created = (body: Record<string, unknown>): [number, unknown] => [200, {
+    status: "created", url: "https://roam.pub/g/x", contentHash: body.contentHash, visibility: "unlisted", listing: "unlisted", encrypted: true,
+  }];
+  const unpublished = { "GET /api/ext/publications": (): [number, unknown] => [200, { publications: [] }] };
+
+  test("the pop-up for a page that isn't published offers it next to Publish", async () => {
+    settings.set("publications", {});
+    server(unpublished);
+    await publishStatus("page1");
+    assert.deepEqual(actions().map((b) => b.textContent), ["Publish page", "Publish with encryption"]);
+  });
+
+  test("asks roam.pub for it, encrypts in Roam and says it opens with the graph password", async () => {
+    settings.set("publications", {});
+    const calls = server({ "GET /api/ext/publications/page1/seal": () => [200, plan], "POST /api/ext/publications": created });
+    await publish("page1", { encrypt: true });
+    assert.equal(calls.find((c) => c.path.endsWith("/seal"))!.search, "?encrypt=1");
+    const post = calls.find((c) => c.method === "POST")!.body;
+    assert.equal(post.encrypt, true);
+    assert.ok(post.sealed);
+    assert.doesNotMatch(JSON.stringify(post), /hello/);
+    assert.match(toasts.at(-1)!, /published with encryption: it opens with your graph password/);
+  });
+
+  test("when roam.pub says it can't be, nothing is published and it says why", async () => {
+    settings.set("publications", {});
+    const calls = server({
+      "GET /api/ext/publications/page1/seal": () => [200, { encrypt: false, encryptBlocked: "First set a graph password." }],
+    });
+    await publish("page1", { encrypt: true });
+    assert.equal(calls.filter((c) => c.method === "POST").length, 0);
+    assert.match(toasts.at(-1)!, /First set a graph password/);
+  });
+
+  test("a roam.pub without it: nothing is published", async () => {
+    settings.set("publications", {});
+    const calls = server();
+    await publish("page1", { encrypt: true });
+    assert.equal(calls.filter((c) => c.method === "POST").length, 0);
+    assert.match(toasts.at(-1)!, /can't publish with encryption yet/);
   });
 });
 
