@@ -541,17 +541,19 @@ export async function publish(
   }
 }
 
-/** The website's words for where a page is listed. */
-const LISTING_LABEL: Record<Listing, string> = { unlisted: "unlisted", listed: "listed", discover: "discoverable" };
+/** The website's words for a page's visibility: the buttons, and what the status calls a page or block. */
+const MAKE: Record<Listing, string> = { unlisted: "Make unlisted", listed: "Make public", discover: "Put on Discover" };
+const statusLabel = (listing: Listing, kind: "page" | "block") =>
+  listing === "discover" ? `${kind} on Discover` : `${listing === "listed" ? "public" : "unlisted"} ${kind}`;
 
 const NOW: Record<Listing, string> = {
   unlisted: "Now unlisted: only people with the link can see it.",
-  listed: "Now listed on your graph's front page.",
-  discover: "Now discoverable: listed on your graph's front page and on Discover.",
+  listed: "Now public: on your graph's front page.",
+  discover: "Now on Discover and your graph's front page.",
 };
 
 /**
- * "Make …" buttons for every listing but the current one. Make discoverable only shows when the
+ * Buttons for every visibility but the current one. Put on Discover only shows when the
  * server says it can be (older servers don't say, so it never shows there). Taking a page off
  * Discover asks first, as the website does. None for a page only in collections: it has no graph
  * place to list, and each collection lists it its own way.
@@ -566,7 +568,7 @@ function listingActions(
   return (["listed", "discover", "unlisted"] as const)
     .filter((l) => l !== current && (l !== "discover" || discoverOk))
     .map((l) => ({
-      label: `Make ${LISTING_LABEL[l]}`,
+      label: MAKE[l],
       onClick: () => (current === "discover" && l !== "discover" ? confirmLeaveDiscover(uid, l) : void setListing(uid, l)),
     }));
 }
@@ -582,14 +584,14 @@ const OFF_DISCOVER: Record<Exclude<Listing, "discover">, string> = {
 /** Closes a confirm toast without doing anything (any button closes it). */
 const CANCEL = { label: "Cancel", onClick: () => {} };
 
-/** Asks before taking a Discoverable page off Discover, as the website does. */
+/** Asks before taking a page off Discover, as the website does. */
 export function confirmLeaveDiscover(uid: string, listing: Exclude<Listing, "discover">) {
   const title = getCache()[uid]?.title;
   toast(
     `Take ${title ? `“${title}”` : "this"} off roam.pub/discover? ${OFF_DISCOVER[listing]}`,
     {
       intent: "danger",
-      actions: [{ label: `Make ${LISTING_LABEL[listing]}`, onClick: () => void setListing(uid, listing) }, CANCEL],
+      actions: [{ label: MAKE[listing], onClick: () => void setListing(uid, listing) }, CANCEL],
       durationMs: 15000,
     },
   );
@@ -610,10 +612,10 @@ export async function setListing(uid: string, listing: Listing) {
       listedNote: res.listedNote, url: res.url,
     };
     if (next) await setCache({ ...cache, [uid]: next });
-    // Listed with the graph's front page off: nothing lists it, so don't say the front page does.
+    // Public with the graph's front page off: nothing lists it, so don't say the front page does.
     const now = listingOf(res);
     const note = now !== "unlisted" && res.listedNote;
-    toast(note ? `Now listed, but ${lowerFirst(note)}` : NOW[now], {
+    toast(note ? `Now public, but ${lowerFirst(note)}` : NOW[now], {
       intent: note ? "none" : "success",
       link: next ? openLink(next) : res.url,
       durationMs: note ? 15000 : undefined,
@@ -650,8 +652,8 @@ function startsAs(c: Pick<CollectionChoice, "listing" | "access">) {
     : c.access === "members"
       ? "members only"
       : c.listing === "discover"
-        ? "listed and on Discover"
-        : "listed";
+        ? "public and on Discover"
+        : "public";
 }
 
 /**
@@ -815,7 +817,7 @@ export async function unpublish(uid: string) {
  * Whether a page or block is published, and if so whether it changed in Roam since: refreshes the
  * published list from the server first (falling back to the cache offline), then hashes the
  * content the way publishing does. Offers what can be done next: publish, or republish, make
- * listed, discoverable or unlisted, and unpublish. Writes nothing to the graph by itself.
+ * public, on Discover or unlisted, and unpublish. Writes nothing to the graph by itself.
  */
 export async function publishStatus(uid: string) {
   try {
@@ -842,8 +844,8 @@ export async function publishStatus(uid: string) {
     if (c.removed) return toast(`${label} was removed by a moderator.${offline}`, { intent: "danger", link: openLink(c) });
     // A page only in collections has no listing of its own: each collection lists it.
     const onlyInCollections = c.inGraph === false;
-    // "Unlisted page", "Encrypted discoverable block", "Page in collections only".
-    const listed = onlyInCollections ? `${payload.kind} in collections only` : `${LISTING_LABEL[listingOf(c)]} ${payload.kind}`;
+    // "Unlisted page", "Encrypted public block", "Page on Discover", "Page in collections only".
+    const listed = onlyInCollections ? `${payload.kind} in collections only` : statusLabel(listingOf(c), payload.kind);
     const what = upperFirst(c.encrypted ? `encrypted ${listed}` : listed);
     if (c.mine === false)
       return toast(`${what}, published by another member of this graph. Only they or the graph's owner can change it.${offline}`, {
@@ -898,7 +900,7 @@ export async function publishStatus(uid: string) {
     const foldsNote = foldsDiffer ? ` Collapsed blocks differ from the published ${payload.kind}.` : "";
     // Roam's toasts can't grey a button out, so say why a Make … button isn't there.
     const blocked = onlyInCollections
-      ? " Each collection sets its listing."
+      ? " Each collection sets its visibility."
       : (listingOf(c) !== "unlisted" && c.listedNote ? ` ${c.listedNote}` : "") ||
         (c.discoverBlocked && listingOf(c) !== "discover" ? ` ${c.discoverBlocked}` : "");
     toast(
