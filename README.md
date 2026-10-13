@@ -6,7 +6,7 @@ Publish Roam Research pages and blocks to the web as clean, shareable pages on [
 
 - **Share it your way.** Every page has a **Visibility**: **Unlisted** so only people with the link can read it,
   **Public** on your graph's blog-style front page, or **Discover** on [Discover](https://roam.pub/discover) for
-  everyone on roam.pub to find. (The extension's buttons still call Public "listed" and Discover "discoverable".)
+  everyone on roam.pub to find.
 - **Lock it down.** Make a page **Password** or **Members**. Password pages can also be encrypted, and from
   Roam Publish 0.2.0 they're encrypted in Roam before they're sent, so roam.pub never sees their text or title.
 - **Publish together.** Collections gather pages from different graphs and people in one place.
@@ -57,10 +57,10 @@ dashboard** in the extension settings.
 - **RSS** for your readers.
 
 New pages and blocks are published **Unlisted**: only people with the link can see them. The toast offers **Make
-listed** and **Make discoverable** right away, and **Add to collection…** when you're in a collection.
+public** and **Put on Discover** right away, and **Add to collection…** when you're in a collection.
 
 **Add to collection…** lists your collections and how the page starts out in each one, using that collection's own
-defaults (listed, on Discover, password-protected or members only). When the collection is password-protected or
+defaults (public, on Discover, password-protected or members only). When the collection is password-protected or
 members only and the page is more open in your graph, or the collection takes the pages added to it out of their
 graph, adding it takes it out of your graph, so the graph link can't get around the collection's lock. Encrypted pages
 can be added too, with no password to type: Roam Publish adds the page and republishes it, so it opens in the
@@ -72,10 +72,10 @@ blocks collapsed in Roam aren't the ones collapsed on the published page, republ
 **Republish, keep open/collapsed** to update the content and leave the published page's blocks as they are. If only
 which blocks are collapsed changed, the status toast offers **Sync open/collapsed blocks** instead.
 
-Open the same menu again to check whether it's published and where it's listed, or to **Republish** after edits,
-change where it's listed (**Make listed**, **Make discoverable**, **Make unlisted**), **Add to collection…**, or
+Open the same menu again to check whether it's published and its visibility, or to **Republish** after edits,
+change its visibility (**Make public**, **Put on Discover**, **Make unlisted**), **Add to collection…**, or
 **Unpublish**. A page that's only in collections has no graph listing to change, so the toast says each of its
-collections sets how it's listed. A page can only be Discoverable when it's open to everyone, shown in your graph,
+collections sets its visibility. A page can only go on Discover when it's open to everyone, shown in your graph,
 and your graph's front page and search engines are on; otherwise the toast says what's stopping it. Unpublishing asks first: it deletes the page on roam.pub along with
 its access settings, passwords, views, upvotes and places in collections. On a shared graph, pages another member
 published show their status only; only they or the graph's owner can change them.

@@ -14,6 +14,9 @@ What's new shows it once Roam Depot serves it. Every bullet starts with **Breaki
   says so.
 
 ### Publishing
+- Improved: The extension uses roam.pub's words for a page's visibility. The buttons are **Make public**, **Put on
+  Discover** and **Make unlisted** (they were Make listed and Make discoverable), and the status says "Public page"
+  or "Page on Discover".
 - New: **Publish with encryption.** The status pop-up for a page or block that isn't published yet has a **Publish
   with encryption** button next to Publish, and the command palette has **Roam Publish: Publish current page with
   encryption** and **Publish focused block with encryption**. It publishes to your graph as a Password page,
@@ -29,7 +32,7 @@ What's new shows it once Roam Depot serves it. Every bullet starts with **Breaki
   this works from any computer.
 - Fixed: For a page that's only in collections, the status toast offered **Make listed** and **Make unlisted**,
   which did nothing, and called it unlisted. It now says the page is only in collections, where each collection sets
-  how it's listed.
+  its visibility.
 - Improved: The status toast is shorter and says when a page is encrypted, for example "Encrypted unlisted page, up
   to date. Last published Oct 8, 2026, 1:14 PM."
 - New: **Add to collection…** works for encrypted pages too, with no password to type. Roam Publish adds the page

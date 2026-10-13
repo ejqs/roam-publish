@@ -113,8 +113,8 @@ describe("publish", () => {
     await publish("page1");
     assert.deepEqual(calls.map((c) => c.method), ["POST"]);
     assert.match(toasts.at(-1)!, /published as unlisted/);
-    // An older server doesn't say whether it can be Discoverable, so only Make listed is offered.
-    assert.deepEqual(actions().map((b) => b.textContent), ["Make listed"]);
+    // An older server doesn't say whether it can go on Discover, so only Make public is offered.
+    assert.deepEqual(actions().map((b) => b.textContent), ["Make public"]);
     // No clipboard here, so it doesn't claim the link was copied.
     assert.doesNotMatch(toasts.at(-1)!, /Link copied/);
   });
@@ -481,7 +481,7 @@ describe("add to collection", () => {
     const options = (sel.children as El[]).slice(1).map((o) => [o.textContent, !!o.disabled]);
     assert.deepEqual(options, [
       ["Writing (already there)", true],
-      ["Best of: listed and on Discover", false],
+      ["Best of: public and on Discover", false],
       ["Private: password-protected, leaves your graph", false],
     ]);
     sel.value = "c3";
@@ -492,7 +492,7 @@ describe("add to collection", () => {
     assert.equal((settings.get("publications") as Record<string, { url: string }>).page1.url, "https://roam.pub/c/bbb");
   });
 
-  test("a new page that went only to collections isn't called unlisted or offered Make listed", async () => {
+  test("a new page that went only to collections isn't called unlisted or offered Make public", async () => {
     server({ "POST /api/ext/publications": (b) => [200, { status: "created", url: "https://roam.pub/c/aaa", contentHash: b.contentHash, visibility: "unlisted", listing: "unlisted", inGraph: false, encrypted: true, collections: 2 }] });
     await publish("page1");
     assert.match(toasts.at(-1)!, /^Page published to collections only\./);
@@ -635,20 +635,21 @@ describe("status", () => {
     });
     await publishStatus("page1");
     assert.match(toasts.at(-1)!, /^Unlisted page, /);
-    assert.deepEqual(labels().filter((l) => l?.startsWith("Make")), ["Make listed", "Make discoverable"]);
-    button("Make discoverable")!.click!();
+    assert.deepEqual(labels().filter((l) => /^(Make|Put)/.test(l ?? "")), ["Make public", "Put on Discover"]);
+    button("Put on Discover")!.click!();
     await new Promise((r) => setImmediate(r));
     assert.deepEqual(calls.at(-1)!.body, { listing: "discover" });
-    assert.match(toasts.at(-1)!, /Now discoverable/);
+    assert.match(toasts.at(-1)!, /Now on Discover/);
   });
 
-  test("asks before taking a Discoverable page off Discover", async () => {
+  test("asks before taking a page off Discover", async () => {
     const calls = server({
       ...remote({ visibility: "public", listing: "discover", discoverBlocked: null }),
       "PATCH /api/ext/publications/page1": (b) => [200, { visibility: "public", listing: b.listing, discoverBlocked: null, url: "https://roam.pub/g/x" }],
     });
     await publishStatus("page1");
-    assert.deepEqual(labels().filter((l) => l?.startsWith("Make")), ["Make listed", "Make unlisted"]);
+    assert.match(toasts.at(-1)!, /^Page on Discover, /);
+    assert.deepEqual(labels().filter((l) => l?.startsWith("Make")), ["Make public", "Make unlisted"]);
     const before = calls.length;
     button("Make unlisted")!.click!();
     await new Promise((r) => setImmediate(r));
@@ -664,10 +665,10 @@ describe("status", () => {
     assert.match(toasts.at(-1)!, /Now unlisted/);
   });
 
-  test("leaves out Make discoverable and says why when it can't be", async () => {
+  test("leaves out Put on Discover and says why when it can't be", async () => {
     server(remote({ visibility: "public", listing: "listed", discoverBlocked: "Turn on search engines in Sharing to make pages Discoverable." }));
     await publishStatus("page1");
-    assert.match(toasts.at(-1)!, /^Listed page, .*Turn on search engines/);
+    assert.match(toasts.at(-1)!, /^Public page, .*Turn on search engines/);
     assert.deepEqual(labels().filter((l) => l?.startsWith("Make")), ["Make unlisted"]);
   });
 
@@ -678,19 +679,19 @@ describe("status", () => {
       "PATCH /api/ext/publications/page1": (b) => [200, { visibility: "public", listing: b.listing, discoverBlocked: null, listedNote: note, url: "https://roam.pub/g/x" }],
     });
     await publishStatus("page1");
-    button("Make listed")!.click!();
+    button("Make public")!.click!();
     await new Promise((r) => setImmediate(r));
-    assert.match(toasts.at(-1)!, /^Now listed, but your graph's front page is off/);
+    assert.match(toasts.at(-1)!, /^Now public, but your graph's front page is off/);
     assert.doesNotMatch(toasts.at(-1)!, /on your graph's front page/);
   });
 
-  test("the status of a listed page says when nothing lists it", async () => {
+  test("the status of a public page says when nothing lists it", async () => {
     server(remote({ visibility: "public", listing: "listed", discoverBlocked: "x", listedNote: "Your graph's front page is off." }));
     await publishStatus("page1");
-    assert.match(toasts.at(-1)!, /^Listed page, .*front page is off/);
+    assert.match(toasts.at(-1)!, /^Public page, .*front page is off/);
   });
 
-  test("a page only in collections offers no Make … buttons and says where it's listed", async () => {
+  test("a page only in collections offers no Make … buttons and says each collection sets its visibility", async () => {
     server({
       "GET /api/ext/publications": () => [200, {
         collections: 2,
@@ -701,7 +702,7 @@ describe("status", () => {
     });
     await publishStatus("page1");
     assert.match(toasts.at(-1)!, /^Page in collections only, /);
-    assert.match(toasts.at(-1)!, /Each collection sets its listing\./);
+    assert.match(toasts.at(-1)!, /Each collection sets its visibility\./);
     assert.doesNotMatch(toasts.at(-1)!, /unlisted|Discoverable/);
     assert.deepEqual(labels().filter((l) => l !== "Republish"), ["Add to collection…", "Unpublish"]);
   });
@@ -722,7 +723,7 @@ describe("status", () => {
   test("an older server that only says public still gets the new words", async () => {
     server(remote({ visibility: "public" }));
     await publishStatus("page1");
-    assert.match(toasts.at(-1)!, /^Listed page, /);
+    assert.match(toasts.at(-1)!, /^Public page, /);
     assert.deepEqual(labels().filter((l) => l?.startsWith("Make")), ["Make unlisted"]);
   });
 });
