@@ -4,7 +4,7 @@ All notable changes to the Roam Publish extension. Each version is dated when it
 What's new shows it once Roam Depot serves it. Every bullet starts with **Breaking:**, **New:**, **Improved:** or
 **Fixed:**; a breaking change comes with a new major version.
 
-## 0.2.0 (2026-10-09)
+## 0.2.0 (2026-10-13)
 
 ### Security
 - New: **Password pages are encrypted in Roam before they're published, title included.** roam.pub only gets the
