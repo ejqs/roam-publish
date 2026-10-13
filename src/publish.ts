@@ -3,7 +3,6 @@ import { foldedUids, hashPayload, isShortlinkText, type Payload, refold, seriali
 import {
   getApiKey,
   getAuthor,
-  getShortlinkText,
   getServer,
   getCache,
   getShortlinkEnabled,
@@ -11,6 +10,7 @@ import {
   getShortlinkPosition,
   getShortlinkTag,
   setCache,
+  SHORTLINK_TEXT,
   type CachedPublication,
   type Listing,
   listingOf,
@@ -158,11 +158,6 @@ async function confirmOnce() {
   warnIfBroken(res.changeLog);
 }
 
-/** Opens the graph's change log settings on the website, where its owner can check and change it. */
-export function openChangeLogSettings() {
-  window.open(changeLogSettings(), "_blank", "noopener");
-}
-
 /** Re-download the list of published items from the server into the cache. */
 export async function syncPublications(opts: { quiet?: boolean } = {}) {
   const { publications, changeLog, collections } = await api<{
@@ -211,22 +206,19 @@ const openLink = (c: CachedPublication) => ((c.places ?? 1) > 1 && c.shortUrl) |
 
 const shortIdOf = (shortUrl: string | null | undefined) => shortUrl?.split("/p/")[1];
 
-/** The link block's text: `[{text}]({shortUrl})`, or the bare link when the text setting is blank. */
-const linkText = (shortUrl: string) => {
-  const text = getShortlinkText();
-  return text ? `[${text.replace(/[[\]]/g, "")}](${shortUrl})` : shortUrl;
-};
+/** The link block's text. Blocks written by earlier versions with other text are rewritten to it on the next publish. */
+const linkText = (shortUrl: string) => `[${SHORTLINK_TEXT}](${shortUrl})`;
 
 /**
  * The page's status link, written in Roam first or last under the root as
  *
- *   {tag}                          ← Shortlink tag setting, [[Roam Publish]] by default
- *     [{text}]({shortUrl})         ← Shortlink text setting, "Roam Publish Status" by default
+ *   {tag}                          ← Block tag setting, [[Roam Publish]] by default
+ *     [Roam Publish Status]({shortUrl})
  *       [[October 2nd, 2026]] …    ← the server appends change log entries here
  *
- * Written before publishing so the server learns the link block's uid with the publish. A tag or
- * text changed in settings is applied in place on the next publish, so the entries stay put. Pages
- * from earlier builds have a separate "Changelog" block under the tag; new entries go under the
+ * Written before publishing so the server learns the link block's uid with the publish. A tag changed
+ * in settings, or link text an earlier version wrote, is replaced in place on the next publish, so the
+ * entries stay put. Pages from earlier builds have a separate "Changelog" block under the tag; new entries go under the
  * link block from then on, and the old block keeps what's already in it. The existing block is the
  * one holding the recorded Changelog block, or failing that one whose text is the tag: a status link
  * pasted under an ordinary block is never mistaken for it (and its text never replaced). `created`

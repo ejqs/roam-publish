@@ -24,7 +24,7 @@ Roam Publish server. For how the extension and server fit together, see
    (Roam: Settings → Graph → API tokens). Use a graph you own. roam.pub adds a block to today's daily note
    (`roam.pub connected this graph (safe to delete)`), which you can delete afterwards.
 3. In Roam, open **Settings → Roam Publish** and click **Open dashboard**, which opens your API keys. Copy the key from the website and paste it into
-   **API key**.
+   **API key**; the extension says which graph it works for.
 
 > [!WARNING]
 > Verifying a graph may leave behind an `[[API Token: …]]` page in your graph that can't be deleted. Roam creates it
@@ -122,27 +122,22 @@ check references, embeds and children first. Nothing else from your graph is sen
 
 | Setting | What it does |
 | --- | --- |
-| **Dashboard** | Opens the roam.pub dashboard, at your API keys until you've added one. |
-| **API key** | Your key for this graph (see Setup). |
-| **Author name** | Shown on your pages when authors are shown. Blank: your @username. |
-| **Add Roam Publish block when publishing pages** | On by default. Off: nothing is written into your pages. roam.pub still keeps each page's status link and history. |
-| **Add Roam Publish block when publishing blocks** | Off by default. On: the same, under each block you publish. Separate from the pages setting. |
+| **Dashboard** | Opens the roam.pub dashboard, at your API keys until you've added one. API keys, access, passwords, collections, members and the change log are managed there. |
+| **API key** | Your key for this graph (see Setup). Pasting it checks it at once and says which graph it works for. |
+| **Author name** | Your byline on pages that show authors. Blank: your @username. |
+| **Roam Publish block** | Where the block with the status link is added: **Pages** (default), **Pages and blocks**, **Blocks only** or **Off**. Off: nothing is written into your pages; roam.pub still keeps each page's status link and history. |
+| **Block position** | **First** or **Last** under the page or block. |
 | **Block tag** | The block's text. Default `[[Roam Publish]]` (graphs set up before this keep `#published`). Blank: no tag. |
-| **Status link text** | Written as `[text](link)`. Default `Roam Publish Status`. Blank: bare link. |
-| **Block position** | First or last on the page, or under the block. |
-| **Change log** | On roam.pub: turn it on or off, check it works, and manage its token. |
-| **Sync published list** | Updates the extension's list of what you've published from roam.pub. Use it if a status looks wrong, e.g. after unpublishing on the website. The **Page…** and **Block…** menus already do this. |
-| **Server URL** | Advanced. Defaults to `https://roam.pub`. Must use `https://` (or `http://localhost` for development), so your key is never sent unencrypted. |
-| **Reset Roam Publish block settings** | Restores the defaults of the Roam Publish block settings. Reinstalling doesn't, since Roam keeps settings. |
 
-Changing the tag or the link text edits existing blocks in place the next time you publish them.
+Changing the tag edits existing blocks in place the next time you publish them. The status link always reads
+`Roam Publish Status`.
 
 ## Privacy and safety
 
 - **Only on your action:** nothing leaves Roam until you publish a page or block. No analytics, and the only server
-  contacted is roam.pub (or your configured Server URL).
+  contacted is roam.pub.
 - **One background request:** while Roam is open, about every 5 minutes, the extension tells roam.pub which status link
-  blocks still exist (uids only, no text). Turning off **Add Roam Publish block when publishing pages** (and **…blocks**) stops it. See
+  blocks still exist (uids only, no text). Setting **Roam Publish block** to **Off** stops it. See
   [Use of the Append API](#use-of-the-append-api).
 - **Written to your graph:** the Roam Publish block when you publish, and change log entries if you kept an
   append-only token. Nothing else.
@@ -167,7 +162,7 @@ token can only add blocks to its own graph. It can't read, edit, move or delete 
   something happens to it (published, listed, access changed, unpublished, and so on), including changes made
   on the website. Entries hold the date, time, what happened and links, never page content.
 - **Your token:** entered on the website only, stored encrypted, never shown again. Pause the change log or remove the
-  token in the graph's settings on roam.pub (**Change log → Open settings** in the extension), or revoke it in Roam.
+  token in the graph's settings on roam.pub (**Open dashboard** in the extension's settings), or revoke it in Roam.
 
 The status link (`roam.pub/p/…`) shows you and your graph's members where a page is published. **Don't share it:**
 anyone else is asked to log in or gets a "not found" page. Share the page's graph or collection link instead.

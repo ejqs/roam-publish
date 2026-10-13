@@ -4,9 +4,9 @@ import { api, ApiError, MIN_VERSION_HEADER, olderThan, updateNotice } from "../s
 import { initState } from "../src/state";
 
 /** Settings the extension reads through Roam Depot's extensionAPI. */
-const settings = new Map<string, unknown>([["api-key", "rp_test"], ["server-url", "https://srv.example/"]]);
+const settings = new Map<string, unknown>([["api-key", "rp_test"]]);
 const extensionAPI = { settings: { get: (k: string) => settings.get(k) ?? null, set: async (k: string, v: unknown) => void settings.set(k, v) } };
-(globalThis as unknown as { __DEFAULT_SERVER__: string }).__DEFAULT_SERVER__ = "https://roam.pub";
+(globalThis as unknown as { __DEFAULT_SERVER__: string }).__DEFAULT_SERVER__ = "https://srv.example/";
 
 initState(extensionAPI as never);
 
@@ -25,6 +25,12 @@ describe("api", () => {
     await api("/api/ext/publications");
     assert.equal(calls[0].url, "https://srv.example/api/ext/publications");
     assert.equal(calls[0].headers["x-api-key"], "rp_test");
+  });
+
+  test("checks a key being typed in settings before it's the saved one", async () => {
+    const calls = respond(200, {});
+    await api("/api/ext/changelog", { key: "rp_new" });
+    assert.equal(calls[0].headers["x-api-key"], "rp_new");
   });
 
   test("names the Roam graph it's in, so the server can refuse another graph's key", async () => {
@@ -111,13 +117,14 @@ describe("api", () => {
 
   test("the key is never sent over plain http, except to this machine", async () => {
     const calls = respond(200, {});
-    settings.set("server-url", "http://srv.example");
+    const build = globalThis as unknown as { __DEFAULT_SERVER__: string };
+    build.__DEFAULT_SERVER__ = "http://srv.example";
     await assert.rejects(api("/x"), /must start with https/);
     assert.equal(calls.length, 0);
-    settings.set("server-url", "http://localhost:3000");
+    build.__DEFAULT_SERVER__ = "http://localhost:3000";
     await api("/x");
     assert.equal(calls.length, 1);
-    settings.set("server-url", "https://srv.example/");
+    build.__DEFAULT_SERVER__ = "https://srv.example/";
   });
 
   test("a server that never answers times out with a friendly error", async () => {

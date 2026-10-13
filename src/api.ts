@@ -48,7 +48,8 @@ export function checkMinVersion(min: string | null) {
   );
 }
 
-export async function api<T>(path: string, init: RequestInit & { auth?: boolean } = {}): Promise<T> {
+/** `key` checks a key before it's saved (the settings panel); otherwise the saved one is sent. */
+export async function api<T>(path: string, { auth, key: keyToCheck, ...init }: RequestInit & { auth?: boolean; key?: string } = {}): Promise<T> {
   const headers: Record<string, string> = { "content-type": "application/json" };
   // Lets roam.pub see which versions are still in use, so it knows when an older API can be retired.
   if (typeof __VERSION__ === "string") headers["x-roam-publish-version"] = __VERSION__;
@@ -56,10 +57,9 @@ export async function api<T>(path: string, init: RequestInit & { auth?: boolean 
   // roam.pub only requires it once everyone can.
   headers["x-roam-publish-can-seal"] = (await canSeal()) ? "1" : "0";
   const server = getServer();
-  if (!isSafeServer(server))
-    throw new ApiError(-1, `The Server URL must start with https:// (it's ${server}). Settings → Roam Publish → Server URL.`);
-  if (init.auth !== false) {
-    const key = getApiKey();
+  if (!isSafeServer(server)) throw new ApiError(-1, `This build's server must start with https:// (it's ${server}).`);
+  if (auth !== false) {
+    const key = keyToCheck ?? getApiKey();
     // Not 0: that means the server couldn't be reached, and the status menu falls back to the last sync then.
     if (!key) throw new ApiError(-1, "Add your API key first: Settings → Roam Publish → Open dashboard.");
     headers["x-api-key"] = key;

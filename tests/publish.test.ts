@@ -12,7 +12,7 @@ import {
 } from "../src/publish";
 import { recheckCanSeal } from "../src/seal";
 import { hashPayload, serialize } from "../src/serialize";
-import { initState, resetShortlinkSettings, withoutUndefined } from "../src/state";
+import { getShortlinkEnabled, getShortlinkOnBlocks, getShortlinkPosition, initState, withoutUndefined } from "../src/state";
 import { fakeRoam } from "./fake-roam";
 
 (globalThis as unknown as { __DEFAULT_SERVER__: string }).__DEFAULT_SERVER__ = "https://roam.pub";
@@ -412,17 +412,34 @@ describe("saved settings", () => {
     });
   });
 
-  test("first-time setup saves the defaults, and resetting saves them again", async () => {
+  test("first-time setup saves the defaults, so the settings panel shows them", () => {
     settings.clear();
     initState({ settings: { get: (k: string) => settings.get(k) ?? null, set: refusingSet } } as never);
-    // A new graph gets the defaults saved, so the settings panel shows them.
-    assert.equal(settings.get("shortlink-enabled"), true);
-    assert.equal(settings.get("shortlink-position"), "top");
-    settings.set("shortlink-tag", "#mine");
-    await resetShortlinkSettings();
+    assert.equal(settings.get("shortlink-add"), "Pages");
+    assert.equal(settings.get("shortlink-position"), "First");
     assert.equal(settings.get("shortlink-tag"), "[[Roam Publish]]");
   });
 
+  test("the two Roam Publish block switches and top/bottom carry over", () => {
+    const cases: [boolean | null, boolean | null, string][] = [
+      [null, null, "Pages"],
+      [true, true, "Pages and blocks"],
+      [false, true, "Blocks only"],
+      [false, false, "Off"],
+    ];
+    for (const [pages, blocks, choice] of cases) {
+      settings.clear();
+      if (pages != null) settings.set("shortlink-enabled", pages);
+      if (blocks != null) settings.set("shortlink-blocks", blocks);
+      settings.set("shortlink-position", "bottom");
+      initState({ settings: { get: (k: string) => settings.get(k) ?? null, set: refusingSet } } as never);
+      assert.equal(settings.get("shortlink-add"), choice);
+      assert.equal(getShortlinkEnabled(), pages !== false);
+      assert.equal(getShortlinkOnBlocks(), blocks === true);
+      assert.equal(settings.get("shortlink-position"), "Last");
+      assert.equal(getShortlinkPosition(), "bottom");
+    }
+  });
 
   test("saves pages with no byline and fields an older server leaves out", async () => {
     // Roam refuses settings holding undefined, which once failed every sync of a page published without an author.
