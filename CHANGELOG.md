@@ -43,13 +43,17 @@ What's new shows it once Roam Depot serves it. Every bullet starts with **Breaki
 ### Setup and settings
 - New: **Collapsed blocks** setting: **As in Roam** (the default) or **Expanded**, for how blocks collapsed in Roam
   start out the first time you publish.
-- Improved: Fewer settings up front. **Add Roam Publish block when publishing blocks**, the block's tag, link text
-  and position, **Sync published list**, **Server URL** and the reset button are now named **Advanced: …** and
-  listed last. Your settings are kept.
 - Improved: The extension's description lists roam.pub's main features, including end-to-end encryption and
   Download as PDF, in fewer words.
 - New: When roam.pub changes in a way that needs a newer Roam Publish, the extension says so and tells you where to
   update it, instead of failing with a confusing error.
+- Improved: **Fewer settings.** Change log, Sync published list, Status link text, Server URL and Reset Roam Publish
+  block settings are gone. The change log is managed from **Open dashboard**, the **Page…** and **Block…** menus
+  already sync, and the status link always reads "Roam Publish Status" (a link with other text gets it the next time
+  you publish that page). Your other choices carry over.
+- New: Pasting an **API key** checks it at once: the extension says which graph it works for, or what's wrong.
+- Improved: **Roam Publish block** is one setting: **Pages**, **Pages and blocks**, **Blocks only** or **Off**. It
+  replaces the two switches. **Block position** reads **First** or **Last**.
 
 ## 0.1.1 (2026-10-07)
 

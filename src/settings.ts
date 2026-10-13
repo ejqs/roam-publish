@@ -1,6 +1,31 @@
-import { COLLAPSED_AS_IN_ROAM, COLLAPSED_EXPANDED, getApiKey, getServer, resetShortlinkSettings } from "./state";
-import { openChangeLogSettings, syncPublications } from "./publish";
+import { api } from "./api";
+import { BLOCK_CHOICES, COLLAPSED_AS_IN_ROAM, COLLAPSED_EXPANDED, getApiKey, getServer, saveLegacyBlockSwitches } from "./state";
 import { toast } from "./toast";
+
+/** Roam saves the key and calls onChange on every keystroke; the check waits until typing stops. */
+const KEY_CHECK_DELAY_MS = 800;
+let keyCheck: ReturnType<typeof setTimeout> | undefined;
+
+/** Says at once whether a pasted key works for this graph, instead of at the first publish. */
+export function checkKeySoon(value: string) {
+  clearTimeout(keyCheck);
+  const key = value.trim();
+  if (!key) return;
+  keyCheck = setTimeout(() => void checkKey(key), KEY_CHECK_DELAY_MS);
+}
+
+async function checkKey(key: string) {
+  if (!key.startsWith("rp_")) {
+    toast("API keys start with rp_. Copy the key from API keys on the dashboard.", { intent: "danger" });
+    return;
+  }
+  try {
+    const { graphName } = await api<{ graphName?: string }>("/api/ext/changelog", { key });
+    toast(graphName ? `API key works for ${graphName}.` : "API key works.", { intent: "success" });
+  } catch (e) {
+    toast((e as Error).message, { intent: "danger" });
+  }
+}
 
 export function createSettingsPanel(extensionAPI: ExtensionAPI) {
   extensionAPI.settings.panel.create({
@@ -9,8 +34,7 @@ export function createSettingsPanel(extensionAPI: ExtensionAPI) {
       {
         id: "dashboard",
         name: "Dashboard",
-        description:
-          "On roam.pub: get this graph's API key (opens there until you add one below), and manage access, passwords, collections and members.",
+        description: "On roam.pub: API keys, access, passwords, collections, members and the change log.",
         action: {
           type: "button",
           content: "Open dashboard",
@@ -21,21 +45,18 @@ export function createSettingsPanel(extensionAPI: ExtensionAPI) {
       {
         id: "api-key",
         name: "API key",
-        description: "This graph's key. Keep it secret.",
-        action: { type: "input", placeholder: "rp_…" },
+        description: "This graph's key, from API keys on the dashboard. Keep it secret.",
+        action: {
+          type: "input",
+          placeholder: "rp_…",
+          onChange: (e) => checkKeySoon((e.target as HTMLInputElement | null)?.value ?? ""),
+        },
       },
       {
         id: "author-name",
         name: "Author name",
-        description: "Shown on your pages when authors are shown. Blank: your @username.",
+        description: "Your byline on pages that show authors. Blank: your @username.",
         action: { type: "input", placeholder: "Your name" },
-      },
-      {
-        id: "shortlink-enabled",
-        name: "Add Roam Publish block when publishing pages",
-        description:
-          "Adds a block with the page's status link and change log. The link is for you and your graph's members, not for sharing. The block itself is never published.",
-        action: { type: "switch" },
       },
       {
         id: "collapsed-blocks",
@@ -45,79 +66,23 @@ export function createSettingsPanel(extensionAPI: ExtensionAPI) {
         action: { type: "select", items: [COLLAPSED_AS_IN_ROAM, COLLAPSED_EXPANDED] },
       },
       {
-        id: "change-log",
-        name: "Change log",
+        id: "shortlink-add",
+        name: "Roam Publish block",
         description:
-          "On roam.pub: turn it on or off, check it works, and manage its token.",
-        action: { type: "button", content: "Open settings", onClick: openChangeLogSettings },
-      },
-      {
-        id: "shortlink-blocks",
-        name: "Advanced: Add Roam Publish block when publishing blocks",
-        description: "Adds the Roam Publish block under each block you publish.",
-        action: { type: "switch" },
-      },
-      {
-        id: "shortlink-tag",
-        name: "Advanced: Roam Publish block tag",
-        description:
-          "The block's text. Starts as [[Roam Publish]]. Blank: no tag. Existing blocks update when you next publish them.",
-        action: { type: "input", placeholder: "(blank: no tag)" },
-      },
-      {
-        id: "shortlink-text",
-        name: "Advanced: Status link text",
-        description:
-          "Written as [text](roam.pub/p/…). Starts as Roam Publish Status. Blank: bare link. Existing blocks update when you next publish them.",
-        action: { type: "input", placeholder: "(blank: bare link)" },
+          "A block with the status link, where roam.pub writes the change log. For you and your graph's members; never published.",
+        action: { type: "select", items: [...BLOCK_CHOICES], onChange: (choice) => void saveLegacyBlockSwitches(choice) },
       },
       {
         id: "shortlink-position",
-        name: "Advanced: Roam Publish block position",
-        description: "First or last on the page, or under the block.",
-        action: { type: "select", items: ["top", "bottom"] },
+        name: "Block position",
+        description: "First or last under the page or block.",
+        action: { type: "select", items: ["First", "Last"] },
       },
       {
-        id: "sync",
-        name: "Advanced: Sync published list",
-        description: "Updates the extension's list of what you've published from roam.pub. Use it if a status looks wrong; the Page… and Block… menus already do this.",
-        action: {
-          type: "button",
-          content: "Sync",
-          onClick: () => void syncPublications().catch((e: Error) => toast(e.message, { intent: "danger" })),
-        },
-      },
-      {
-        id: "server-url",
-        name: "Advanced: Server URL",
-        description: "Blank: the default server. Must start with https://.",
-        action: { type: "input", placeholder: __DEFAULT_SERVER__ },
-      },
-      {
-        id: "shortlink-reset",
-        name: "Advanced: Reset Roam Publish block settings",
-        description:
-          "Restores the defaults of the Roam Publish block settings. Reinstalling doesn't, since Roam keeps settings.",
-        action: {
-          type: "button",
-          content: "Reset",
-          // Asks first: it overwrites the tag, link text and position you set.
-          onClick: () =>
-            toast("Reset the Roam Publish block settings to their defaults? Your tag, link text and position are replaced.", {
-              intent: "danger",
-              actions: [
-                {
-                  label: "Reset",
-                  onClick: () =>
-                    void resetShortlinkSettings()
-                      .then(() => toast("Defaults restored. Close and reopen settings to see them."))
-                      .catch((e: Error) => toast(e.message, { intent: "danger" })),
-                },
-                { label: "Cancel", onClick: () => {} },
-              ],
-              durationMs: 15000,
-            }),
-        },
+        id: "shortlink-tag",
+        name: "Block tag",
+        description: "The block's text. Blank: no tag. Existing blocks update when next published.",
+        action: { type: "input", placeholder: "No tag" },
       },
     ],
   });
