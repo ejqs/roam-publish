@@ -1,7 +1,11 @@
 name: Release
 
-# Push a tag like v0.1.0 to publish a GitHub Release with the matching CHANGELOG.md notes.
-# Roam Depot still needs its source_commit bumped to the released commit.
+# Push a tag like v0.1.0 on a commit in main to publish a GitHub Release with the matching CHANGELOG.md notes,
+# and open the "Roam Publish v0.1.0" pull request to Roam-Research/roam-depot that pins that commit as its
+# source_commit. Moving the tag to another commit (delete it, push it again) re-pins that pull request, still as one
+# commit, while it's open. Opening that PR needs the ROAM_DEPOT_TOKEN secret: a classic token of EJ's with
+# `public_repo`, which can push to ejqs/roam-depot and open pull requests on Roam-Research/roam-depot. Without it, that
+# job only says so.
 on:
   push:
     tags: ["v*"]
@@ -9,11 +13,24 @@ on:
 permissions:
   contents: write
 
+# Moving a tag quickly (delete, push again) would otherwise race two runs force-pushing the same Roam Depot branch.
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: true
+
 jobs:
   release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: The tagged commit must be on main
+        # Roam Depot builds whatever commit it's pinned to; only main's are released, not even as a GitHub Release.
+        run: |
+          git fetch origin main
+          git merge-base --is-ancestor HEAD origin/main \
+            || { echo "::error::$GITHUB_REF_NAME ($(git rev-parse HEAD)) isn't on main, so it isn't released."; exit 1; }
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -39,4 +56,72 @@ jobs:
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file notes.md --verify-tag
+        # A moved tag (deleted and pushed again on a new commit) runs this again. Deleting the tag turns its Release
+        # into a draft, so it's published again with fresh notes.
+        run: |
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            gh release edit "$GITHUB_REF_NAME" --draft=false --notes-file notes.md
+          else
+            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file notes.md --verify-tag
+          fi
+
+  roam-depot:
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      TOKEN: ${{ secrets.ROAM_DEPOT_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: The tag must still be on this commit
+        # Re-running an old run after the tag moved would pin the old commit again. HEAD is the commit itself, also
+        # for an annotated tag, whose own object id is never what Roam Depot should pin.
+        run: |
+          commit=$(git rev-parse HEAD)
+          git fetch --force origin "refs/tags/$GITHUB_REF_NAME:refs/tags/$GITHUB_REF_NAME" \
+            || { echo "::error::$GITHUB_REF_NAME was deleted, so it isn't sent to Roam Depot."; exit 1; }
+          test "$(git rev-parse "refs/tags/$GITHUB_REF_NAME^{commit}")" = "$commit" \
+            || { echo "::error::$GITHUB_REF_NAME has moved off $commit; the run for its new commit pins that one."; exit 1; }
+          echo "COMMIT=$commit" >> "$GITHUB_ENV"
+      - name: Release notes
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          {
+            echo "Updates Roam Publish to $version: \`source_commit\` is $COMMIT, tagged $GITHUB_REF_NAME on ejqs/roam-publish main."
+            echo
+            echo "Release notes: https://github.com/$GITHUB_REPOSITORY/releases/tag/$GITHUB_REF_NAME"
+            echo
+            awk -v v="$version" '
+              $0 ~ "^## " v "( |$)" { on = 1; next }
+              /^## / { on = 0 }
+              on
+            ' CHANGELOG.md
+          } > "$RUNNER_TEMP/body.md"
+      - name: Open the Roam Depot pull request
+        env:
+          GH_TOKEN: ${{ secrets.ROAM_DEPOT_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "::warning::No ROAM_DEPOT_TOKEN secret, so no Roam Depot pull request. Pin $COMMIT in Roam-Research/roam-depot by hand."
+            exit 0
+          fi
+          branch="roam-publish-$GITHUB_REF_NAME"
+          # Always one commit on Roam Depot's current main that changes only source_commit. A moved tag rebuilds it
+          # and force-pushes it over the open pull request's branch, so that pull request still has just one commit.
+          git clone https://github.com/Roam-Research/roam-depot.git "$RUNNER_TEMP/depot"
+          cd "$RUNNER_TEMP/depot"
+          file=extensions/ejqs/roam-publish.json
+          sed -i -E "s/(\"source_commit\": *\")[0-9a-f]{40}\"/\1$COMMIT\"/" "$file"
+          grep -q "\"source_commit\": *\"$COMMIT\"" "$file" || { echo "::error::Couldn't set source_commit in $file"; exit 1; }
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -am "Roam Publish $GITHUB_REF_NAME"
+          git push --force "https://x-access-token:$TOKEN@github.com/ejqs/roam-depot.git" "HEAD:refs/heads/$branch"
+          open=$(gh pr list --repo Roam-Research/roam-depot --head "$branch" --state open --json number --jq '.[].number')
+          if [ -n "$open" ]; then
+            gh pr edit "$open" --repo Roam-Research/roam-depot --body-file "$RUNNER_TEMP/body.md"
+            echo "Updated Roam-Research/roam-depot#$open to $COMMIT."
+          else
+            gh pr create --repo Roam-Research/roam-depot --base main --head "ejqs:$branch" \
+              --title "Roam Publish $GITHUB_REF_NAME" --body-file "$RUNNER_TEMP/body.md"
+          fi
