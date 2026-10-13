@@ -4,7 +4,7 @@ All notable changes to the Roam Publish extension. Each version is dated when it
 What's new shows it once Roam Depot serves it. Every bullet starts with **Breaking:**, **New:**, **Improved:** or
 **Fixed:**; a breaking change comes with a new major version.
 
-## 0.2.0 (2026-10-09)
+## 0.2.0 (2026-10-13)
 
 ### Security
 - New: **Password pages are encrypted in Roam before they're published, title included.** roam.pub only gets the
@@ -15,9 +15,10 @@ What's new shows it once Roam Depot serves it. Every bullet starts with **Breaki
 
 ### Publishing
 - New: **Publish with encryption.** The status pop-up for a page or block that isn't published yet has a **Publish
-  with encryption** button next to Publish. It publishes to your graph as a Password page, encrypted in Roam with
-  your graph password, whatever new pages usually start as. If your graph has no password that can encrypt yet,
-  nothing is published and the message says how to set one on roam.pub.
+  with encryption** button next to Publish, and the command palette has **Roam Publish: Publish current page with
+  encryption** and **Publish focused block with encryption**. It publishes to your graph as a Password page,
+  encrypted in Roam with your graph password, whatever new pages usually start as. If your graph has no password
+  that can encrypt yet, nothing is published and the message says how to set one on roam.pub.
 - New: Pages with collapsed blocks can be published with those blocks collapsed, as you have them in Roam. The first
   time you publish a page with collapsed blocks, Roam Publish asks: **Publish as is (Collapsed)** or **Publish
   expanded**. Readers can open and close blocks either way.
@@ -29,7 +30,8 @@ What's new shows it once Roam Depot serves it. Every bullet starts with **Breaki
 - Fixed: For a page that's only in collections, the status toast offered **Make listed** and **Make unlisted**,
   which did nothing, and called it unlisted. It now says the page is only in collections, where each collection sets
   how it's listed.
-- Improved: The status toast is shorter, for example "Unlisted page, up to date. Last published Oct 8, 2026, 1:14 PM."
+- Improved: The status toast is shorter and says when a page is encrypted, for example "Encrypted unlisted page, up
+  to date. Last published Oct 8, 2026, 1:14 PM."
 - New: **Add to collection…** works for encrypted pages too, with no password to type. Roam Publish adds the page
   and republishes it, so it opens in the collection with the collection's password. If the page changed in Roam since
   you last published it, it asks first. Collections without a password that can encrypt are greyed out.

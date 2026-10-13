@@ -193,7 +193,7 @@ describe("encrypted in Roam", () => {
     // The keyed hash still tells that nothing changed in Roam since.
     buttons = [];
     await publishStatus("page1");
-    assert.match(toasts.at(-1)!, /up to date/);
+    assert.match(toasts.at(-1)!, /^Encrypted unlisted page, up to date/);
     assert.equal(button("Republish"), undefined);
     // roam.pub only knows it as "Encrypted page"; the title published from here is kept.
     assert.equal((settings.get("publications") as Record<string, { title: string }>).page1.title, "Page");
@@ -225,7 +225,7 @@ describe("encrypted in Roam", () => {
       }],
     });
     await publishStatus("page1");
-    assert.match(toasts.at(-1)!, /Can't tell on this device whether it changed/);
+    assert.match(toasts.at(-1)!, /^Encrypted unlisted page, last published .*Can't tell here whether it changed\. Republish to be sure\./);
     assert.ok(button("Republish"));
     assert.equal(settings.get("hash-key"), undefined);
   });
@@ -277,6 +277,17 @@ describe("Publish with encryption", () => {
     await publish("page1", { encrypt: true });
     assert.equal(calls.filter((c) => c.method === "POST").length, 0);
     assert.match(toasts.at(-1)!, /First set a graph password/);
+  });
+
+  test("for something already published, it changes nothing and says so", async () => {
+    settings.set("publications", cached({ encrypted: false }));
+    const calls = server();
+    await publish("page1", { encrypt: true });
+    assert.equal(calls.length, 0);
+    assert.match(toasts.at(-1)!, /already published, so this doesn't change it\. To encrypt it, give it a password on roam\.pub/);
+    settings.set("publications", cached({ encrypted: true }));
+    await publish("page1", { encrypt: true });
+    assert.match(toasts.at(-1)!, /already published, encrypted\./);
   });
 
   test("a roam.pub without it: nothing is published", async () => {
