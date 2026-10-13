@@ -43,6 +43,10 @@ let api: ExtensionAPI;
 export const DEFAULT_SHORTLINK_TAG = "[[Roam Publish]]";
 export const DEFAULT_SHORTLINK_TEXT = "Roam Publish Status";
 
+/** The Collapsed blocks setting's choices, as the settings panel shows and stores them. */
+export const COLLAPSED_AS_IN_ROAM = "As in Roam";
+export const COLLAPSED_EXPANDED = "Expanded";
+
 export function initState(extensionAPI: ExtensionAPI) {
   api = extensionAPI;
   // Graphs set up before these defaults keep the labels their blocks already have.
@@ -54,6 +58,7 @@ export function initState(extensionAPI: ExtensionAPI) {
   if (api.settings.get("shortlink-enabled") == null) void save("shortlink-enabled", true);
   if (api.settings.get("shortlink-position") == null) void save("shortlink-position", "top");
   if (api.settings.get("shortlink-blocks") == null) void save("shortlink-blocks", false);
+  if (api.settings.get("collapsed-blocks") == null) void save("collapsed-blocks", COLLAPSED_AS_IN_ROAM);
 }
 
 /**
@@ -82,6 +87,8 @@ export const getShortlinkTag = () => ((api.settings.get("shortlink-tag") as stri
 export const getShortlinkText = () => ((api.settings.get("shortlink-text") as string) ?? DEFAULT_SHORTLINK_TEXT).trim();
 /** Published blocks get a shortlink block only when this is on; pages always do. */
 export const getShortlinkOnBlocks = () => api.settings.get("shortlink-blocks") === true;
+/** How collapsed blocks start on a first publish: as in Roam unless set to Expanded. */
+export const getFirstFolds = () => (api.settings.get("collapsed-blocks") === COLLAPSED_EXPANDED ? "expanded" : "asIs");
 export const getShortlinkPosition = () => (api.settings.get("shortlink-position") === "bottom" ? "bottom" : "top");
 
 export const getCache = (): PublicationCache =>

@@ -22,17 +22,18 @@ What's new shows it once Roam Depot serves it. Every bullet starts with **Breaki
   encryption** and **Publish focused block with encryption**. It publishes to your graph as a Password page,
   encrypted in Roam with your graph password, whatever new pages usually start as. If your graph has no password
   that can encrypt yet, nothing is published and the message says how to set one on roam.pub.
-- New: Pages with collapsed blocks can be published with those blocks collapsed, as you have them in Roam. The first
-  time you publish a page with collapsed blocks, Roam Publish asks: **Publish as is (Collapsed)** or **Publish
-  expanded**. Readers can open and close blocks either way.
-- New: When the blocks collapsed in Roam aren't the ones collapsed on the published page, republishing asks:
-  **Republish as is**, exactly as you see it in Roam, or **Republish, keep open/collapsed** to update the content and
-  leave the published page's blocks open and collapsed as they are. Collapsing or expanding blocks alone doesn't make
-  a page show as changed; instead the status toast offers **Sync open/collapsed blocks**. roam.pub remembers which blocks it has collapsed, so
-  this works from any computer.
+- New: Pages with collapsed blocks are published with those blocks collapsed, as you have them in Roam. To publish
+  them expanded instead, set **Collapsed blocks** to **Expanded** in the extension settings. Readers can open and
+  close blocks either way.
+- New: Republishing keeps the published page's open and collapsed blocks. Collapsing or expanding blocks in Roam
+  alone doesn't make a page show as changed; instead the status toast offers **Sync open/collapsed blocks**. roam.pub
+  remembers which blocks it has collapsed, so this works from any computer.
+- Improved: The status toast offers one action: **Republish** when the page changed, **Sync open/collapsed blocks**
+  when only collapsed blocks differ, or none when it's up to date, then **Add to collection…** and **Unpublish**.
+  Visibility is changed on roam.pub, from the page **Open** goes to; the toast after a first publish still offers
+  **Make public** and **Put on Discover**.
 - Fixed: For a page that's only in collections, the status toast offered **Make listed** and **Make unlisted**,
-  which did nothing, and called it unlisted. It now says the page is only in collections, where each collection sets
-  its visibility.
+  which did nothing, and called it unlisted. It now says the page is only in collections.
 - Improved: The status toast is shorter and says when a page is encrypted, for example "Encrypted unlisted page, up
   to date. Last published Oct 8, 2026, 1:14 PM."
 - New: **Add to collection…** works for encrypted pages too, with no password to type. Roam Publish adds the page
@@ -40,6 +41,11 @@ What's new shows it once Roam Depot serves it. Every bullet starts with **Breaki
   you last published it, it asks first. Collections without a password that can encrypt are greyed out.
 
 ### Setup and settings
+- New: **Collapsed blocks** setting: **As in Roam** (the default) or **Expanded**, for how blocks collapsed in Roam
+  start out the first time you publish.
+- Improved: Fewer settings up front. **Add Roam Publish block when publishing blocks**, the block's tag, link text
+  and position, **Sync published list**, **Server URL** and the reset button are now named **Advanced: …** and
+  listed last. Your settings are kept.
 - Improved: The extension's description lists roam.pub's main features, including end-to-end encryption and
   Download as PDF, in fewer words.
 - New: When roam.pub changes in a way that needs a newer Roam Publish, the extension says so and tells you where to

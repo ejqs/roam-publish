@@ -66,17 +66,15 @@ graph, adding it takes it out of your graph, so the graph link can't get around 
 can be added too, with no password to type: Roam Publish adds the page and republishes it, so it opens in the
 collection with the collection's password. Collections without a password that can encrypt are greyed out.
 
-**Collapsed blocks.** The first time you publish a page with collapsed blocks, Roam Publish asks whether to publish
-it as is (those blocks start collapsed) or expanded. Readers can open and close blocks either way. Later, when the
-blocks collapsed in Roam aren't the ones collapsed on the published page, republishing asks: **Republish as is**, or
-**Republish, keep open/collapsed** to update the content and leave the published page's blocks as they are. If only
-which blocks are collapsed changed, the status toast offers **Sync open/collapsed blocks** instead.
+**Collapsed blocks.** A page is published with its blocks collapsed as they are in Roam, or all expanded if you set
+**Collapsed blocks** to **Expanded**. Readers can open and close blocks either way. Republishing keeps the published
+page's open and collapsed blocks; when only those differ from Roam's, the status toast offers **Sync open/collapsed
+blocks** instead.
 
-Open the same menu again to check whether it's published and its visibility, or to **Republish** after edits,
-change its visibility (**Make public**, **Put on Discover**, **Make unlisted**), **Add to collection…**, or
-**Unpublish**. A page that's only in collections has no graph listing to change, so the toast says each of its
-collections sets its visibility. A page can only go on Discover when it's open to everyone, shown in your graph,
-and your graph's front page and search engines are on; otherwise the toast says what's stopping it. Unpublishing asks first: it deletes the page on roam.pub along with
+Open the same menu again to check whether it's published and its visibility. It offers one action when there's
+something to do (**Republish** after edits, or **Sync open/collapsed blocks**), then **Add to collection…** and
+**Unpublish**. Visibility is changed on roam.pub, from the page **Open** goes to. A page can only go on Discover when
+it's open to everyone, shown in your graph, and your graph's front page and search engines are on. Unpublishing asks first: it deletes the page on roam.pub along with
 its access settings, passwords, views, upvotes and places in collections. On a shared graph, pages another member
 published show their status only; only they or the graph's owner can change them.
 
@@ -126,13 +124,19 @@ check references, embeds and children first. Nothing else from your graph is sen
 | **API key** | Your key for this graph (see Setup). |
 | **Author name** | Shown on your pages when authors are shown. Blank: your @username. |
 | **Add Roam Publish block when publishing pages** | On by default. Off: nothing is written into your pages. roam.pub still keeps each page's status link and history. |
-| **Add Roam Publish block when publishing blocks** | Off by default. On: the same, under each block you publish. Separate from the pages setting. |
-| **Block tag** | The block's text. Default `[[Roam Publish]]` (graphs set up before this keep `#published`). Blank: no tag. |
-| **Status link text** | Written as `[text](link)`. Default `Roam Publish Status`. Blank: bare link. |
-| **Block position** | First or last on the page, or under the block. |
+| **Collapsed blocks** | **As in Roam** (default): blocks collapsed in Roam start collapsed on a first publish. **Expanded**: every block starts open. Republishing keeps the published page's. |
 | **Change log** | On roam.pub: turn it on or off, check it works, and manage its token. |
+
+Roam's settings panel has no sections, so the rest are named **Advanced: …** and listed last:
+
+| Setting | What it does |
+| --- | --- |
+| **Add Roam Publish block when publishing blocks** | Off by default. On: the same block, under each block you publish. Separate from the pages setting. |
+| **Roam Publish block tag** | The block's text. Default `[[Roam Publish]]` (graphs set up before this keep `#published`). Blank: no tag. |
+| **Status link text** | Written as `[text](link)`. Default `Roam Publish Status`. Blank: bare link. |
+| **Roam Publish block position** | First or last on the page, or under the block. |
 | **Sync published list** | Updates the extension's list of what you've published from roam.pub. Use it if a status looks wrong, e.g. after unpublishing on the website. The **Page…** and **Block…** menus already do this. |
-| **Server URL** | Advanced. Defaults to `https://roam.pub`. Must use `https://` (or `http://localhost` for development), so your key is never sent unencrypted. |
+| **Server URL** | Defaults to `https://roam.pub`. Must use `https://` (or `http://localhost` for development), so your key is never sent unencrypted. |
 | **Reset Roam Publish block settings** | Restores the defaults of the Roam Publish block settings. Reinstalling doesn't, since Roam keeps settings. |
 
 Changing the tag or the link text edits existing blocks in place the next time you publish them.

@@ -6,6 +6,7 @@ import {
   getShortlinkText,
   getServer,
   getCache,
+  getFirstFolds,
   getShortlinkEnabled,
   getShortlinkOnBlocks,
   getShortlinkPosition,
@@ -321,39 +322,19 @@ function folded(p: Payload, folds: Folds, published?: string[]): Payload {
   return { ...p, tree: refold(p.tree, new Set(folds === "keep" ? published : [])) };
 }
 
-const blocksWord = (n: number) => (n === 1 ? "1 block" : `${n} blocks`);
 const sameFolds = (a: string[], b: string[]) => a.length === b.length && a.every((u, i) => u === b[i]);
-
-/** The first publish of something with collapsed blocks: should they start collapsed on the website? */
-function askFirstFolds(uid: string, count: number, kind: "page" | "block", republish: boolean, encrypt?: boolean) {
-  const verb = republish ? "Republish" : "Publish";
-  toast(
-    `${blocksWord(count)} on this ${kind} ${count === 1 ? "is" : "are"} collapsed in Roam. Should ${count === 1 ? "it" : "they"} start collapsed on the published ${kind} too? Readers can open and close blocks either way.`,
-    {
-      actions: [
-        { label: `${verb} as is (Collapsed)`, onClick: () => void publish(uid, { folds: "asIs", encrypt }) },
-        { label: `${verb} expanded`, onClick: () => void publish(uid, { folds: "expanded", encrypt }) },
-      ],
-      durationMs: 20000,
-    },
-  );
-}
-
-/** Republishing when the blocks collapsed in Roam aren't the ones collapsed on the published page. */
-function askRepublishFolds(uid: string, kind: "page" | "block") {
-  toast(
-    `The blocks collapsed in Roam aren't the ones collapsed on the published ${kind}. Republish it exactly as you see it in Roam, or keep the published ${kind}'s open and collapsed blocks?`,
-    { actions: republishActions(uid), durationMs: 20000 },
-  );
-}
 
 /** For when only which blocks are collapsed changed: makes the website's match Roam's. */
 const syncFoldsAction = (uid: string) => ({ label: "Sync open/collapsed blocks", onClick: () => void publish(uid, { folds: "asIs" }) });
 
-const republishActions = (uid: string) => [
-  { label: "Republish as is", onClick: () => void publish(uid, { folds: "asIs" }) },
-  { label: "Republish, keep open/collapsed", onClick: () => void publish(uid, { folds: "keep" }) },
-];
+/**
+ * Republish, keeping the published page's open and collapsed blocks when they're known (Sync open/collapsed
+ * blocks changes those); otherwise as the Collapsed blocks setting says.
+ */
+const republishAction = (uid: string, published: string[] | undefined) => ({
+  label: "Republish",
+  onClick: () => void publish(uid, { folds: published ? "keep" : getFirstFolds() }),
+});
 
 type PublishResponse = {
   status: "created" | "updated" | "unchanged";
@@ -404,8 +385,9 @@ const encryptedByRoamPub = (unchanged: boolean) =>
 
 /**
  * Publishes or republishes. `folds` says which blocks start collapsed on the website (see Folds).
- * Without it, the user is asked when it matters: the first time something with collapsed blocks is
- * published, and when the blocks collapsed in Roam differ from the published page's. `encrypt`: Publish
+ * Without it, a first publish (or one whose published collapsed blocks aren't known) follows the
+ * Collapsed blocks setting, and a republish keeps the published page's open and collapsed blocks; when
+ * only those differ from Roam's, it offers to sync them instead. `encrypt`: Publish
  * with encryption, for something not published yet: it goes to the graph as a Password page, encrypted.
  */
 export async function publish(
@@ -428,22 +410,22 @@ export async function publish(
       );
     const published = cache[uid]?.folded;
     let folds = opts.folds;
+    if (!folds && !published) folds = getFirstFolds();
     if (!folds) {
-      // Asked before writing anything to the graph.
+      // Checked before writing anything to the graph.
       const first = await serialize(uid, shortlinksOf(cache));
       const inRoam = first ? foldedUids(first.tree) : [];
-      const kept = first && published ? foldedUids(refold(first.tree, new Set(published))) : [];
-      if (first && inRoam.length && !published) return askFirstFolds(uid, inRoam.length, first.kind, !!cache[uid], opts.encrypt);
-      if (first && published && !sameFolds(inRoam, kept)) {
-        // Nothing but collapsed blocks changed: there's only one thing to do.
+      const kept = first ? foldedUids(refold(first.tree, new Set(published))) : [];
+      folds = "asIs";
+      if (first && !sameFolds(inRoam, kept)) {
+        // Nothing but collapsed blocks changed: republishing them kept would change nothing.
         if ((await hashLike(cache[uid]?.hash, folded(first, "keep", published))) === cache[uid]?.hash)
           return toast(
             `Only which blocks are collapsed changed since this ${first.kind} was published. Sync them to the website?`,
             { actions: [syncFoldsAction(uid), CANCEL], durationMs: 15000 },
           );
-        return askRepublishFolds(uid, first.kind);
+        folds = "keep";
       }
-      folds = "asIs";
     }
     link = await ensureShortlinkBlock(uid, cache[uid]);
     // Shortlink blocks (this page's, and those of blocks published from inside it) and their change
@@ -816,8 +798,9 @@ export async function unpublish(uid: string) {
 /**
  * Whether a page or block is published, and if so whether it changed in Roam since: refreshes the
  * published list from the server first (falling back to the cache offline), then hashes the
- * content the way publishing does. Offers what can be done next: publish, or republish, make
- * public, on Discover or unlisted, and unpublish. Writes nothing to the graph by itself.
+ * content the way publishing does. Offers what can be done next: publish, or the one thing the
+ * state calls for (republish, or sync open/collapsed blocks), add to collection and unpublish; its
+ * link opens the status page on roam.pub, where visibility is changed. Writes nothing to the graph by itself.
  */
 export async function publishStatus(uid: string) {
   try {
@@ -866,7 +849,6 @@ export async function publishStatus(uid: string) {
           link: openLink(c),
           actions: [
             { label: "Republish", onClick: () => void publish(uid, { folds: "asIs" }) },
-            ...listingActions(uid, c),
             ...collectionAction(uid),
             { label: "Unpublish", onClick: () => void confirmUnpublish(uid, { checked: true }) },
           ],
@@ -879,34 +861,29 @@ export async function publishStatus(uid: string) {
     // Only known for items published from this graph's extension settings.
     const bylineChanged = c.author !== undefined && c.author !== getAuthor();
     const upToDate = !changed && !bylineChanged;
-    const republish = !foldsDiffer
-      ? upToDate
-        ? []
-        : [{ label: "Republish", onClick: () => void publish(uid, { folds: "asIs" }) }]
-      : published
-        ? upToDate
-          ? [syncFoldsAction(uid)]
-          : republishActions(uid)
-        : [
-            { label: "Republish as is (Collapsed)", onClick: () => void publish(uid, { folds: "asIs" }) },
-            ...(upToDate ? [] : [{ label: "Republish expanded", onClick: () => void publish(uid, { folds: "expanded" }) }]),
-          ];
+    // The one thing to do, if any: Republish (keeping the published open/collapsed blocks), or, when only
+    // those differ, sync them. Visibility is changed on the status page the toast links to.
+    const next = !upToDate
+      ? [republishAction(uid, published)]
+      : foldsDiffer
+        ? [syncFoldsAction(uid)]
+        : [];
     const actions = [
-      ...republish,
-      ...listingActions(uid, c),
+      ...next,
       ...collectionAction(uid),
       { label: "Unpublish", onClick: () => void confirmUnpublish(uid, { checked: true }) },
     ];
-    const foldsNote = foldsDiffer ? ` Collapsed blocks differ from the published ${payload.kind}.` : "";
-    // Roam's toasts can't grey a button out, so say why a Make … button isn't there.
-    const blocked = onlyInCollections
-      ? " Each collection sets its visibility."
-      : (listingOf(c) !== "unlisted" && c.listedNote ? ` ${c.listedNote}` : "") ||
-        (c.discoverBlocked && listingOf(c) !== "discover" ? ` ${c.discoverBlocked}` : "");
+    const foldsNote = !foldsDiffer
+      ? ""
+      : upToDate || !published
+        ? ` Collapsed blocks differ from the published ${payload.kind}.`
+        : ` Collapsed blocks differ from the published ${payload.kind}; Republish keeps the published ones.`;
+    // Public, but nothing lists it (its graph's front page is off).
+    const listedNote = !onlyInCollections && listingOf(c) !== "unlisted" && c.listedNote ? ` ${c.listedNote}` : "";
     toast(
       upToDate
-        ? `${what}, up to date. Last published ${since}.${foldsNote}${offline}${blocked}`
-        : `${what}, ${changed ? "changed" : "new author name"} since last published ${since}.${foldsNote}${offline}${blocked}`,
+        ? `${what}, up to date. Last published ${since}.${foldsNote}${offline}${listedNote}`
+        : `${what}, ${changed ? "changed" : "new author name"} since last published ${since}.${foldsNote}${offline}${listedNote}`,
       { intent: upToDate ? "success" : "none", link: openLink(c), actions, durationMs: 15000 },
     );
   } catch (e) {

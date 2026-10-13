@@ -5,6 +5,7 @@ import {
   addToCollection,
   chooseCollection,
   confirmChangeLogBlocks,
+  confirmLeaveDiscover,
   confirmUnpublish,
   publish,
   publishStatus,
@@ -328,37 +329,42 @@ describe("collapsed blocks", () => {
   });
   const labels = () => actions().map((b) => b.textContent).filter((l) => /^(Republish|Publish|Sync)/.test(l ?? ""));
 
-  test("the first publish asks, writes nothing until answered, and remembers what's collapsed", async () => {
+  const savedFolds = () => (settings.get("publications") as Record<string, { folded?: string[] }>).page1?.folded;
+
+  test("the first publish keeps blocks collapsed as in Roam by default, without asking, and remembers them", async () => {
     settings.set("publications", {});
     roam = folded();
     const calls = server(routes(""));
     await publish("page1");
-    assert.equal(posts(calls).length, 0);
-    assert.deepEqual(roam.blocks.get("page1")!.children!.map((c) => c.uid), ["b1", "b3"]);
-    assert.match(toasts.at(-1)!, /1 block on this page is collapsed in Roam/);
-    assert.deepEqual(labels(), ["Publish as is (Collapsed)", "Publish expanded"]);
-    button("Publish as is (Collapsed)")!.click!();
-    await settle(() => !!(settings.get("publications") as Record<string, { folded?: string[] }>).page1?.folded);
+    assert.equal(posts(calls).length, 1);
     assert.match(sentTree(calls), /"collapsed":true/);
-    assert.deepEqual((settings.get("publications") as Record<string, { folded?: string[] }>).page1.folded, ["b1"]);
-    // Nothing changed in Roam since: republishing doesn't ask again.
+    assert.deepEqual(savedFolds(), ["b1"]);
+    // Nothing changed in Roam since: republishing offers nothing about collapsed blocks.
     buttons = [];
     await publish("page1");
     assert.deepEqual(labels(), []);
     assert.equal(posts(calls).length, 2);
   });
 
-  test("when Roam's collapsed blocks differ, republishing asks: as is, or keep the published page's", async () => {
+  test("with the Collapsed blocks setting on Expanded, the first publish opens every block", async () => {
+    settings.set("publications", {});
+    settings.set("collapsed-blocks", "Expanded");
+    roam = folded();
+    const calls = server(routes(""));
+    await publish("page1");
+    assert.equal(posts(calls).length, 1);
+    assert.doesNotMatch(sentTree(calls), /collapsed/);
+    assert.deepEqual(savedFolds(), []);
+  });
+
+  test("when Roam's collapsed blocks differ, republishing keeps the published page's without asking", async () => {
     roam = folded();
     settings.set("publications", cached({ hash: "old", folded: [] }));
     const calls = server(routes());
     await publish("page1");
-    assert.equal(posts(calls).length, 0);
-    assert.match(toasts.at(-1)!, /aren't the ones collapsed on the published page/);
-    assert.deepEqual(labels(), ["Republish as is", "Republish, keep open/collapsed"]);
-    button("Republish, keep open/collapsed")!.click!();
-    await settle(() => (settings.get("publications") as Record<string, { hash: string }>).page1.hash !== "old");
+    assert.equal(posts(calls).length, 1);
     assert.doesNotMatch(sentTree(calls), /collapsed/);
+    assert.deepEqual(labels(), []);
     buttons = [];
     await publish("page1", { folds: "asIs" });
     assert.match(sentTree(calls), /"collapsed":true/);
@@ -368,6 +374,7 @@ describe("collapsed blocks", () => {
     roam = folded();
     settings.set("publications", {});
     const calls = server({
+      ...routes(),
       "GET /api/ext/publications": () => [200, {
         publications: [{ rootUid: "page1", kind: "page", title: "Page", url: "https://roam.pub/g/x", contentHash: "old",
           visibility: "unlisted", listing: "unlisted", updatedAt: "", folded: [] }],
@@ -375,11 +382,11 @@ describe("collapsed blocks", () => {
     });
     await syncPublications({ quiet: true });
     await publish("page1");
-    assert.equal(posts(calls).length, 0);
-    assert.deepEqual(labels(), ["Republish as is", "Republish, keep open/collapsed"]);
+    assert.equal(posts(calls).length, 1);
+    assert.doesNotMatch(sentTree(calls), /collapsed/);
   });
 
-  test("the status says when only collapsed blocks differ, and offers both after an edit", async () => {
+  test("the status offers Sync when only collapsed blocks differ, and one Republish that keeps them after an edit", async () => {
     roam = folded();
     const asPublished = await hashPayload({ ...(await serialize("page1"))!, tree: JSON.parse(JSON.stringify((await serialize("page1"))!.tree).replace(',"collapsed":true', "")) });
     settings.set("publications", cached({ hash: asPublished, folded: [] }));
@@ -396,10 +403,14 @@ describe("collapsed blocks", () => {
 
     buttons = [];
     settings.set("publications", cached({ hash: "old", folded: [] }));
-    server(routes("old"));
+    const calls = server(routes("old"));
     await publishStatus("page1");
-    assert.match(toasts.at(-1)!, /, changed since last published/);
-    assert.deepEqual(labels(), ["Republish as is", "Republish, keep open/collapsed"]);
+    assert.match(toasts.at(-1)!, /, changed since last published.*Republish keeps the published ones\./);
+    assert.deepEqual(labels(), ["Republish"]);
+    button("Republish")!.click!();
+    await settle(() => posts(calls).length > 0);
+    await settle(() => (settings.get("publications") as Record<string, { hash: string }>).page1.hash !== "old");
+    assert.doesNotMatch(sentTree(calls), /collapsed/);
   });
 });
 
@@ -418,6 +429,7 @@ describe("saved settings", () => {
     // A new graph gets the defaults saved, so the settings panel shows them.
     assert.equal(settings.get("shortlink-enabled"), true);
     assert.equal(settings.get("shortlink-position"), "top");
+    assert.equal(settings.get("collapsed-blocks"), "As in Roam");
     settings.set("shortlink-tag", "#mine");
     await resetShortlinkSettings();
     assert.equal(settings.get("shortlink-tag"), "[[Roam Publish]]");
@@ -628,13 +640,39 @@ describe("status", () => {
   });
   const labels = () => actions().map((b) => b.textContent);
 
-  test("uses the website's words and offers the other two listings", async () => {
-    const calls = server({
-      ...remote({ visibility: "unlisted", listing: "unlisted", discoverBlocked: null }),
-      "PATCH /api/ext/publications/page1": (b) => [200, { visibility: "public", listing: b.listing, discoverBlocked: null, url: "https://roam.pub/g/x" }],
-    });
+  /** A first publish, answered the way roam.pub answers a new page. */
+  const created = (over: object = {}) => ({
+    "GET /api/ext/publications": (): [number, unknown] => [200, { publications: [] }],
+    "POST /api/ext/publications": (b: Record<string, unknown>): [number, unknown] => [200, {
+      status: "created", url: "https://roam.pub/g/x", contentHash: b.contentHash, visibility: "unlisted", listing: "unlisted",
+      discoverBlocked: null, ...over,
+    }],
+    "PATCH /api/ext/publications/page1": (b: Record<string, unknown>): [number, unknown] => [200, {
+      visibility: "public", listing: b.listing, discoverBlocked: null, url: "https://roam.pub/g/x",
+    }],
+  });
+
+  test("uses the website's words and offers one action, leaving visibility to the status page it links to", async () => {
+    server(remote({ visibility: "unlisted", listing: "unlisted", discoverBlocked: null }));
     await publishStatus("page1");
-    assert.match(toasts.at(-1)!, /^Unlisted page, /);
+    assert.match(toasts.at(-1)!, /^Unlisted page, changed since/);
+    assert.deepEqual(labels(), ["Republish", "Unpublish"]);
+  });
+
+  test("an up-to-date page offers no republish", async () => {
+    settings.set("shortlink-enabled", false);
+    const hash = await hashPayload((await serialize("page1"))!);
+    server(remote({ visibility: "public", listing: "discover", discoverBlocked: null, contentHash: hash, author: "" }));
+    await publishStatus("page1");
+    assert.match(toasts.at(-1)!, /^Page on Discover, up to date\./);
+    assert.deepEqual(labels(), ["Unpublish"]);
+  });
+
+  test("a first publish offers the other two listings", async () => {
+    settings.set("publications", {});
+    const calls = server(created());
+    await publish("page1");
+    assert.match(toasts.at(-1)!, /published as unlisted/);
     assert.deepEqual(labels().filter((l) => /^(Make|Put)/.test(l ?? "")), ["Make public", "Put on Discover"]);
     button("Put on Discover")!.click!();
     await new Promise((r) => setImmediate(r));
@@ -643,42 +681,36 @@ describe("status", () => {
   });
 
   test("asks before taking a page off Discover", async () => {
-    const calls = server({
-      ...remote({ visibility: "public", listing: "discover", discoverBlocked: null }),
-      "PATCH /api/ext/publications/page1": (b) => [200, { visibility: "public", listing: b.listing, discoverBlocked: null, url: "https://roam.pub/g/x" }],
-    });
-    await publishStatus("page1");
-    assert.match(toasts.at(-1)!, /^Page on Discover, /);
-    assert.deepEqual(labels().filter((l) => l?.startsWith("Make")), ["Make public", "Make unlisted"]);
-    const before = calls.length;
-    button("Make unlisted")!.click!();
-    await new Promise((r) => setImmediate(r));
-    assert.equal(calls.length, before);
+    settings.set("publications", cached({ visibility: "public", listing: "discover" }));
+    const calls = server(created());
+    confirmLeaveDiscover("page1", "unlisted");
+    assert.equal(calls.length, 0);
     assert.match(toasts.at(-1)!, /Take “Page” off roam.pub\/discover\? .*only people with the link/);
     buttons.findLast((b) => b.textContent === "Cancel")!.click!();
     await new Promise((r) => setImmediate(r));
-    assert.equal(calls.length, before);
-    button("Make unlisted")!.click!();
+    assert.equal(calls.length, 0);
+    confirmLeaveDiscover("page1", "unlisted");
     buttons.findLast((b) => b.textContent === "Make unlisted")!.click!();
     await new Promise((r) => setImmediate(r));
     assert.deepEqual(calls.at(-1)!.body, { listing: "unlisted" });
     assert.match(toasts.at(-1)!, /Now unlisted/);
   });
 
-  test("leaves out Put on Discover and says why when it can't be", async () => {
-    server(remote({ visibility: "public", listing: "listed", discoverBlocked: "Turn on search engines in Sharing to make pages Discoverable." }));
-    await publishStatus("page1");
-    assert.match(toasts.at(-1)!, /^Public page, .*Turn on search engines/);
-    assert.deepEqual(labels().filter((l) => l?.startsWith("Make")), ["Make unlisted"]);
+  test("a first publish leaves out Put on Discover when it can't be", async () => {
+    settings.set("publications", {});
+    server(created({ discoverBlocked: "Turn on search engines in Sharing to make pages Discoverable." }));
+    await publish("page1");
+    assert.deepEqual(labels().filter((l) => /^(Make|Put)/.test(l ?? "")), ["Make public"]);
   });
 
   test("doesn't claim the front page lists a page when the graph's front page is off", async () => {
     const note = "Your graph's front page is off, so nothing lists this page yet: only people with the link will find it.";
+    settings.set("publications", {});
     server({
-      ...remote({ visibility: "unlisted", listing: "unlisted", discoverBlocked: "Turn on this graph's front page in Sharing to make pages Discoverable.", listedNote: null }),
+      ...created({ discoverBlocked: "Turn on this graph's front page in Sharing to make pages Discoverable." }),
       "PATCH /api/ext/publications/page1": (b) => [200, { visibility: "public", listing: b.listing, discoverBlocked: null, listedNote: note, url: "https://roam.pub/g/x" }],
     });
-    await publishStatus("page1");
+    await publish("page1");
     button("Make public")!.click!();
     await new Promise((r) => setImmediate(r));
     assert.match(toasts.at(-1)!, /^Now public, but your graph's front page is off/);
@@ -691,7 +723,7 @@ describe("status", () => {
     assert.match(toasts.at(-1)!, /^Public page, .*front page is off/);
   });
 
-  test("a page only in collections offers no Make … buttons and says each collection sets its visibility", async () => {
+  test("a page only in collections isn't called unlisted", async () => {
     server({
       "GET /api/ext/publications": () => [200, {
         collections: 2,
@@ -702,7 +734,6 @@ describe("status", () => {
     });
     await publishStatus("page1");
     assert.match(toasts.at(-1)!, /^Page in collections only, /);
-    assert.match(toasts.at(-1)!, /Each collection sets its visibility\./);
     assert.doesNotMatch(toasts.at(-1)!, /unlisted|Discoverable/);
     assert.deepEqual(labels().filter((l) => l !== "Republish"), ["Add to collection…", "Unpublish"]);
   });
@@ -724,7 +755,6 @@ describe("status", () => {
     server(remote({ visibility: "public" }));
     await publishStatus("page1");
     assert.match(toasts.at(-1)!, /^Public page, /);
-    assert.deepEqual(labels().filter((l) => l?.startsWith("Make")), ["Make unlisted"]);
   });
 });
 

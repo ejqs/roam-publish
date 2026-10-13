@@ -1,4 +1,4 @@
-import { getApiKey, getServer, resetShortlinkSettings } from "./state";
+import { COLLAPSED_AS_IN_ROAM, COLLAPSED_EXPANDED, getApiKey, getServer, resetShortlinkSettings } from "./state";
 import { openChangeLogSettings, syncPublications } from "./publish";
 import { toast } from "./toast";
 
@@ -38,30 +38,11 @@ export function createSettingsPanel(extensionAPI: ExtensionAPI) {
         action: { type: "switch" },
       },
       {
-        id: "shortlink-blocks",
-        name: "Add Roam Publish block when publishing blocks",
-        description: "The same, under each block you publish.",
-        action: { type: "switch" },
-      },
-      {
-        id: "shortlink-tag",
-        name: "Block tag",
+        id: "collapsed-blocks",
+        name: "Collapsed blocks",
         description:
-          "The block's text. Starts as [[Roam Publish]]. Blank: no tag. Existing blocks update when you next publish them.",
-        action: { type: "input", placeholder: "(blank: no tag)" },
-      },
-      {
-        id: "shortlink-text",
-        name: "Status link text",
-        description:
-          "Written as [text](roam.pub/p/…). Starts as Roam Publish Status. Blank: bare link. Existing blocks update when you next publish them.",
-        action: { type: "input", placeholder: "(blank: bare link)" },
-      },
-      {
-        id: "shortlink-position",
-        name: "Block position",
-        description: "First or last on the page, or under the block.",
-        action: { type: "select", items: ["top", "bottom"] },
+          "How blocks collapsed in Roam start out on a first publish; republishing keeps the published page's.",
+        action: { type: "select", items: [COLLAPSED_AS_IN_ROAM, COLLAPSED_EXPANDED] },
       },
       {
         id: "change-log",
@@ -71,9 +52,35 @@ export function createSettingsPanel(extensionAPI: ExtensionAPI) {
         action: { type: "button", content: "Open settings", onClick: openChangeLogSettings },
       },
       {
+        id: "shortlink-blocks",
+        name: "Advanced: Add Roam Publish block when publishing blocks",
+        description: "Adds the Roam Publish block under each block you publish.",
+        action: { type: "switch" },
+      },
+      {
+        id: "shortlink-tag",
+        name: "Advanced: Roam Publish block tag",
+        description:
+          "The block's text. Starts as [[Roam Publish]]. Blank: no tag. Existing blocks update when you next publish them.",
+        action: { type: "input", placeholder: "(blank: no tag)" },
+      },
+      {
+        id: "shortlink-text",
+        name: "Advanced: Status link text",
+        description:
+          "Written as [text](roam.pub/p/…). Starts as Roam Publish Status. Blank: bare link. Existing blocks update when you next publish them.",
+        action: { type: "input", placeholder: "(blank: bare link)" },
+      },
+      {
+        id: "shortlink-position",
+        name: "Advanced: Roam Publish block position",
+        description: "First or last on the page, or under the block.",
+        action: { type: "select", items: ["top", "bottom"] },
+      },
+      {
         id: "sync",
-        name: "Sync published list",
-        description: "The extension keeps a list of what you've published, to tell whether a page is published or changed since. This updates it from roam.pub. Use it if a status looks wrong, e.g. after unpublishing on the website. The Page… and Block… menus already do this.",
+        name: "Advanced: Sync published list",
+        description: "Updates the extension's list of what you've published from roam.pub. Use it if a status looks wrong; the Page… and Block… menus already do this.",
         action: {
           type: "button",
           content: "Sync",
@@ -82,13 +89,13 @@ export function createSettingsPanel(extensionAPI: ExtensionAPI) {
       },
       {
         id: "server-url",
-        name: "Server URL",
-        description: "Advanced. Blank: the default server. Must start with https://.",
+        name: "Advanced: Server URL",
+        description: "Blank: the default server. Must start with https://.",
         action: { type: "input", placeholder: __DEFAULT_SERVER__ },
       },
       {
         id: "shortlink-reset",
-        name: "Reset Roam Publish block settings",
+        name: "Advanced: Reset Roam Publish block settings",
         description:
           "Restores the defaults of the Roam Publish block settings. Reinstalling doesn't, since Roam keeps settings.",
         action: {
