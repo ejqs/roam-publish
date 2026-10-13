@@ -417,6 +417,15 @@ export async function publish(
   let link: Awaited<ReturnType<typeof ensureShortlinkBlock>> = null;
   try {
     const cache = await ensureCache();
+    // Publish with encryption is for something new: roam.pub ignores it on a republish.
+    const already = opts.encrypt && cache[uid];
+    if (already)
+      return toast(
+        already.encrypted
+          ? `This ${already.kind} is already published, encrypted.`
+          : `This ${already.kind} is already published, so this doesn't change it. To encrypt it, give it a password on roam.pub.`,
+        { link: openLink(already) },
+      );
     const published = cache[uid]?.folded;
     let folds = opts.folds;
     if (!folds) {
@@ -833,10 +842,9 @@ export async function publishStatus(uid: string) {
     if (c.removed) return toast(`${label} was removed by a moderator.${offline}`, { intent: "danger", link: openLink(c) });
     // A page only in collections has no listing of its own: each collection lists it.
     const onlyInCollections = c.inGraph === false;
-    // "Unlisted page", "Discoverable block", "Page in collections only".
-    const what = onlyInCollections
-      ? `${label} in collections only`
-      : `${upperFirst(LISTING_LABEL[listingOf(c)])} ${payload.kind}`;
+    // "Unlisted page", "Encrypted discoverable block", "Page in collections only".
+    const listed = onlyInCollections ? `${payload.kind} in collections only` : `${LISTING_LABEL[listingOf(c)]} ${payload.kind}`;
+    const what = upperFirst(c.encrypted ? `encrypted ${listed}` : listed);
     if (c.mine === false)
       return toast(`${what}, published by another member of this graph. Only they or the graph's owner can change it.${offline}`, {
         link: openLink(c),
@@ -851,7 +859,7 @@ export async function publishStatus(uid: string) {
     // Encrypted in Roam elsewhere, and the graph's key for telling hasn't reached this Roam's settings.
     if (asIsHash === null || keptHash === null)
       return toast(
-        `${what}, last published ${since}. Can't tell on this device whether it changed since: this Roam doesn't have this graph's Roam Publish key for encrypted pages yet. Republish to be sure.${offline}`,
+        `${what}, last published ${since}. Can't tell here whether it changed. Republish to be sure.${offline}`,
         {
           link: openLink(c),
           actions: [
