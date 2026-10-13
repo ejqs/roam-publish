@@ -49,6 +49,10 @@ export const BLOCK_CHOICES = ["Pages", "Pages and blocks", "Blocks only", "Off"]
 type BlockChoice = (typeof BLOCK_CHOICES)[number];
 const BLOCK_SETTING = "shortlink-add";
 
+/** The Collapsed blocks setting's choices, as the settings panel shows and stores them. */
+export const COLLAPSED_AS_IN_ROAM = "As in Roam";
+export const COLLAPSED_EXPANDED = "Expanded";
+
 export function initState(extensionAPI: ExtensionAPI) {
   api = extensionAPI;
   // Graphs set up before these defaults keep the labels their blocks already have.
@@ -59,6 +63,7 @@ export function initState(extensionAPI: ExtensionAPI) {
   if (api.settings.get(BLOCK_SETTING) == null) void save(BLOCK_SETTING, legacyBlockChoice());
   const position = api.settings.get("shortlink-position");
   if (position !== "First" && position !== "Last") void save("shortlink-position", position === "bottom" ? "Last" : "First");
+  if (api.settings.get("collapsed-blocks") == null) void save("collapsed-blocks", COLLAPSED_AS_IN_ROAM);
 }
 
 /** What the two switches before the select said: pages on unless switched off, blocks off unless on. */
@@ -91,6 +96,8 @@ export const getShortlinkEnabled = () => blockChoice() === "Pages" || blockChoic
 export const getShortlinkOnBlocks = () => blockChoice() === "Pages and blocks" || blockChoice() === "Blocks only";
 /** The Roam Publish block's text; blank for none. */
 export const getShortlinkTag = () => ((api.settings.get("shortlink-tag") as string) ?? DEFAULT_SHORTLINK_TAG).trim();
+/** How collapsed blocks start on a first publish: as in Roam unless set to Expanded. */
+export const getFirstFolds = () => (api.settings.get("collapsed-blocks") === COLLAPSED_EXPANDED ? "expanded" : "asIs");
 /** First or last under the page or block; "bottom" is how earlier versions saved Last. */
 export const getShortlinkPosition = () => {
   const saved = api.settings.get("shortlink-position");

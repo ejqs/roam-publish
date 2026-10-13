@@ -1,5 +1,5 @@
 import { api } from "./api";
-import { BLOCK_CHOICES, getApiKey, getServer, saveLegacyBlockSwitches } from "./state";
+import { BLOCK_CHOICES, COLLAPSED_AS_IN_ROAM, COLLAPSED_EXPANDED, getApiKey, getServer, saveLegacyBlockSwitches } from "./state";
 import { toast } from "./toast";
 
 /** Roam saves the key and calls onChange on every keystroke; the check waits until typing stops. */
@@ -57,6 +57,13 @@ export function createSettingsPanel(extensionAPI: ExtensionAPI) {
         name: "Author name",
         description: "Your byline on pages that show authors. Blank: your @username.",
         action: { type: "input", placeholder: "Your name" },
+      },
+      {
+        id: "collapsed-blocks",
+        name: "Collapsed blocks",
+        description:
+          "How blocks collapsed in Roam start out on a first publish; republishing keeps the published page's.",
+        action: { type: "select", items: [COLLAPSED_AS_IN_ROAM, COLLAPSED_EXPANDED] },
       },
       {
         id: "shortlink-add",
