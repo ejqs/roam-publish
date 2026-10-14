@@ -56,6 +56,10 @@ dashboard** in the extension settings.
 - **Discover**, where readers find and upvote pages.
 - **RSS** for your readers.
 
+**Publish to.** Publishing something new asks where it goes: your graph, your graph encrypted with its password,
+or one of your collections. It starts on your graph's **New pages go to** setting on roam.pub, so Publish is one
+click. Turn off **Ask where to publish** to skip the question.
+
 New pages and blocks are published **Unlisted**: only people with the link can see them. The toast offers **Make
 public** and **Put on Discover** right away, and **Add to collection…** when you're in a collection.
 

@@ -17,11 +17,13 @@ What's new shows it once Roam Depot serves it. Every bullet starts with **Breaki
 - Improved: The extension uses roam.pub's words for a page's visibility. The buttons are **Make public**, **Put on
   Discover** and **Make unlisted** (they were Make listed and Make discoverable), and the status says "Public page"
   or "Page on Discover".
-- New: **Publish with encryption.** The status pop-up for a page or block that isn't published yet has a **Publish
-  with encryption** button next to Publish, and the command palette has **Roam Publish: Publish current page with
-  encryption** and **Publish focused block with encryption**. It publishes to your graph as a Password page,
-  encrypted in Roam with your graph password, whatever new pages usually start as. If your graph has no password
-  that can encrypt yet, nothing is published and the message says how to set one on roam.pub.
+- New: **Publish to.** Publishing something new asks where it goes: your graph, your graph encrypted, or one of
+  your collections, each with how the page starts out there. It starts on roam.pub's **New pages go to**, so one
+  click on **Publish** keeps the usual place. A collection picked is the only place the page goes.
+- New: **Publish with encryption.** One of the **Publish to** choices, and in the command palette as **Roam Publish:
+  Publish current page with encryption** and **Publish focused block with encryption**. It publishes to your graph
+  as a Password page, encrypted in Roam with your graph password. Without a graph password that can encrypt, the
+  choice is greyed out.
 - New: Pages with collapsed blocks are published with those blocks collapsed, as you have them in Roam. To publish
   them expanded instead, set **Collapsed blocks** to **Expanded** in the extension settings. Readers can open and
   close blocks either way.
@@ -41,6 +43,8 @@ What's new shows it once Roam Depot serves it. Every bullet starts with **Breaki
   you last published it, it asks first. Collections without a password that can encrypt are greyed out.
 
 ### Setup and settings
+- New: **Ask where to publish** setting, on by default. Off: Publish goes straight to where **New pages go to**
+  says, and the status pop-up offers **Publish with encryption** next to Publish.
 - New: **Collapsed blocks** setting: **As in Roam** (the default) or **Expanded**, for how blocks collapsed in Roam
   start out the first time you publish.
 - Improved: The extension's description lists roam.pub's main features, including end-to-end encryption and

@@ -81,6 +81,8 @@ function server(routes: Record<string, (body: Record<string, unknown>) => [numbe
     const route = routes[`${method} ${path}`];
     // Asked before every publish; unless a test says otherwise, nothing is encrypted, and it isn't listed.
     if (!route && method === "GET" && path.endsWith("/seal")) return new Response(JSON.stringify({ encrypt: false }));
+    // And it can't publish where you pick (as before "Publish where?"), so Publish doesn't ask.
+    if (!route && method === "GET" && path === "/api/ext/places") return new Response("{}", { status: 404 });
     calls.push({ method, path, ...(search && { search }), body });
     const [status, res] = route
       ? route(body)
@@ -251,9 +253,13 @@ describe("Publish with encryption", () => {
   }];
   const unpublished = { "GET /api/ext/publications": (): [number, unknown] => [200, { publications: [] }] };
 
-  test("the pop-up for a page that isn't published offers it next to Publish", async () => {
+  test("the pop-up for a page that isn't published offers it next to Publish when Publish doesn't ask", async () => {
     settings.set("publications", {});
     server(unpublished);
+    await publishStatus("page1");
+    assert.deepEqual(actions().map((b) => b.textContent), ["Publish page"]);
+    buttons = [];
+    settings.set("ask-where", false);
     await publishStatus("page1");
     assert.deepEqual(actions().map((b) => b.textContent), ["Publish page", "Publish with encryption"]);
   });
@@ -476,6 +482,118 @@ describe("saved settings", () => {
     server();
     await publish("page1");
     assert.equal((settings.get("publications") as Record<string, { author?: string }>).page1.author, "");
+  });
+});
+
+describe("publish where?", () => {
+  const places = (over: object = {}) => ({
+    graph: { name: "notes", access: "open", encrypted: false, encryptBlocked: null },
+    collections: [
+      { id: "c1", name: "Writing", access: "open", listing: "listed", encrypted: false },
+      { id: "c2", name: "Private", access: "password", listing: "listed", encrypted: true },
+    ],
+    newPagesGoTo: ["graph"],
+    ...over,
+  });
+  const optionsOf = (s: El) => (s.children as El[]).map((o) => o.textContent);
+  type Calls = ReturnType<typeof server>;
+  /** The publish sent once the click's publish has run. */
+  const posted = async (calls: Calls) => {
+    for (let i = 0; i < 1000 && !calls.some((c) => c.method === "POST"); i++) await new Promise((r) => setImmediate(r));
+    return calls.find((c) => c.method === "POST")!;
+  };
+  // Nothing published yet.
+  const NONE = { "GET /api/ext/publications": () => [200, { publications: [] }] as [number, unknown] };
+  beforeEach(() => settings.set("publications", {}));
+
+  test("asks before publishing something new, starting on where New pages go to says", async () => {
+    const calls = server({ ...NONE, "GET /api/ext/places": () => [200, places()] });
+    await publish("page1");
+    assert.deepEqual(calls.map((c) => c.path).filter((p) => p !== "/api/ext/publications"), ["/api/ext/places"]);
+    assert.match(toasts.at(-1)!, /Publish “Page” to:/);
+    assert.deepEqual(optionsOf(selects[0]), [
+      "Graph: notes (Open)",
+      "Graph: notes (Password, encrypted)",
+      "Collection: Writing (Open)",
+      "Collection: Private (Password, encrypted)",
+    ]);
+    assert.equal(selects[0].value, "graph");
+    // One click publishes there.
+    button("Publish")!.click!();
+    assert.deepEqual((await posted(calls)).body.to, ["graph"]);
+  });
+
+  test("a collection picked is where it goes, and the seal plan is asked for it", async () => {
+    const calls = server({ ...NONE, "GET /api/ext/places": () => [200, places()] });
+    await publish("page1");
+    selects[0].value = "c2";
+    button("Publish")!.click!();
+    assert.deepEqual((await posted(calls)).body.to, ["c2"]);
+  });
+
+  test("starts on New pages go to when that's several places, and sends them all", async () => {
+    const calls = server({ ...NONE, "GET /api/ext/places": () => [200, places({ newPagesGoTo: ["graph", "c1"] })] });
+    await publish("page1");
+    assert.equal(optionsOf(selects[0])[0], "New pages setting: notes + Writing");
+    button("Publish")!.click!();
+    assert.deepEqual((await posted(calls)).body.to, ["graph", "c1"]);
+  });
+
+  test("doesn't ask with nothing to choose, when switched off, or for a republish", async () => {
+    // No collection, and the graph can't be published encrypted: nothing to choose.
+    const graphOnly = { name: "notes", access: "open", encrypted: false, encryptBlocked: "No password" };
+    let calls = server({ ...NONE, "GET /api/ext/places": () => [200, places({ collections: [], graph: graphOnly })] });
+    await publish("page1");
+    assert.equal((await posted(calls)).body.to, undefined);
+
+    settings.set("ask-where", false);
+    settings.set("publications", {});
+    calls = server({ ...NONE, "GET /api/ext/places": () => [200, places()] });
+    await publish("page1");
+    assert.ok(!calls.some((c) => c.path === "/api/ext/places"));
+    assert.ok(await posted(calls));
+
+    settings.set("ask-where", true);
+    settings.set("publications", cached());
+    calls = server({ "GET /api/ext/places": () => [200, places()] });
+    await publish("page1");
+    assert.ok(!calls.some((c) => c.path === "/api/ext/places"));
+  });
+
+  test("encrypted is one of the choices; picking it publishes with encryption", async () => {
+    const calls = server({ ...NONE, "GET /api/ext/places": () => [200, places({ collections: [] })] });
+    await publish("page1");
+    assert.deepEqual(optionsOf(selects[0]), ["Graph: notes (Open)", "Graph: notes (Password, encrypted)"]);
+    selects[0].value = "graph-encrypted";
+    button("Publish")!.click!();
+    for (let i = 0; i < 1000 && !calls.some((c) => c.path.endsWith("/seal")); i++) await new Promise((r) => setImmediate(r));
+    // Refused here (the fake plan can't encrypt), so it asked roam.pub with encrypt=1 and sent nothing.
+    for (let i = 0; i < 1000 && !/can't publish with encryption/.test(toasts.at(-1) ?? ""); i++) await new Promise((r) => setImmediate(r));
+    assert.ok(!calls.some((c) => c.method === "POST"));
+  });
+
+  test("encrypted can't be picked without a graph password that can encrypt, and isn't offered when the graph encrypts anyway", async () => {
+    server({ ...NONE, "GET /api/ext/places": () => [200, places({ graph: { name: "notes", access: "open", encrypted: false, encryptBlocked: "No password" } })] });
+    await publish("page1");
+    const enc = (selects[0].children as El[]).find((o) => o.value === "graph-encrypted")!;
+    assert.equal(enc.textContent, "Graph: notes (Password, encrypted), needs a graph password that can encrypt");
+    assert.equal(enc.disabled, true);
+
+    selects = [];
+    server({ ...NONE, "GET /api/ext/places": () => [200, places({ graph: { name: "notes", access: "password", encrypted: true, encryptBlocked: null } })] });
+    await publish("page1");
+    assert.deepEqual(optionsOf(selects[0])[0], "Graph: notes (Password, encrypted)");
+    assert.equal(optionsOf(selects[0]).length, 3);
+  });
+
+  test("Publish with encryption doesn't ask: it goes to the graph", async () => {
+    const calls = server({
+      "GET /api/ext/places": () => [200, places()],
+      ...NONE,
+      "GET /api/ext/publications/page1/seal": () => [200, { encrypt: false, encryptBlocked: "No graph password" }],
+    });
+    await publish("page1", { encrypt: true });
+    assert.ok(!calls.some((c) => c.path === "/api/ext/places"));
   });
 });
 
