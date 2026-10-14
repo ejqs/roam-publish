@@ -64,6 +64,7 @@ export function initState(extensionAPI: ExtensionAPI) {
   const position = api.settings.get("shortlink-position");
   if (position !== "First" && position !== "Last") void save("shortlink-position", position === "bottom" ? "Last" : "First");
   if (api.settings.get("collapsed-blocks") == null) void save("collapsed-blocks", COLLAPSED_AS_IN_ROAM);
+  if (api.settings.get("ask-where") == null) void save("ask-where", true);
 }
 
 /** What the two switches before the select said: pages on unless switched off, blocks off unless on. */
@@ -95,6 +96,8 @@ export const getShortlinkEnabled = () => blockChoice() === "Pages" || blockChoic
 /** Published blocks get a Roam Publish block. */
 export const getShortlinkOnBlocks = () => blockChoice() === "Pages and blocks" || blockChoice() === "Blocks only";
 /** The Roam Publish block's text; blank for none. */
+/** Whether Publish asks where a new page goes; on unless switched off. */
+export const getAskWhere = () => api.settings.get("ask-where") !== false;
 export const getShortlinkTag = () => ((api.settings.get("shortlink-tag") as string) ?? DEFAULT_SHORTLINK_TAG).trim();
 /** How collapsed blocks start on a first publish: as in Roam unless set to Expanded. */
 export const getFirstFolds = () => (api.settings.get("collapsed-blocks") === COLLAPSED_EXPANDED ? "expanded" : "asIs");

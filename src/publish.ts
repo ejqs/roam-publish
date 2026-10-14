@@ -2,6 +2,7 @@ import { api, ApiError } from "./api";
 import { foldedUids, hashPayload, isShortlinkText, type Payload, refold, serialize, type Shortlinks } from "./serialize";
 import {
   getApiKey,
+  getAskWhere,
   getAuthor,
   getServer,
   getCache,
@@ -349,10 +350,11 @@ type PublishResponse = {
  * has no X25519 (older desktop apps): it's sent as before, roam.pub encrypts it on arrival, and the
  * toast says so. `encrypt`: Publish with encryption, refused (nothing sent) when roam.pub says it can't be.
  */
-async function sealFor(uid: string, payload: Payload, encrypt: boolean) {
+async function sealFor(uid: string, payload: Payload, encrypt: boolean, to?: string[]) {
   let plan: SealPlan;
+  const query = new URLSearchParams([...(encrypt ? [["encrypt", "1"]] : []), ...(to ?? []).map((t) => ["to", t])]).toString();
   try {
-    plan = await api<SealPlan>(`/api/ext/publications/${encodeURIComponent(uid)}/seal${encrypt ? "?encrypt=1" : ""}`);
+    plan = await api<SealPlan>(`/api/ext/publications/${encodeURIComponent(uid)}/seal${query ? `?${query}` : ""}`);
   } catch (e) {
     if (e instanceof ApiError && e.status === 404 && !encrypt) return null;
     if (e instanceof ApiError && e.status === 404) throw new ApiError(400, CANT_ENCRYPT_YET);
@@ -375,17 +377,25 @@ const CANT_ENCRYPT_YET = "roam.pub can't publish with encryption yet. Nothing wa
 const encryptedByRoamPub = (unchanged: boolean) =>
   ` ${unchanged ? "This Roam can't encrypt pages itself, so its text and title reached roam.pub to check that." : "roam.pub encrypted it, since this Roam can't encrypt pages itself, so its text and title reached roam.pub this time."} To encrypt in Roam, update Roam's desktop app or publish from roamresearch.com in a browser.`;
 
+type PublishOpts = {
+  folds?: Folds;
+  addedTo?: { name: string; entryUrl: string };
+  encrypt?: boolean;
+  /** Where a new page goes: "graph" and collection ids, as picked in "Publish where?". */
+  to?: string[];
+  /** Publish where roam.pub's New pages go to says, without asking (it was asked, or there's nothing to pick). */
+  noAsk?: boolean;
+};
+
 /**
  * Publishes or republishes. `folds` says which blocks start collapsed on the website (see Folds).
  * Without it, a first publish (or one whose published collapsed blocks aren't known) follows the
  * Collapsed blocks setting, and a republish keeps the published page's open and collapsed blocks; when
  * only those differ from Roam's, it offers to sync them instead. `encrypt`: Publish
  * with encryption, for something not published yet: it goes to the graph as a Password page, encrypted.
+ * Something new is first asked where it goes (askWhere), unless that's switched off in settings.
  */
-export async function publish(
-  uid: string,
-  opts: { folds?: Folds; addedTo?: { name: string; entryUrl: string }; encrypt?: boolean } = {},
-) {
+export async function publish(uid: string, opts: PublishOpts = {}): Promise<void> {
   if (publishing.has(uid)) return toast("Already publishing that. One moment…");
   publishing.add(uid);
   let link: Awaited<ReturnType<typeof ensureShortlinkBlock>> = null;
@@ -400,6 +410,11 @@ export async function publish(
           : `This ${already.kind} is already published, so this doesn't change it. To encrypt it, give it a password on roam.pub.`,
         { link: openLink(already) },
       );
+    if (!cache[uid] && !opts.encrypt && !opts.to && !opts.noAsk && getAskWhere()) {
+      // Asked before anything else, and before writing anything to the graph.
+      publishing.delete(uid);
+      return await askWhere(uid, opts);
+    }
     const published = cache[uid]?.folded;
     let folds = opts.folds;
     if (!folds && !published) folds = getFirstFolds();
@@ -438,7 +453,7 @@ export async function publish(
     let roamCantEncrypt = false;
     const send = async (retry = true): Promise<PublishResponse> => {
       // Password pages are encrypted here, title included, so roam.pub only gets the cipher (see seal.ts).
-      const seal = await sealFor(uid, payload, !!opts.encrypt);
+      const seal = await sealFor(uid, payload, !!opts.encrypt, opts.to);
       const sealed = seal === "roamCantEncrypt" ? null : seal;
       roamCantEncrypt = seal === "roamCantEncrypt";
       const body = sealed
@@ -453,6 +468,7 @@ export async function publish(
             anchorUid: link?.anchorUid,
             timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
             ...(opts.encrypt && { encrypt: true }),
+            ...(opts.to && { to: opts.to }),
           }),
         });
       } catch (e) {
@@ -519,6 +535,81 @@ export async function publish(
 const MAKE: Record<Listing, string> = { unlisted: "Make unlisted", listed: "Make public", discover: "Put on Discover" };
 const statusLabel = (listing: Listing, kind: "page" | "block") =>
   listing === "discover" ? `${kind} on Discover` : `${listing === "listed" ? "public" : "unlisted"} ${kind}`;
+
+type Places = {
+  /** `encryptBlocked`: why it can't be published with encryption, or null when it can (from servers that say). */
+  graph: { name: string; access: Access; encrypted: boolean; encryptBlocked?: string | null };
+  collections: { id: string; name: string; access: Access; listing: Exclude<Listing, "unlisted">; encrypted: boolean }[];
+  /** Where roam.pub's New pages go to puts a new page: "graph" and collection ids. */
+  newPagesGoTo: string[];
+};
+type Access = "open" | "password" | "members";
+
+/** How a new page starts out in a place, as the dropdown says it. */
+const ACCESS_WORDS: Record<Access, string> = { open: "Open", password: "Password", members: "Members only" };
+const startsWords = (p: { access: Access; encrypted: boolean }) => ACCESS_WORDS[p.access] + (p.encrypted ? ", encrypted" : "");
+
+/** "Where New pages go to" as the dropdown says it, when that's more than one place. */
+const NEW_PAGES = "new-pages";
+/** Publish with encryption, as one of the choices. */
+const ENCRYPTED = "graph-encrypted";
+
+/**
+ * "Publish where?": asks whether something new goes to the graph or one of the publisher's
+ * collections, starting on where roam.pub's New pages go to says, so Publish is still one click.
+ * A collection is the only place it goes; Add to collection… after publishing adds more. Not asked
+ * when there's no collection to pick, nor by a roam.pub that can't publish to one directly.
+ */
+async function askWhere(uid: string, opts: PublishOpts): Promise<void> {
+  let places: Places;
+  try {
+    places = await api<Places>("/api/ext/places");
+  } catch (e) {
+    // A roam.pub from before "Publish where?": publish as before.
+    if (e instanceof ApiError && e.status === 404) return publish(uid, { ...opts, noAsk: true });
+    return report(e);
+  }
+  // Not offered when new pages there are encrypted anyway.
+  const offerEncrypted = places.graph.encryptBlocked !== undefined && !places.graph.encrypted;
+  if (places.collections.length === 0 && !(offerEncrypted && !places.graph.encryptBlocked))
+    return publish(uid, { ...opts, noAsk: true });
+  const names = new Map([["graph", places.graph.name], ...places.collections.map((c) => [c.id, c.name] as [string, string])]);
+  const goTo = places.newPagesGoTo.filter((t) => names.has(t));
+  const several = goTo.length > 1;
+  const options = [
+    ...(several
+      ? [{ value: NEW_PAGES, label: `New pages setting: ${goTo.map((t) => names.get(t)).join(" + ")}` }]
+      : []),
+    { value: "graph", label: `Graph: ${places.graph.name} (${startsWords(places.graph)})` },
+    ...(offerEncrypted
+      ? [{
+          value: ENCRYPTED,
+          label: `Graph: ${places.graph.name} (Password, encrypted)${places.graph.encryptBlocked ? ", needs a graph password that can encrypt" : ""}`,
+          disabled: !!places.graph.encryptBlocked,
+        }]
+      : []),
+    ...places.collections.map((c) => ({ value: c.id, label: `Collection: ${c.name} (${startsWords(c)})` })),
+  ];
+  const root = await window.roamAlphaAPI.data.async.pull("[:node/title]", `[:block/uid "${uid}"]`);
+  const title = root?.[":node/title"];
+  const kind = typeof title === "string" ? "page" : "block";
+  toast(`Publish ${title ? `“${title}”` : `this ${kind}`} to:`, {
+    select: { placeholder: "Publish to…", options, value: several ? NEW_PAGES : (goTo[0] ?? "graph") },
+    actions: [
+      {
+        label: "Publish",
+        onClick: (picked) =>
+          void publish(
+            uid,
+            picked === ENCRYPTED
+              ? { ...opts, noAsk: true, encrypt: true }
+              : { ...opts, noAsk: true, to: picked === NEW_PAGES ? goTo : [picked] },
+          ),
+      },
+    ],
+    durationMs: 20000,
+  });
+}
 
 const NOW: Record<Listing, string> = {
   unlisted: "Now unlisted: only people with the link can see it.",
@@ -813,7 +904,8 @@ export async function publishStatus(uid: string) {
       return toast(`${label} isn't published.${offline}`, {
         actions: [
           { label: `Publish ${payload.kind}`, onClick: () => void publish(uid) },
-          { label: "Publish with encryption", onClick: () => void publish(uid, { encrypt: true }) },
+          // Otherwise Publish asks, with encryption as one of the choices.
+          ...(getAskWhere() ? [] : [{ label: "Publish with encryption", onClick: () => void publish(uid, { encrypt: true }) }]),
         ],
       });
     if (c.removed) return toast(`${label} was removed by a moderator.${offline}`, { intent: "danger", link: openLink(c) });

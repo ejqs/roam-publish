@@ -59,6 +59,13 @@ export function createSettingsPanel(extensionAPI: ExtensionAPI) {
         action: { type: "input", placeholder: "Your name" },
       },
       {
+        id: "ask-where",
+        name: "Ask where to publish",
+        description:
+          "Publish asks: your graph, your graph encrypted, or a collection. Off: it goes where New pages go to says on roam.pub.",
+        action: { type: "switch" },
+      },
+      {
         id: "collapsed-blocks",
         name: "Collapsed blocks",
         description:
