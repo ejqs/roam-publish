@@ -33,6 +33,7 @@ const MAX_MARKED = 500;
 
 const STYLES = `
 .${GROUP_CLASS} { display: inline-flex; align-items: center; gap: 2px; margin-left: 8px; vertical-align: middle; }
+h1.rm-title-display:has(textarea, input) .${GROUP_CLASS} { display: none; }
 .${ICON_CLASS} { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px;
   vertical-align: middle; border-radius: 3px; cursor: pointer; position: relative; user-select: none; }
 .${ICON_CLASS}:hover { background: rgba(138, 155, 168, 0.2); }
@@ -236,6 +237,8 @@ function recheckSoon(ms: number) {
   }, ms);
 }
 
+const editingTitle = (h: Element) => !!h.querySelector("textarea, input");
+
 /** The page title in a Roam title heading, without our icons. */
 function titleText(h: Element) {
   const node = [...h.childNodes].find((n) => n.nodeName === "#text" || (n.nodeName === "SPAN" && !ours(n)));
@@ -292,8 +295,11 @@ async function apply() {
   const edited = new Set<string>();
 
   for (const h of document.querySelectorAll("h1.rm-title-display")) {
-    const uid = await pageUid(titleText(h));
     const icon = h.querySelector(`.${GROUP_CLASS}`) as HTMLElement | null;
+    // While the title is being edited, Roam puts a text box in the heading: leave the (hidden) icons
+    // alone until it's done, so they neither jump above the title nor flicker with each keystroke.
+    if (editingTitle(h)) continue;
+    const uid = await pageUid(titleText(h));
     const c = uid ? cache[uid] : undefined;
     const state = c && uid ? check(uid) : undefined;
     if (!uid || !c || !state?.view) {
@@ -373,6 +379,9 @@ function drawIcons(h: Element, existing: HTMLElement | null, uid: string, view: 
       group.append(iconButton(uid, "stats", "page", "Roam Publish: views and upvotes"), iconButton(uid, "settings", "settings", "Roam Publish: page settings"));
     group.querySelector('[data-part="stats"] > span')?.setAttribute("class", "bp3-icon bp3-icon-standard bp3-icon-timeline-bar-chart");
     group.querySelector('[data-part="settings"] > span')?.setAttribute("class", "bp3-icon bp3-icon-standard bp3-icon-cog");
+    h.appendChild(group);
+  } else if (group !== h.lastChild) {
+    // Roam redrew the title before the icons (after an edit): put them back after it.
     h.appendChild(group);
   }
   const el = group.firstElementChild as HTMLElement;
