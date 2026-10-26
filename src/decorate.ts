@@ -68,6 +68,8 @@ h1.rm-title-display:has(textarea, input) .${GROUP_CLASS} { display: none; }
 .rp-form-field > .rp-list-row { padding: 2px 0; }
 .rp-link { cursor: pointer; }
 .rp-links { display: flex; flex-wrap: wrap; gap: 16px; }
+.rp-inline { display: flex; gap: 6px; align-items: center; margin-top: 4px; }
+.rp-inline > .bp3-html-select { flex: 1; min-width: 0; }
 .rp-row-end { justify-content: flex-end; }
 .rp-tiles.rp-tiles-3 { grid-template-columns: repeat(3, 1fr); margin-top: 10px; }
 .rp-tile-small { padding: 8px 10px; }
