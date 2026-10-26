@@ -90,6 +90,15 @@ status, click it for the same actions as the menu. A block published on its own 
 edited since their page was last published get a bar beside them. Nothing is written to your graph to show these.
 Set **Status in Roam** to **Titles only** or **Off** to show less.
 
+**Settings in Roam.** The icon's **Settings** tab changes the page's settings on roam.pub: where it's listed, its byline,
+view count and Download PDF, in your graph and in each collection it's in, and takes it out of a collection. A
+collection's owner can change its own settings from there too (**Collection…**). Access, passwords and members stay
+on roam.pub.
+
+**Dashboard.** The globe in Roam's top bar, or **Roam Publish: Open dashboard** in the command palette, shows your
+views per day, upvotes, readers' countries, most read pages, what changed since you published it, and your
+collections, for the last 7 or 30 days or all time. A graph member sees only the pages they published.
+
 **Keeping up to date.** When roam.pub changes in a way that needs a newer Roam Publish, the extension says so once and
 tells you where to update it (Settings → Roam Depot → Installed extensions), instead of failing with a confusing
 error.
@@ -135,6 +144,7 @@ check references, embeds and children first. Nothing else from your graph is sen
 | **Author name** | Your byline on pages that show authors. Blank: your @username. |
 | **Ask where to publish** | On (default): Publish asks where something new goes. Off: it goes where **New pages go to** says on roam.pub. |
 | **Status in Roam** | **Titles and blocks** (default): the icon after published page titles, rings on published blocks and bars beside edited blocks. **Titles only**, or **Off**. |
+| **Top bar button** | On (default): a globe in Roam's top bar opens the dashboard. Off: use the command palette. |
 | **Collapsed blocks** | **As in Roam** (default): blocks collapsed in Roam start collapsed on a first publish. **Expanded**: every block starts open. Republishing keeps the published page's. |
 | **Roam Publish block** | Where the block with the status link is added: **Pages** (default), **Pages and blocks**, **Blocks only** or **Off**. Off: nothing is written into your pages; roam.pub still keeps each page's status link and history. |
 | **Block position** | **First** or **Last** under the page or block. |
@@ -154,6 +164,8 @@ Changing the tag edits existing blocks in place the next time you publish them. 
   page in Roam; it sends nothing. To keep that list current, it asks roam.pub for it (titles, links and states of
   your published pages; nothing from Roam is sent) at most every 10 minutes while Roam is in front, and saves it
   only when it changed. **Status in Roam: Off** stops this.
+- **Settings and the dashboard** ask roam.pub only when you open them, and change settings only when you press Save.
+  The dashboard's numbers are ones roam.pub already keeps; its "Changed since published" list is worked out in Roam.
 - **Written to your graph:** the Roam Publish block when you publish, and change log entries if you kept an
   append-only token. Nothing else.
 - **Encrypted graphs** are supported. The extension only sends the data you choose to publish.

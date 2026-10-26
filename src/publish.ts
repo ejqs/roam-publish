@@ -662,21 +662,32 @@ export function confirmLeaveDiscover(uid: string, listing: Exclude<Listing, "dis
   );
 }
 
+type ListingResponse = {
+  visibility: Visibility;
+  listing?: Listing;
+  discoverBlocked?: string | null;
+  listedNote?: string | null;
+  url: string;
+};
+
+/** Saves where a page is listed, as a PATCH of it answered, in the published list. */
+export async function cacheListing(uid: string, res: ListingResponse) {
+  const cache = getCache();
+  const next = cache[uid] && {
+    ...cache[uid], visibility: res.visibility, listing: res.listing, discoverBlocked: res.discoverBlocked,
+    listedNote: res.listedNote, url: res.url,
+  };
+  if (next) await setCache({ ...cache, [uid]: next });
+  return next;
+}
+
 export async function setListing(uid: string, listing: Listing) {
   try {
-    const res = await api<{
-      visibility: Visibility;
-      listing?: Listing;
-      discoverBlocked?: string | null;
-      listedNote?: string | null;
-      url: string;
-    }>(`/api/ext/publications/${encodeURIComponent(uid)}`, { method: "PATCH", body: JSON.stringify({ listing }) });
-    const cache = getCache();
-    const next = cache[uid] && {
-      ...cache[uid], visibility: res.visibility, listing: res.listing, discoverBlocked: res.discoverBlocked,
-      listedNote: res.listedNote, url: res.url,
-    };
-    if (next) await setCache({ ...cache, [uid]: next });
+    const res = await api<ListingResponse>(`/api/ext/publications/${encodeURIComponent(uid)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ listing }),
+    });
+    const next = await cacheListing(uid, res);
     // Public with the graph's front page off: nothing lists it, so don't say the front page does.
     const now = listingOf(res);
     const note = now !== "unlisted" && res.listedNote;
