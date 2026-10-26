@@ -1,5 +1,5 @@
 import { api, ApiError } from "./api";
-import { cacheListing, chooseCollection, statusView, syncPublications } from "./publish";
+import { addToCollection, cacheListing, collectionOptions, statusView, syncPublications } from "./publish";
 import { getCache, getServer, type Listing, type Visibility } from "./state";
 import { toast } from "./toast";
 import { button, callout, dialog, h, openUrl, segmented, selectField, switchField, textField } from "./ui";
@@ -163,7 +163,8 @@ export async function renderPageSettings(root: HTMLElement, uid: string, onChang
       button("Edit…", () => openEntrySettings(uid, c, () => (onChange(), void renderPageSettings(root, uid, onChange))), { minimal: true }),
     ),
   );
-  const add = h("a", { class: "rp-link", href: "#", onclick: (e: Event) => (e.preventDefault(), void chooseCollection(uid)) }, "Add to collection…");
+  const add = h("div", {});
+  void addToCollectionField(add, uid, () => (onChange(), void renderPageSettings(root, uid, onChange)));
 
   const save = button(
     "Save",
@@ -200,6 +201,35 @@ export async function renderPageSettings(root: HTMLElement, uid: string, onChang
     status,
     h("div", { class: "rp-row rp-row-end" }, save),
   );
+}
+
+/** A collection picker inside the Settings tab: choose one, then Add. Nothing shows without collections to add to. */
+async function addToCollectionField(root: HTMLElement, uid: string, onAdded: () => void) {
+  let options: Awaited<ReturnType<typeof collectionOptions>>;
+  try {
+    options = await collectionOptions(uid);
+  } catch {
+    return;
+  }
+  if (!root.isConnected || !options.some((o) => !o.disabled)) return;
+  const field = selectField("Add to collection", [{ value: "", label: "Add to collection…" }, ...options.map((o) => ({ value: o.value, label: o.label }))], "", {
+    bare: true,
+  });
+  const select = field.row.querySelector("select")!;
+  // A disabled option already says why in its label ("already there").
+  select.querySelectorAll("option").forEach((o, i) => (o.disabled = i > 0 && options[i - 1].disabled));
+  const add = button(
+    "Add",
+    async () => {
+      if (!field.get()) return;
+      add.disabled = true;
+      await addToCollection(uid, field.get());
+      onAdded();
+    },
+    { disabled: true },
+  );
+  select.addEventListener("change", () => (add.disabled = !field.get()));
+  root.replaceChildren(h("div", { class: "rp-inline" }, field.row, add));
 }
 
 /** The page's settings in one of its collections, and taking it out of that collection. */

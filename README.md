@@ -85,7 +85,7 @@ published show their status only; only they or the graph's owner can change them
 You can also do all of this from the command palette: type "Roam Publish".
 
 **Status in Roam.** A published page shows three icons after its title: its status, its stats and its settings. The
-status icon is a globe, or a lock when it's encrypted. It's green when the page is up to date, and orange with a dot
+status icon is a globe, an eye crossed out when the page is unlisted, or a lock when it's encrypted. It's green when the page is up to date, and orange with a dot
 when it changed since you last published it. Each icon opens a pop-up about that page: its status, views, upvotes
 and readers' countries, and the same actions as the menu. A block published on its own gets a ring on its bullet, and blocks
 edited since their page was last published get a bar beside them. Nothing is written to your graph to show these.
