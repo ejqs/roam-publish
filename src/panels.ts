@@ -2,7 +2,7 @@ import { api, ApiError } from "./api";
 import { cacheListing, chooseCollection, statusView, syncPublications } from "./publish";
 import { getCache, getServer, type Listing, type Visibility } from "./state";
 import { toast } from "./toast";
-import { button, callout, dialog, h, openUrl, type Option, selectField, switchField, textField } from "./ui";
+import { button, callout, dialog, h, openUrl, segmented, selectField, switchField, textField } from "./ui";
 
 /**
  * Page settings, Collection settings and the dashboard, all drawn by the extension and filled from
@@ -92,23 +92,41 @@ const date = (iso: string) => new Date(iso.length === 10 ? `${iso}T00:00:00Z` : 
 const count = (n: number) => n.toLocaleString();
 const plural = (n: number, one: string, many = `${one}s`) => `${count(n)} ${n === 1 ? one : many}`;
 
-/** The page's own settings in one place, as fields; `read` gives what changed. */
+const listingNote = (l: Listing, where: "graph" | "collection") =>
+  l === "unlisted" ? "Only people with the link find it." : `Shown on the ${where === "graph" ? "graph's front page" : "collection's page"}${l === "discover" ? " and on Discover" : ""}.`;
+
+/** A labelled row of the compact settings form. */
+const formRow = (label: string, ...field: (Node | string | null)[]) =>
+  h("div", { class: "rp-form-row" }, h("div", { class: "rp-form-label" }, label), h("div", { class: "rp-form-field" }, ...field));
+
+/** The page's own settings in one place, as form rows; `read` gives what changed. */
 function placeFields(p: PlaceSettings, where: "graph" | "collection", opts: { listingBlocked?: string | null; disabled?: boolean }) {
   const as = where === "graph" ? "As the graph" : "As the collection";
-  const listingOptions: Option[] = (["unlisted", "listed", "discover"] as const).map((v) => ({
-    value: v,
-    label: LISTING_LABEL[v],
-    disabled: v === "discover" && p.listing !== "discover" ? p.discoverBlocked : null,
-  }));
-  const listing = opts.listingBlocked ? null : selectField("Visibility", listingOptions, p.listing, { disabled: opts.disabled });
+  const listing = opts.listingBlocked
+    ? null
+    : segmented(
+        "Visibility",
+        (["unlisted", "listed", "discover"] as const).map((v) => ({
+          value: v,
+          label: LISTING_LABEL[v],
+          disabled: opts.disabled ? "Not yours to change" : v === "discover" ? p.discoverBlocked : null,
+        })),
+        p.listing,
+      );
   const own = (label: string, value: string, inherit: string, choices: [string, string][]) =>
     selectField(label, [{ value: "inherit", label: `${as} (${SHOWN[inherit]})` }, ...choices.map(([v, l]) => ({ value: v, label: l }))], value, {
       disabled: opts.disabled,
+      bare: true,
     });
   const byline = own("Byline", p.showAuthor, p.defaults.showAuthor, [["show", "Show"], ["hide", "Hide"]]);
   const views = own("View count", p.views, p.defaults.views, [["show", "Show"], ["hide", "Only for you"], ["off", "Off"]]);
-  const pdf = own("Download PDF", p.pdfDownload, p.defaults.pdfDownload, [["on", "On"], ["off", "Off"]]);
-  const rows = [listing?.row, byline.row, views.row, pdf.row];
+  const pdf = own("PDF download", p.pdfDownload, p.defaults.pdfDownload, [["on", "On"], ["off", "Off"]]);
+  const rows = [
+    listing ? formRow("Visibility", listing.group, h("div", { class: "rp-note" }, listingNote(p.listing, where))) : null,
+    formRow("Byline", byline.row),
+    formRow("View count", views.row),
+    formRow("PDF download", pdf.row),
+  ];
   const read = () => {
     const out: Record<string, string> = {};
     if (listing && listing.get() !== p.listing) out.listing = listing.get();
@@ -117,12 +135,12 @@ function placeFields(p: PlaceSettings, where: "graph" | "collection", opts: { li
     if (pdf.get() !== p.pdfDownload) out.pdfDownload = pdf.get();
     return out;
   };
-  return { rows, read };
+  return { rows: rows.filter((r): r is HTMLDivElement => !!r), read };
 }
 
 /**
- * The Settings tab of the title icon's pop-up: the page's settings in its graph and in each of its
- * collections, saved together.
+ * The Settings tab of the title icons' pop-up: the page's settings in its graph, its collections
+ * (each opens its own small dialog) and its access, which is changed on roam.pub.
  */
 export async function renderPageSettings(root: HTMLElement, uid: string, onChange: () => void) {
   root.replaceChildren(h("div", { class: "rp-muted" }, "Loading settings…"));
@@ -134,111 +152,148 @@ export async function renderPageSettings(root: HTMLElement, uid: string, onChang
     return;
   }
   if (!root.isConnected) return;
-  const sections: { save: () => Promise<boolean> }[] = [];
-  const out: Node[] = [];
   const status = h("div", { class: "rp-status", role: "status" });
+  const f = s.graph.inGraph ? placeFields(s.graph, "graph", { listingBlocked: s.graph.listingBlocked }) : null;
 
-  if (s.graph.inGraph) {
-    const f = placeFields(s.graph, "graph", { listingBlocked: s.graph.listingBlocked });
-    out.push(
-      h("div", { class: "rp-section-head" }, h("strong", {}, `In ${s.graph.name}`), button("Open ↗", () => openUrl(s.graph.url), { minimal: true })),
-      ...f.rows.filter((r): r is HTMLLabelElement => !!r),
-      h("div", { class: "rp-note" }, `Access: ${ACCESS_LABEL[s.graph.access]}`),
-    );
-    sections.push({
-      save: async () => {
-        const body = f.read();
-        if (!Object.keys(body).length) return false;
+  const collections = s.collections.map((c) =>
+    h(
+      "div",
+      { class: "rp-list-row" },
+      h("span", { title: `${ACCESS_LABEL[c.access]}, ${LISTING_LABEL[c.listing]}` }, c.name, h("span", { class: "rp-muted" }, ` · ${LISTING_LABEL[c.listing]}`)),
+      button("Edit…", () => openEntrySettings(uid, c, () => (onChange(), void renderPageSettings(root, uid, onChange))), { minimal: true }),
+    ),
+  );
+  const add = h("a", { class: "rp-link", href: "#", onclick: (e: Event) => (e.preventDefault(), void chooseCollection(uid)) }, "Add to collection…");
+
+  const save = button(
+    "Save",
+    async () => {
+      const body = f?.read() ?? {};
+      if (!Object.keys(body).length) return void toast("Nothing changed.");
+      save.disabled = true;
+      status.replaceChildren();
+      try {
         const res = await api<{ visibility: Visibility; listing?: Listing; url: string }>(`/api/ext/publications/${enc(uid)}`, {
           method: "PATCH",
           body: JSON.stringify(body),
         });
         if (body.listing) await cacheListing(uid, res);
-        return true;
-      },
-    });
-  } else out.push(h("div", { class: "rp-note" }, `Only in collections, not shown in ${s.graph.name}.`));
-
-  for (const c of s.collections) {
-    const f = placeFields(c, "collection", { disabled: !c.canManage });
-    let confirming = false;
-    const remove = button(
-      "Remove",
-      async () => {
-        if (!confirming) {
-          confirming = true;
-          remove.textContent = `Remove from ${c.name}?`;
-          return;
-        }
-        try {
-          remove.disabled = true;
-          await api(`/api/ext/publications/${enc(uid)}/collections/${enc(c.id)}`, { method: "DELETE" });
-          await syncPublications({ quiet: true });
-          toast(`Removed from ${c.name}.`, { intent: "success" });
-          onChange();
-          void renderPageSettings(root, uid, onChange);
-        } catch (e) {
-          status.replaceChildren(callout(errorText(e), "danger"));
-          remove.disabled = false;
-        }
-      },
-      { minimal: true, intent: "danger" },
-    );
-    out.push(
-      h(
-        "div",
-        { class: "rp-section-head" },
-        h("strong", {}, `In ${c.name}`),
-        h(
-          "span",
-          {},
-          button("Open ↗", () => openUrl(c.url), { minimal: true }),
-          button("Collection…", () => void openCollectionSettings(c.id), { minimal: true, title: `${c.name}'s own settings` }),
-          remove,
-        ),
-      ),
-      ...f.rows.filter((r): r is HTMLLabelElement => !!r),
-      h("div", { class: "rp-note" }, c.canManage ? `Access: ${ACCESS_LABEL[c.access]}` : `Access: ${ACCESS_LABEL[c.access]}. Only the collection's owner or the member who added it changes these.`),
-    );
-    if (c.canManage)
-      sections.push({
-        save: async () => {
-          const body = f.read();
-          if (!Object.keys(body).length) return false;
-          await api(`/api/ext/publications/${enc(uid)}/collections/${enc(c.id)}`, { method: "PATCH", body: JSON.stringify(body) });
-          return true;
-        },
-      });
-  }
-
-  const save = button(
-    "Save",
-    async () => {
-      save.disabled = true;
-      status.replaceChildren();
-      try {
-        let saved = false;
-        for (const section of sections) saved = (await section.save()) || saved;
-        toast(saved ? "Settings saved." : "Nothing changed.", { intent: saved ? "success" : "none" });
-        if (saved) onChange();
+        toast("Settings saved.", { intent: "success" });
+        onChange();
         void renderPageSettings(root, uid, onChange);
       } catch (e) {
         status.replaceChildren(callout(errorText(e), "danger"));
         save.disabled = false;
       }
     },
-    { intent: "primary" },
+    { intent: "primary", disabled: !f },
   );
+
   root.replaceChildren(
-    ...out,
+    ...(f ? f.rows : [formRow("Visibility", h("span", { class: "rp-muted" }, `Not in ${s.graph.name}, only in collections.`))]),
+    formRow("Collections", ...(collections.length ? collections : [h("div", { class: "rp-muted" }, "None")]), add),
+    formRow(
+      "Access",
+      h("div", {}, ACCESS_LABEL[s.graph.access], s.encrypted ? ", encrypted" : ""),
+      h("a", { class: "rp-link", href: "#", onclick: (e: Event) => (e.preventDefault(), openUrl(s.manageUrl)) }, "Change on roam.pub ↗"),
+    ),
     status,
+    h("div", { class: "rp-row rp-row-end" }, save),
+  );
+}
+
+/** The page's settings in one of its collections, and taking it out of that collection. */
+function openEntrySettings(uid: string, c: PageSettings["collections"][number], onChange: () => void) {
+  const d = dialog(`In ${c.name}`);
+  const f = placeFields(c, "collection", { disabled: !c.canManage });
+  const status = h("div", { class: "rp-status", role: "status" });
+  d.body.append(
+    ...f.rows,
+    formRow("Access", h("div", {}, ACCESS_LABEL[c.access])),
+    formRow(
+      "",
+      h(
+        "div",
+        { class: "rp-links" },
+        h("a", { class: "rp-link", href: "#", onclick: (e: Event) => (e.preventDefault(), void openCollectionSettings(c.id)) }, "Collection settings…"),
+        h("a", { class: "rp-link", href: "#", onclick: (e: Event) => (e.preventDefault(), openUrl(c.url)) }, "Open in collection ↗"),
+      ),
+    ),
+    c.canManage ? "" : callout("Only the collection's owner or the member who added the page changes these."),
+    status,
+  );
+  let confirming = false;
+  const remove = button(
+    "Remove",
+    async () => {
+      if (!confirming) {
+        confirming = true;
+        remove.textContent = `Remove from ${c.name}?`;
+        return;
+      }
+      remove.disabled = true;
+      try {
+        await api(`/api/ext/publications/${enc(uid)}/collections/${enc(c.id)}`, { method: "DELETE" });
+        await syncPublications({ quiet: true });
+        toast(`Removed from ${c.name}.`, { intent: "success" });
+        d.close();
+        onChange();
+      } catch (e) {
+        status.replaceChildren(callout(errorText(e), "danger"));
+        remove.disabled = false;
+      }
+    },
+    { minimal: true, intent: "danger", small: false, disabled: !c.canManage },
+  );
+  const save = button(
+    "Save",
+    async () => {
+      const body = f.read();
+      if (!Object.keys(body).length) return d.close();
+      save.disabled = true;
+      try {
+        await api(`/api/ext/publications/${enc(uid)}/collections/${enc(c.id)}`, { method: "PATCH", body: JSON.stringify(body) });
+        toast("Settings saved.", { intent: "success" });
+        d.close();
+        onChange();
+      } catch (e) {
+        status.replaceChildren(callout(errorText(e), "danger"));
+        save.disabled = false;
+      }
+    },
+    { intent: "primary", small: false, disabled: !c.canManage },
+  );
+  d.footer.append(
+    remove,
+    h("span", { class: "rp-spacer" }),
+    button("Cancel", d.close, { small: false }),
+    save,
+  );
+}
+
+type PageStats = Pick<Stats, "views" | "upvotes" | "countries">;
+
+/** The page's views, upvotes and readers' countries as three tiles, or nothing if roam.pub can't say. */
+export async function renderPageStats(root: HTMLElement, uid: string) {
+  let s: PageStats;
+  try {
+    s = await api<PageStats>(`/api/ext/publications/${enc(uid)}/stats?period=7`);
+  } catch {
+    root.replaceChildren();
+    return;
+  }
+  if (!root.isConnected) return;
+  const countries = s.countries.filter((c) => c.code !== "other");
+  const tile = (label: string, value: number, gained?: number) =>
     h(
       "div",
-      { class: "rp-row" },
-      save,
-      button("Add to collection…", () => void chooseCollection(uid)),
-      button("Access and passwords ↗", () => openUrl(s.manageUrl), { minimal: true, title: "Changed on roam.pub" }),
-    ),
+      { class: "rp-tile rp-tile-small" },
+      h("div", { class: "rp-tile-value" }, count(value)),
+      h("div", { class: "rp-tile-label" }, label),
+      gained === undefined ? "" : h("div", { class: `rp-note${gained ? " rp-gain" : ""}` }, `+${count(gained)} in 7 days`),
+    );
+  root.replaceChildren(
+    h("div", { class: "rp-tiles rp-tiles-3" }, tile("Views", s.views.total, s.views.period), tile("Upvotes", s.upvotes.total, s.upvotes.period), tile("Countries", countries.length)),
   );
 }
 

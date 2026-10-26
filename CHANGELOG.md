@@ -7,9 +7,11 @@ What's new shows it once Roam Depot serves it. Every bullet starts with **Breaki
 ## 0.3.0 (2026-10-26)
 
 ### Status in Roam
-- New: **A published page shows its status after its title.** A globe icon, or a lock when it's encrypted: green
-  when it's up to date, orange with a dot when it changed since you last published it. Hover it for the status;
-  click it for the same actions as **Roam Publish: Page…**.
+- New: **Three icons after a published page's title**: status, stats and settings. The status icon is a globe, or a
+  lock when the page is encrypted: green when it's up to date, orange with a dot when it changed since you last
+  published it. Each opens a pop-up about that page, with the same actions as **Roam Publish: Page…**.
+- New: **Stats for each page** in its pop-up: views, upvotes and readers' countries, with what's new in the last 7
+  days.
 - New: A block published on its own gets a ring on its bullet, green or orange the same way.
 - New: Blocks edited since their page or block was last published get a bar beside them, so you can see what a
   Republish would change.
@@ -17,8 +19,8 @@ What's new shows it once Roam Depot serves it. Every bullet starts with **Breaki
   to your graph to show any of this.
 
 ### Settings and dashboard
-- New: **Settings** in the title icon's pop-up: where the page is listed, its byline, view count and Download PDF,
-  in your graph and in each of its collections, and **Remove** to take it out of a collection. Access and passwords
+- New: **Page settings in Roam**, from the settings icon: visibility, byline, view count and PDF download, in your
+  graph and in each of the page's collections, and **Remove** to take it out of a collection. Access and passwords
   are still changed on roam.pub.
 - New: **Collection settings** from Roam, for a collection's owner: name, description, bylines, view counts,
   Download PDF, Discover, search and RSS. Members see them without changing them.

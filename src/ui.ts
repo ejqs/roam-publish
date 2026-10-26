@@ -57,21 +57,36 @@ export function button(label: string, onClick: () => void, opts: { intent?: "pri
 export type Option = { value: string; label: string; disabled?: string | null };
 
 /** A labelled dropdown; a disabled option says why in its label. */
-export function selectField(label: string, options: Option[], value: string, opts: { disabled?: boolean; note?: string } = {}) {
+export function selectField(label: string, options: Option[], value: string, opts: { disabled?: boolean; note?: string; bare?: boolean } = {}) {
   const select = h("select", { disabled: opts.disabled, "aria-label": label });
   for (const o of options) {
     const opt = h("option", { value: o.value, disabled: !!o.disabled }, o.disabled ? `${o.label} (${o.disabled})` : o.label);
     if (o.value === value) opt.selected = true;
     select.append(opt);
   }
-  const row = h(
-    "label",
-    { class: "rp-field" },
-    h("span", { class: "rp-field-label" }, label),
-    h("div", { class: "bp3-html-select bp3-small bp3-fill" }, select, icon("double-caret-vertical")),
-  );
+  const control = h("div", { class: "bp3-html-select bp3-small bp3-fill" }, select, icon("double-caret-vertical"));
+  // Bare: the control alone, for a form that labels its rows itself.
+  const row = opts.bare ? control : h("label", { class: "rp-field" }, h("span", { class: "rp-field-label" }, label), control);
   if (opts.note) row.append(h("span", { class: "rp-note" }, opts.note));
   return { row, get: () => select.value };
+}
+
+/** A row of buttons where one is chosen (Blueprint's button group); a disabled one says why in its title. */
+export function segmented(label: string, options: Option[], value: string) {
+  let chosen = value;
+  const group = h("div", { class: "bp3-button-group bp3-small bp3-fill", role: "group", "aria-label": label });
+  const draw = () =>
+    group.querySelectorAll("button").forEach((b) => {
+      b.classList.toggle("bp3-active", b.dataset.value === chosen);
+      b.setAttribute("aria-pressed", String(b.dataset.value === chosen));
+    });
+  for (const o of options) {
+    const b = button(o.label, () => ((chosen = o.value), draw()), { disabled: !!o.disabled && o.value !== value, title: o.disabled ?? undefined });
+    b.dataset.value = o.value;
+    group.append(b);
+  }
+  draw();
+  return { group, get: () => chosen };
 }
 
 export function switchField(label: string, checked: boolean, opts: { disabled?: string | null | boolean; note?: string } = {}) {
