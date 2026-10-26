@@ -84,6 +84,22 @@ published show their status only; only they or the graph's owner can change them
 
 You can also do all of this from the command palette: type "Roam Publish".
 
+**Status in Roam.** A published page shows three icons after its title: its status, its stats and its settings. The
+status icon is a globe, or a lock when it's encrypted. It's green when the page is up to date, and orange with a dot
+when it changed since you last published it. Each icon opens a pop-up about that page: its status, views, upvotes
+and readers' countries, and the same actions as the menu. A block published on its own gets a ring on its bullet, and blocks
+edited since their page was last published get a bar beside them. Nothing is written to your graph to show these.
+Set **Status in Roam** to **Titles only** or **Off** to show less.
+
+**Settings in Roam.** The settings icon changes the page's settings on roam.pub: its visibility, byline, view count
+and PDF download. **Edit…** next to each of its collections does the same there, or takes it out of the collection.
+A collection's owner can change the collection's own settings from there too (**Collection settings…**). Access, passwords and members stay
+on roam.pub.
+
+**Dashboard.** The globe in Roam's top bar, or **Roam Publish: Open dashboard** in the command palette, shows your
+views per day, upvotes, readers' countries, most read pages, what changed since you published it, and your
+collections, for the last 7 or 30 days or all time. A graph member sees only the pages they published.
+
 **Keeping up to date.** When roam.pub changes in a way that needs a newer Roam Publish, the extension says so once and
 tells you where to update it (Settings → Roam Depot → Installed extensions), instead of failing with a confusing
 error.
@@ -127,6 +143,9 @@ check references, embeds and children first. Nothing else from your graph is sen
 | **Dashboard** | Opens the roam.pub dashboard, at your API keys until you've added one. API keys, access, passwords, collections, members and the change log are managed there. |
 | **API key** | Your key for this graph (see Setup). Pasting it checks it at once and says which graph it works for. |
 | **Author name** | Your byline on pages that show authors. Blank: your @username. |
+| **Ask where to publish** | On (default): Publish asks where something new goes. Off: it goes where **New pages go to** says on roam.pub. |
+| **Status in Roam** | **Titles and blocks** (default): the icons after published page titles, rings on published blocks and bars beside edited blocks. **Titles only**, or **Off**. |
+| **Top bar button** | On (default): a globe in Roam's top bar opens the dashboard. Off: use the command palette. |
 | **Collapsed blocks** | **As in Roam** (default): blocks collapsed in Roam start collapsed on a first publish. **Expanded**: every block starts open. Republishing keeps the published page's. |
 | **Roam Publish block** | Where the block with the status link is added: **Pages** (default), **Pages and blocks**, **Blocks only** or **Off**. Off: nothing is written into your pages; roam.pub still keeps each page's status link and history. |
 | **Block position** | **First** or **Last** under the page or block. |
@@ -142,6 +161,12 @@ Changing the tag edits existing blocks in place the next time you publish them. 
 - **One background request:** while Roam is open, about every 5 minutes, the extension tells roam.pub which status link
   blocks still exist (uids only, no text). Setting **Roam Publish block** to **Off** stops it. See
   [Use of the Append API](#use-of-the-append-api).
+- **Status in Roam** reads the list of your published pages that the extension already keeps, and checks the open
+  page in Roam; it sends nothing. To keep that list current, it asks roam.pub for it (titles, links and states of
+  your published pages; nothing from Roam is sent) at most every 10 minutes while Roam is in front, and saves it
+  only when it changed. **Status in Roam: Off** stops this.
+- **Settings and the dashboard** ask roam.pub only when you open them, and change settings only when you press Save.
+  The dashboard's numbers are ones roam.pub already keeps; its "Changed since published" list is worked out in Roam.
 - **Written to your graph:** the Roam Publish block when you publish, and change log entries if you kept an
   append-only token. Nothing else.
 - **Encrypted graphs** are supported. The extension only sends the data you choose to publish.
@@ -205,6 +230,17 @@ CI runs the typecheck and Roam Depot's own `./build.sh` on every PR and push to 
 `package.json` and add a matching `## x.y.z` section to `CHANGELOG.md`, then push a tag (`git tag v0.1.1 && git push
 origin v0.1.1`). The Release workflow publishes a GitHub Release with that changelog section. Then bump `source_commit`
 in your roam-depot PR to the released commit.
+
+## Credits
+
+Roam Publish adapts a small amount of code from these MIT-licensed projects, credited where it's used:
+
+- [roamjs-components](https://github.com/RoamJS/roamjs-components) (Copyright (c) 2021 David Vargas): reading a block's
+  uid from Roam's element id (`src/marks.ts`).
+
+The approach to marking pages and blocks in Roam (one observer, attributes and CSS on Roam's own elements, everything
+removed on unload) follows [Reference Count](https://github.com/fbgallet/roam-extension-ref-count) by Fabrice Gallet
+(MIT), RoamJS's [roamjs-components](https://github.com/RoamJS/roamjs-components) and Roam Depot's review notes.
 
 ## License
 

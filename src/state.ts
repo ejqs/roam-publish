@@ -65,7 +65,20 @@ export function initState(extensionAPI: ExtensionAPI) {
   if (position !== "First" && position !== "Last") void save("shortlink-position", position === "bottom" ? "Last" : "First");
   if (api.settings.get("collapsed-blocks") == null) void save("collapsed-blocks", COLLAPSED_AS_IN_ROAM);
   if (api.settings.get("ask-where") == null) void save("ask-where", true);
+  if (api.settings.get(TOP_BAR_SETTING) == null) void save(TOP_BAR_SETTING, true);
+  if (!STATUS_CHOICES.includes(api.settings.get(STATUS_SETTING) as StatusChoice)) void save(STATUS_SETTING, STATUS_CHOICES[0]);
 }
+
+/** Where published pages and blocks are marked in Roam, as the settings panel's select shows it. */
+export const STATUS_CHOICES = ["Titles and blocks", "Titles only", "Off"] as const;
+type StatusChoice = (typeof STATUS_CHOICES)[number];
+export const STATUS_SETTING = "status-in-roam";
+/** Saved by the select's onChange too, so the marks redraw with the new choice right away. */
+export const saveStatusMarks = (choice: string) => save(STATUS_SETTING, choice);
+export const getStatusMarks = (): StatusChoice => {
+  const saved = api.settings.get(STATUS_SETTING);
+  return STATUS_CHOICES.includes(saved as StatusChoice) ? (saved as StatusChoice) : STATUS_CHOICES[0];
+};
 
 /** What the two switches before the select said: pages on unless switched off, blocks off unless on. */
 function legacyBlockChoice(): BlockChoice {
@@ -98,6 +111,8 @@ export const getShortlinkOnBlocks = () => blockChoice() === "Pages and blocks" |
 /** The Roam Publish block's text; blank for none. */
 /** Whether Publish asks where a new page goes; on unless switched off. */
 export const getAskWhere = () => api.settings.get("ask-where") !== false;
+export const TOP_BAR_SETTING = "top-bar-button";
+export const getTopBar = () => api.settings.get(TOP_BAR_SETTING) !== false;
 export const getShortlinkTag = () => ((api.settings.get("shortlink-tag") as string) ?? DEFAULT_SHORTLINK_TAG).trim();
 /** How collapsed blocks start on a first publish: as in Roam unless set to Expanded. */
 export const getFirstFolds = () => (api.settings.get("collapsed-blocks") === COLLAPSED_EXPANDED ? "expanded" : "asIs");
@@ -110,8 +125,21 @@ export const getShortlinkPosition = () => {
 export const getCache = (): PublicationCache =>
   (api.settings.get("publications") as PublicationCache) ?? {};
 
+/** Called after the published list changes (a publish, an unpublish, a sync), so status marks redraw. */
+const cacheListeners = new Set<() => void>();
+export function onCacheChange(fn: () => void) {
+  cacheListeners.add(fn);
+  return () => void cacheListeners.delete(fn);
+}
+
+/**
+ * Saved only when it changed: the list is synced every few minutes while status marks are on, and
+ * rewriting an unchanged (possibly large) setting each time is needless work for Roam.
+ */
 export async function setCache(cache: PublicationCache) {
+  if (JSON.stringify(withoutUndefined(cache)) === JSON.stringify(getCache())) return;
   await save("publications", cache);
+  cacheListeners.forEach((fn) => fn());
 }
 
 /** The key for encrypted pages' content hashes (seal.ts `keyedHash`), when this graph has one. */

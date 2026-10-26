@@ -4,6 +4,42 @@ All notable changes to the Roam Publish extension. Each version is dated when it
 What's new shows it once Roam Depot serves it. Every bullet starts with **Breaking:**, **New:**, **Improved:** or
 **Fixed:**; a breaking change comes with a new major version.
 
+## 0.3.0 (2026-10-26)
+
+### Status in Roam
+- New: **Three icons after a published page's title**: status, stats and settings. The status icon is a globe, or a
+  lock when the page is encrypted: green when it's up to date, orange with a dot when it changed since you last
+  published it. Each opens a pop-up about that page, with the same actions as **Roam Publish: Page…**.
+- New: **Stats for each page** in its pop-up: views, upvotes and readers' countries, with what's new in the last 7
+  days.
+- New: A block published on its own gets a ring on its bullet, green or orange the same way.
+- New: Blocks edited since their page or block was last published get a bar beside them, so you can see what a
+  Republish would change.
+- New: **Status in Roam** setting: **Titles and blocks** (the default), **Titles only** or **Off**. Nothing is written
+  to your graph to show any of this.
+
+### Settings and dashboard
+- New: **Page settings in Roam**, from the settings icon: visibility, byline, view count and PDF download, in your
+  graph and in each of the page's collections, and **Remove** to take it out of a collection. Access and passwords
+  are still changed on roam.pub.
+- New: **Collection settings** from Roam, for a collection's owner: name, description, bylines, view counts,
+  Download PDF, Discover, search and RSS. Members see them without changing them.
+- New: **A Roam Publish dashboard in Roam**, from a globe in the top bar or **Roam Publish: Open dashboard**: views
+  per day, upvotes, readers' countries, your most read pages, what changed since you published it, with
+  Republish, and your collections, for the last 7 or 30 days or all time.
+
+### Publishing
+- New: **Publish to.** Publishing something new asks where it goes: your graph, your graph encrypted, or one of
+  your collections, each with how the page starts out there. It starts on roam.pub's **New pages go to**, so one
+  click on **Publish** keeps the usual place. A collection picked is the only place the page goes.
+- Improved: **Publish with encryption** is one of the **Publish to** choices. Without a graph password that can
+  encrypt, the choice is greyed out.
+
+### Setup and settings
+- New: **Top bar button** setting, on by default: the globe that opens the dashboard.
+- New: **Ask where to publish** setting, on by default. Off: Publish goes straight to where **New pages go to**
+  says, and the status pop-up offers **Publish with encryption** next to Publish.
+
 ## 0.2.0 (2026-10-13)
 
 ### Security
@@ -17,13 +53,11 @@ What's new shows it once Roam Depot serves it. Every bullet starts with **Breaki
 - Improved: The extension uses roam.pub's words for a page's visibility. The buttons are **Make public**, **Put on
   Discover** and **Make unlisted** (they were Make listed and Make discoverable), and the status says "Public page"
   or "Page on Discover".
-- New: **Publish to.** Publishing something new asks where it goes: your graph, your graph encrypted, or one of
-  your collections, each with how the page starts out there. It starts on roam.pub's **New pages go to**, so one
-  click on **Publish** keeps the usual place. A collection picked is the only place the page goes.
-- New: **Publish with encryption.** One of the **Publish to** choices, and in the command palette as **Roam Publish:
-  Publish current page with encryption** and **Publish focused block with encryption**. It publishes to your graph
-  as a Password page, encrypted in Roam with your graph password. Without a graph password that can encrypt, the
-  choice is greyed out.
+- New: **Publish with encryption.** The status pop-up for a page or block that isn't published yet has a **Publish
+  with encryption** button next to Publish, and the command palette has **Roam Publish: Publish current page with
+  encryption** and **Publish focused block with encryption**. It publishes to your graph as a Password page,
+  encrypted in Roam with your graph password, whatever new pages usually start as. If your graph has no password
+  that can encrypt yet, nothing is published and the message says how to set one on roam.pub.
 - New: Pages with collapsed blocks are published with those blocks collapsed, as you have them in Roam. To publish
   them expanded instead, set **Collapsed blocks** to **Expanded** in the extension settings. Readers can open and
   close blocks either way.
@@ -43,8 +77,6 @@ What's new shows it once Roam Depot serves it. Every bullet starts with **Breaki
   you last published it, it asks first. Collections without a password that can encrypt are greyed out.
 
 ### Setup and settings
-- New: **Ask where to publish** setting, on by default. Off: Publish goes straight to where **New pages go to**
-  says, and the status pop-up offers **Publish with encryption** next to Publish.
 - New: **Collapsed blocks** setting: **As in Roam** (the default) or **Expanded**, for how blocks collapsed in Roam
   start out the first time you publish.
 - Improved: The extension's description lists roam.pub's main features, including end-to-end encryption and

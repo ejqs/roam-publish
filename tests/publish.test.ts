@@ -9,6 +9,7 @@ import {
   confirmUnpublish,
   publish,
   publishStatus,
+  statusView,
   syncPublications,
 } from "../src/publish";
 import { recheckCanSeal } from "../src/seal";
@@ -903,5 +904,30 @@ describe("change log confirmations", () => {
     await confirmChangeLogBlocks();
     const sizes = calls.map((c) => (c.body.present as unknown[]).length + (c.body.missing as unknown[]).length);
     assert.deepEqual(sizes, [2000, 1]);
+  });
+});
+
+describe("status in Roam", () => {
+  test("reads only the cache: no request, and the state the title icon shows", async () => {
+    const calls = server();
+    const hash = await hashPayload((await serialize("page1"))!);
+    settings.set("publications", cached({ hash, updatedAt: "2026-10-20T09:14:00Z" }));
+    const current = await statusView("page1", { sync: false });
+    assert.equal(current?.state, "current");
+    assert.deepEqual(current?.uids, ["page1", "b1"]);
+    roam.blocks.get("b1")!.string = "hello, edited";
+    const changed = await statusView("page1", { sync: false });
+    assert.equal(changed?.state, "changed");
+    assert.deepEqual(changed?.actions.map((a) => a.label), ["Republish", "Unpublish"]);
+    assert.equal(calls.length, 0);
+  });
+
+  test("a page that isn't published, and one published by another member", async () => {
+    settings.set("publications", {});
+    assert.equal((await statusView("page1", { sync: false }))?.state, "unpublished");
+    settings.set("publications", cached({ mine: false }));
+    const other = await statusView("page1", { sync: false });
+    assert.equal(other?.state, "other");
+    assert.deepEqual(other?.actions, []);
   });
 });

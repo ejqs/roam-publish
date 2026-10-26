@@ -1,4 +1,6 @@
 import { confirmChangeLogBlocks, confirmUnpublish, publish, publishStatus } from "./publish";
+import { addStyles, removeStyles, startMarks, startTopbar, stopMarks, stopTopbar } from "./decorate";
+import { openDashboard } from "./panels";
 import { createSettingsPanel } from "./settings";
 import { initState } from "./state";
 import { removeToasts, toast } from "./toast";
@@ -19,6 +21,9 @@ const PALETTE: { label: string; target: "page" | "block"; run: (uid: string) => 
   { label: "Roam Publish: Unpublish focused block", target: "block", run: confirmUnpublish },
   { label: "Roam Publish: Focused block status", target: "block", run: publishStatus },
 ];
+
+/** Commands that need no page or block. */
+const GLOBAL = [{ label: "Roam Publish: Open dashboard", run: openDashboard }];
 
 let extensionAPI: ExtensionAPI;
 let confirmTimers: ReturnType<typeof setTimeout>[] = [];
@@ -73,17 +78,24 @@ async function onload({ extensionAPI: api }: { extensionAPI: ExtensionAPI }) {
   ui.pageContextMenu.addCommand({ label: PAGE_MENU, callback: (c) => void withPageUid(c, publishStatus) });
 
   for (const c of PALETTE) api.ui.commandPalette.addCommand({ label: c.label, callback: () => void withTarget(c.target, c.run) });
+  for (const c of GLOBAL) api.ui.commandPalette.addCommand({ label: c.label, callback: c.run });
   confirmTimers = [setTimeout(confirm, 20_000), setInterval(confirm, CONFIRM_EVERY_MS)];
+  addStyles();
+  startMarks();
+  startTopbar();
 }
 
 function onunload() {
   const { ui } = window.roamAlphaAPI;
   ui.blockContextMenu.removeCommand({ label: BLOCK_MENU });
   ui.pageContextMenu.removeCommand({ label: PAGE_MENU });
-  for (const c of PALETTE) extensionAPI?.ui.commandPalette.removeCommand({ label: c.label });
+  for (const c of [...PALETTE, ...GLOBAL]) extensionAPI?.ui.commandPalette.removeCommand({ label: c.label });
   confirmTimers.forEach((t) => clearTimeout(t));
   confirmTimers = [];
   removeToasts();
+  stopMarks();
+  stopTopbar();
+  removeStyles();
 }
 
 export default { onload, onunload };
