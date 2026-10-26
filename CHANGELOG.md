@@ -4,7 +4,7 @@ All notable changes to the Roam Publish extension. Each version is dated when it
 What's new shows it once Roam Depot serves it. Every bullet starts with **Breaking:**, **New:**, **Improved:** or
 **Fixed:**; a breaking change comes with a new major version.
 
-## Unreleased
+## 0.3.0 (2026-10-26)
 
 ### Status in Roam
 - New: **A published page shows its status after its title.** A globe icon, or a lock when it's encrypted: green
