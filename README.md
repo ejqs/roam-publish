@@ -84,15 +84,16 @@ published show their status only; only they or the graph's owner can change them
 
 You can also do all of this from the command palette: type "Roam Publish".
 
-**Status in Roam.** A published page shows an icon after its title: a globe, or a lock when it's encrypted. It's green
-when the page is up to date, and orange with a dot when it changed since you last published it; hover it for the
-status, click it for the same actions as the menu. A block published on its own gets a ring on its bullet, and blocks
+**Status in Roam.** A published page shows three icons after its title: its status, its stats and its settings. The
+status icon is a globe, or a lock when it's encrypted. It's green when the page is up to date, and orange with a dot
+when it changed since you last published it. Each icon opens a pop-up about that page: its status, views, upvotes
+and readers' countries, and the same actions as the menu. A block published on its own gets a ring on its bullet, and blocks
 edited since their page was last published get a bar beside them. Nothing is written to your graph to show these.
 Set **Status in Roam** to **Titles only** or **Off** to show less.
 
-**Settings in Roam.** The icon's **Settings** tab changes the page's settings on roam.pub: where it's listed, its byline,
-view count and Download PDF, in your graph and in each collection it's in, and takes it out of a collection. A
-collection's owner can change its own settings from there too (**Collection…**). Access, passwords and members stay
+**Settings in Roam.** The settings icon changes the page's settings on roam.pub: its visibility, byline, view count
+and PDF download. **Edit…** next to each of its collections does the same there, or takes it out of the collection.
+A collection's owner can change the collection's own settings from there too (**Collection settings…**). Access, passwords and members stay
 on roam.pub.
 
 **Dashboard.** The globe in Roam's top bar, or **Roam Publish: Open dashboard** in the command palette, shows your
@@ -143,7 +144,7 @@ check references, embeds and children first. Nothing else from your graph is sen
 | **API key** | Your key for this graph (see Setup). Pasting it checks it at once and says which graph it works for. |
 | **Author name** | Your byline on pages that show authors. Blank: your @username. |
 | **Ask where to publish** | On (default): Publish asks where something new goes. Off: it goes where **New pages go to** says on roam.pub. |
-| **Status in Roam** | **Titles and blocks** (default): the icon after published page titles, rings on published blocks and bars beside edited blocks. **Titles only**, or **Off**. |
+| **Status in Roam** | **Titles and blocks** (default): the icons after published page titles, rings on published blocks and bars beside edited blocks. **Titles only**, or **Off**. |
 | **Top bar button** | On (default): a globe in Roam's top bar opens the dashboard. Off: use the command palette. |
 | **Collapsed blocks** | **As in Roam** (default): blocks collapsed in Roam start collapsed on a first publish. **Expanded**: every block starts open. Republishing keeps the published page's. |
 | **Roam Publish block** | Where the block with the status link is added: **Pages** (default), **Pages and blocks**, **Blocks only** or **Off**. Off: nothing is written into your pages; roam.pub still keeps each page's status link and history. |
