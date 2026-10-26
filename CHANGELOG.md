@@ -16,6 +16,16 @@ What's new shows it once Roam Depot serves it. Every bullet starts with **Breaki
 - New: **Status in Roam** setting: **Titles and blocks** (the default), **Titles only** or **Off**. Nothing is written
   to your graph to show any of this.
 
+### Settings and dashboard
+- New: **Settings** in the title icon's pop-up: where the page is listed, its byline, view count and Download PDF,
+  in your graph and in each of its collections, and **Remove** to take it out of a collection. Access and passwords
+  are still changed on roam.pub.
+- New: **Collection settings** from Roam, for a collection's owner: name, description, bylines, view counts,
+  Download PDF, Discover, search and RSS. Members see them without changing them.
+- New: **A Roam Publish dashboard in Roam**, from a globe in the top bar or **Roam Publish: Open dashboard**: views
+  per day, upvotes, readers' countries, your most read pages, what changed since you published it, with
+  Republish, and your collections, for the last 7 or 30 days or all time.
+
 ### Publishing
 - New: **Publish to.** Publishing something new asks where it goes: your graph, your graph encrypted, or one of
   your collections, each with how the page starts out there. It starts on roam.pub's **New pages go to**, so one
@@ -24,6 +34,7 @@ What's new shows it once Roam Depot serves it. Every bullet starts with **Breaki
   encrypt, the choice is greyed out.
 
 ### Setup and settings
+- New: **Top bar button** setting, on by default: the globe that opens the dashboard.
 - New: **Ask where to publish** setting, on by default. Off: Publish goes straight to where **New pages go to**
   says, and the status pop-up offers **Publish with encryption** next to Publish.
 

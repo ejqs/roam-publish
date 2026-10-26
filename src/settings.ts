@@ -1,6 +1,6 @@
 import { api } from "./api";
-import { restartMarks } from "./decorate";
-import { BLOCK_CHOICES, STATUS_CHOICES, STATUS_SETTING, COLLAPSED_AS_IN_ROAM, COLLAPSED_EXPANDED, getApiKey, getServer, saveLegacyBlockSwitches, saveStatusMarks } from "./state";
+import { restartMarks, startTopbar, stopTopbar } from "./decorate";
+import { BLOCK_CHOICES, STATUS_CHOICES, STATUS_SETTING, TOP_BAR_SETTING, COLLAPSED_AS_IN_ROAM, COLLAPSED_EXPANDED, getApiKey, getServer, saveLegacyBlockSwitches, saveStatusMarks } from "./state";
 import { toast } from "./toast";
 
 /** Roam saves the key and calls onChange on every keystroke; the check waits until typing stops. */
@@ -72,6 +72,18 @@ export function createSettingsPanel(extensionAPI: ExtensionAPI) {
         description:
           "An icon after published page titles; a ring on published blocks' bullets and a bar beside blocks edited since publishing.",
         action: { type: "select", items: [...STATUS_CHOICES], onChange: (choice) => void saveStatusMarks(choice).then(restartMarks) },
+      },
+      {
+        id: TOP_BAR_SETTING,
+        name: "Top bar button",
+        description: "A globe in Roam's top bar that opens the Roam Publish dashboard. It's also in the command palette.",
+        action: {
+          type: "switch",
+          onChange: (e) => {
+            stopTopbar();
+            startTopbar(!!(e.target as HTMLInputElement | null)?.checked);
+          },
+        },
       },
       {
         id: "collapsed-blocks",

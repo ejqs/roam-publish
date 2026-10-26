@@ -1,6 +1,8 @@
 import { editedSince, iconFor, uidInId } from "./marks";
 import { statusView, syncPublications, type StatusView } from "./publish";
-import { getApiKey, getCache, getStatusMarks, onCacheChange } from "./state";
+import { openDashboard, renderPageSettings } from "./panels";
+import { getApiKey, getCache, getStatusMarks, getTopBar, onCacheChange } from "./state";
+import { button as bpButton, closeDialogs, h, isDark } from "./ui";
 
 /**
  * Status marks in Roam: an icon after the title of a published page, a ring on the bullet of a block
@@ -20,6 +22,7 @@ const STYLE_ID = "roam-publish-marks";
 const ATTR = "data-roam-publish";
 const ICON_CLASS = "roam-publish-title-icon";
 const POPOVER_ID = "roam-publish-popover";
+export const TOPBAR_CLASS = "roam-publish-topbar";
 /** Status is re-checked this long after Roam stops changing. */
 const RECHECK_MS = 2000;
 /** The published list is refreshed from roam.pub at most this often, when Roam is focused. */
@@ -49,7 +52,37 @@ const STYLES = `
   border-radius: 4px; font-size: 14px; line-height: 1.45; background: #fff; color: #182026;
   box-shadow: 0 0 0 1px rgba(16, 22, 26, 0.1), 0 2px 4px rgba(16, 22, 26, 0.2), 0 8px 24px rgba(16, 22, 26, 0.2); }
 #${POPOVER_ID}.rp-dark { background: #30404d; color: #f5f8fa; }
-#${POPOVER_ID} .rp-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+#${POPOVER_ID}.rp-wide { width: 400px; max-height: calc(100vh - 120px); overflow-y: auto; }
+#${POPOVER_ID} .rp-tabs { display: flex; align-items: center; gap: 2px; margin: -6px -6px 8px; }
+.rp-spacer { flex: 1; }
+.rp-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.rp-muted { opacity: 0.7; }
+.rp-note { display: block; font-size: 12px; opacity: 0.75; margin: 2px 0 6px; }
+.rp-field { display: block; margin: 6px 0; }
+.rp-field-label { display: block; font-size: 12px; margin-bottom: 2px; opacity: 0.8; }
+.rp-switch { margin: 8px 0 !important; }
+.rp-switch .rp-note { margin-top: 2px; }
+.rp-section-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin: 12px 0 2px;
+  padding-top: 8px; border-top: 1px solid rgba(138, 155, 168, 0.3); }
+.rp-tab-body > .rp-section-head:first-child, .bp3-dialog-body > .rp-section-head:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+.roam-publish-dialog textarea { font-family: inherit; }
+.rp-callout { margin: 8px 0; font-size: 13px; }
+.roam-publish-portal .bp3-overlay { z-index: 40; }
+.roam-publish-dialog { width: 460px; max-width: calc(100vw - 32px); }
+.roam-publish-dialog.rp-wide { width: 760px; }
+.roam-publish-dialog .bp3-dialog-body { max-height: calc(100vh - 220px); overflow-y: auto; }
+.rp-periods { margin-bottom: 12px; }
+.rp-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.rp-tile { padding: 10px 12px; border-radius: 3px; background: rgba(138, 155, 168, 0.12); }
+.rp-tile-value { font-size: 22px; font-weight: 600; line-height: 1.2; }
+.rp-tile-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.8; }
+.rp-heading { margin: 18px 0 6px !important; }
+.rp-chart { display: flex; align-items: flex-end; gap: 2px; height: 96px; padding: 4px 0; border-bottom: 1px solid rgba(138, 155, 168, 0.4); }
+.rp-bar { flex: 1; min-width: 2px; border-radius: 2px 2px 0 0; background: #2b95d6; }
+.rp-list-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+.rp-list-row > :first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rp-foot { margin-top: 16px; }
+.${TOPBAR_CLASS} { margin: 0 2px; }
 `;
 
 type Checked = { view: StatusView | null; edited: Set<string> };
@@ -66,13 +99,52 @@ const checking = new Set<string>();
 /** Page uid per title, so titles aren't looked up on every pass. */
 const titleUids = new Map<string, string | null>();
 
-export function startMarks() {
-  if (running || getStatusMarks() === "Off") return;
-  running = true;
+/** The styles for the marks, the pop-up and the dialogs; added on load, whatever Status in Roam says. */
+export function addStyles() {
+  if (document.getElementById(STYLE_ID)) return;
   const style = document.createElement("style");
   style.id = STYLE_ID;
   style.textContent = STYLES;
   document.head.appendChild(style);
+}
+
+export function removeStyles() {
+  closeDialogs();
+  document.getElementById(STYLE_ID)?.remove();
+}
+
+let topbarObserver: MutationObserver | null = null;
+
+/** The dashboard's button in Roam's top bar, put back if Roam redraws the bar without it. */
+export function startTopbar(on = getTopBar()) {
+  if (topbarObserver || !on) return;
+  const mount = () => {
+    const bar = document.querySelector(".rm-topbar");
+    if (!bar || bar.querySelector(`.${TOPBAR_CLASS}`)) return;
+    const b = h(
+      "span",
+      { class: `bp3-button bp3-minimal bp3-small bp3-icon-globe-network ${TOPBAR_CLASS}`, role: "button", tabindex: 0, title: "Roam Publish dashboard", "aria-label": "Roam Publish dashboard" },
+    );
+    b.addEventListener("click", openDashboard);
+    b.addEventListener("keydown", (e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), openDashboard()));
+    bar.append(b);
+  };
+  mount();
+  topbarObserver = new MutationObserver(mount);
+  topbarObserver.observe(document.querySelector(".rm-topbar")?.parentElement ?? document.body, { childList: true });
+  const bar = document.querySelector(".rm-topbar");
+  if (bar) topbarObserver.observe(bar, { childList: true });
+}
+
+export function stopTopbar() {
+  topbarObserver?.disconnect();
+  topbarObserver = null;
+  document.querySelectorAll(`.${TOPBAR_CLASS}`).forEach((e) => e.remove());
+}
+
+export function startMarks() {
+  if (running || getStatusMarks() === "Off") return;
+  running = true;
   observer = new MutationObserver(onMutations);
   observer.observe(document.querySelector(".roam-app") ?? document.body, { childList: true, subtree: true });
   unlisten = onCacheChange(() => recheckSoon(0));
@@ -92,7 +164,6 @@ export function stopMarks() {
   unlisten = null;
   window.removeEventListener("focus", syncIfStale);
   closePopover();
-  document.getElementById(STYLE_ID)?.remove();
   document.querySelectorAll(`.${ICON_CLASS}`).forEach((e) => e.remove());
   document.querySelectorAll(`[${ATTR}]`).forEach((e) => e.removeAttribute(ATTR));
   checked.clear();
@@ -268,15 +339,6 @@ function drawIcon(h: Element, existing: HTMLElement | null, uid: string, view: S
   }
 }
 
-/** Whether Roam is showing a dark theme here, from the page's own background. */
-function isDark(near: Element) {
-  for (let e: Element | null = near; e; e = e.parentElement) {
-    const m = /rgba?\((\d+), (\d+), (\d+)(?:, ([\d.]+))?\)/.exec(getComputedStyle(e).backgroundColor);
-    if (m && m[4] !== "0") return 0.299 * +m[1] + 0.587 * +m[2] + 0.114 * +m[3] < 128;
-  }
-  return false;
-}
-
 let closeListeners: (() => void) | null = null;
 
 function closePopover() {
@@ -320,20 +382,46 @@ async function openPopover(anchor: HTMLElement, uid: string) {
     pop.textContent = e instanceof Error ? e.message : "Couldn't check the status.";
   }
   if (!pop.isConnected || !view) return;
-  pop.textContent = view.message;
-  const row = document.createElement("div");
-  row.className = "rp-row";
-  const button = (label: string, onClick: () => void, primary: boolean) => {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.className = `bp3-button bp3-small${primary ? " bp3-intent-primary" : ""}${label === "Unpublish" ? " bp3-minimal bp3-intent-danger" : ""}`;
-    b.textContent = label;
-    b.addEventListener("click", () => {
-      closePopover();
-      onClick();
+  const v = view;
+  const body = h("div", { class: "rp-tab-body" });
+  // Settings only for pages this key may change: published, not removed, not another member's.
+  const tabs: [string, () => void][] = [["Status", () => drawStatus(body, v)]];
+  if (v.state !== "unpublished" && v.state !== "removed" && v.state !== "other")
+    tabs.push(["Settings", () => void renderPageSettings(body, uid, () => recheckSoon(0)).then(place)]);
+  const bar = h("div", { class: "rp-tabs", role: "tablist" });
+  const select = (i: number) => {
+    bar.querySelectorAll("[role=tab]").forEach((t, j) => {
+      t.classList.toggle("bp3-active", i === j);
+      t.setAttribute("aria-selected", String(i === j));
     });
-    row.appendChild(b);
+    pop.classList.toggle("rp-wide", i > 0);
+    tabs[i][1]();
+    place();
   };
+  tabs.forEach(([label], i) => bar.append(bpButton(label, () => select(i), { minimal: true })));
+  bar.querySelectorAll("button").forEach((b) => b.setAttribute("role", "tab"));
+  bar.append(h("span", { class: "rp-spacer" }), bpButton("Dashboard", () => (closePopover(), openDashboard()), { minimal: true }));
+  pop.replaceChildren(bar, body);
+  select(0);
+  // What the pop-up found is the freshest status: draw it.
+  checked.set(uid, { view, edited: checked.get(uid)?.edited ?? new Set() });
+  schedule();
+}
+
+/** The Status tab: what the status toast says, with its actions. */
+function drawStatus(root: HTMLElement, view: StatusView) {
+  const row = h("div", { class: "rp-row" });
+  const button = (label: string, onClick: () => void, primary: boolean) =>
+    row.append(
+      bpButton(
+        label,
+        () => {
+          closePopover();
+          onClick();
+        },
+        label === "Unpublish" ? { minimal: true, intent: "danger" } : { intent: primary ? "primary" : undefined },
+      ),
+    );
   const last = view.actions.filter((a) => a.label === "Unpublish");
   view.actions
     .filter((a) => !last.includes(a))
@@ -342,9 +430,5 @@ async function openPopover(anchor: HTMLElement, uid: string) {
   const link = view.link;
   if (link && /^https?:\/\//i.test(link)) button("Open ↗", () => void window.open(link, "_blank", "noopener"), false);
   last.forEach((a) => button(a.label, a.onClick, false));
-  if (row.childElementCount) pop.appendChild(row);
-  place();
-  // What the pop-up found is the freshest status: draw it.
-  checked.set(uid, { view, edited: checked.get(uid)?.edited ?? new Set() });
-  schedule();
+  root.replaceChildren(h("div", {}, view.message), row.childElementCount ? row : "");
 }

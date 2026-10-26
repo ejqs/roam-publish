@@ -51,6 +51,8 @@ interface Window {
       mainWindow: {
         getOpenView(): Promise<{ type: string; uid?: string; title?: string }>;
         getOpenPageOrBlockUid(): Promise<string | null>;
+        openPage(args: { page: { uid: string } }): Promise<void>;
+        openBlock(args: { block: { uid: string } }): Promise<void>;
       };
       blockContextMenu: {
         addCommand(args: ContextMenuCommand<BlockContextMenuInfo>): void;
