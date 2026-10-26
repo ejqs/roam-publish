@@ -1,13 +1,18 @@
 // Tiny self-contained toast so we don't depend on Roam internals.
 let container: HTMLDivElement | null = null;
 
-type ToastAction = { label: string; onClick: () => void };
+/** `selected`: the dropdown's choice, for a toast whose dropdown starts on a `value`. */
+type ToastAction = { label: string; onClick: (selected: string) => void };
 
-/** A dropdown above the buttons; picking an option closes the toast and runs `onChoose`. */
+/**
+ * A dropdown above the buttons. Without a `value`, picking an option closes the toast and runs
+ * `onChoose`. With one, it starts on that option and stays open, and the buttons act on the choice.
+ */
 type ToastSelect = {
   placeholder: string;
   options: { value: string; label: string; disabled?: boolean }[];
-  onChoose: (value: string) => void;
+  value?: string;
+  onChoose?: (value: string) => void;
 };
 
 type ToastOptions = {
@@ -51,33 +56,43 @@ export function toast(message: string, opts: ToastOptions = {}) {
     Object.assign(a.style, { color: "#fff", fontWeight: "600", marginLeft: "6px" });
     el.appendChild(a);
   }
+  let sel: HTMLSelectElement | null = null;
   if (opts.select) {
-    const { placeholder, options, onChoose } = opts.select;
-    const sel = document.createElement("select");
+    // Wide enough to read its options, also on a phone.
+    el.style.width = "min(480px, calc(100vw - 24px))";
+    el.style.boxSizing = "border-box";
+    const { placeholder, options, value, onChoose } = opts.select;
+    sel = document.createElement("select");
     sel.setAttribute("aria-label", placeholder);
     Object.assign(sel.style, {
       display: "block", width: "100%", marginTop: "8px", padding: "4px 6px", fontSize: "13px",
       color: "#1c2127", background: "#fff", border: "1px solid rgba(255,255,255,.4)", borderRadius: "2px",
     });
-    const first = document.createElement("option");
-    first.textContent = placeholder;
-    first.value = "";
-    first.disabled = true;
-    first.selected = true;
-    sel.appendChild(first);
+    if (value === undefined) {
+      const first = document.createElement("option");
+      first.textContent = placeholder;
+      first.value = "";
+      first.disabled = true;
+      first.selected = true;
+      sel.appendChild(first);
+    }
     for (const o of options) {
       const opt = document.createElement("option");
       opt.value = o.value;
       opt.textContent = o.label;
       opt.disabled = !!o.disabled;
+      opt.selected = o.value === value;
       sel.appendChild(opt);
     }
-    sel.addEventListener("change", () => {
-      if (!sel.value) return;
-      el.remove();
-      onChoose(sel.value);
-    });
-    el.appendChild(sel);
+    const picked = sel;
+    if (value !== undefined) picked.value = value;
+    if (onChoose)
+      picked.addEventListener("change", () => {
+        if (!picked.value) return;
+        el.remove();
+        onChoose(picked.value);
+      });
+    el.appendChild(picked);
   }
   const actions = [...(opts.action ? [opts.action] : []), ...(opts.actions ?? [])];
   // Every toast can be closed; Close sits at the right end of the button row.
@@ -95,7 +110,7 @@ export function toast(message: string, opts: ToastOptions = {}) {
     });
     b.addEventListener("click", () => {
       el.remove();
-      onClick();
+      onClick(sel?.value ?? "");
     });
     row.appendChild(b);
   }

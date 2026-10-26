@@ -4,6 +4,29 @@ All notable changes to the Roam Publish extension. Each version is dated when it
 What's new shows it once Roam Depot serves it. Every bullet starts with **Breaking:**, **New:**, **Improved:** or
 **Fixed:**; a breaking change comes with a new major version.
 
+## 0.3.0 (2026-10-26)
+
+### Status in Roam
+- New: **A published page shows its status after its title.** A globe icon, or a lock when it's encrypted: green
+  when it's up to date, orange with a dot when it changed since you last published it. Hover it for the status;
+  click it for the same actions as **Roam Publish: Page…**.
+- New: A block published on its own gets a ring on its bullet, green or orange the same way.
+- New: Blocks edited since their page or block was last published get a bar beside them, so you can see what a
+  Republish would change.
+- New: **Status in Roam** setting: **Titles and blocks** (the default), **Titles only** or **Off**. Nothing is written
+  to your graph to show any of this.
+
+### Publishing
+- New: **Publish to.** Publishing something new asks where it goes: your graph, your graph encrypted, or one of
+  your collections, each with how the page starts out there. It starts on roam.pub's **New pages go to**, so one
+  click on **Publish** keeps the usual place. A collection picked is the only place the page goes.
+- Improved: **Publish with encryption** is one of the **Publish to** choices. Without a graph password that can
+  encrypt, the choice is greyed out.
+
+### Setup and settings
+- New: **Ask where to publish** setting, on by default. Off: Publish goes straight to where **New pages go to**
+  says, and the status pop-up offers **Publish with encryption** next to Publish.
+
 ## 0.2.0 (2026-10-13)
 
 ### Security
@@ -14,22 +37,26 @@ What's new shows it once Roam Depot serves it. Every bullet starts with **Breaki
   says so.
 
 ### Publishing
+- Improved: The extension uses roam.pub's words for a page's visibility. The buttons are **Make public**, **Put on
+  Discover** and **Make unlisted** (they were Make listed and Make discoverable), and the status says "Public page"
+  or "Page on Discover".
 - New: **Publish with encryption.** The status pop-up for a page or block that isn't published yet has a **Publish
   with encryption** button next to Publish, and the command palette has **Roam Publish: Publish current page with
   encryption** and **Publish focused block with encryption**. It publishes to your graph as a Password page,
   encrypted in Roam with your graph password, whatever new pages usually start as. If your graph has no password
   that can encrypt yet, nothing is published and the message says how to set one on roam.pub.
-- New: Pages with collapsed blocks can be published with those blocks collapsed, as you have them in Roam. The first
-  time you publish a page with collapsed blocks, Roam Publish asks: **Publish as is (Collapsed)** or **Publish
-  expanded**. Readers can open and close blocks either way.
-- New: When the blocks collapsed in Roam aren't the ones collapsed on the published page, republishing asks:
-  **Republish as is**, exactly as you see it in Roam, or **Republish, keep open/collapsed** to update the content and
-  leave the published page's blocks open and collapsed as they are. Collapsing or expanding blocks alone doesn't make
-  a page show as changed; instead the status toast offers **Sync open/collapsed blocks**. roam.pub remembers which blocks it has collapsed, so
-  this works from any computer.
+- New: Pages with collapsed blocks are published with those blocks collapsed, as you have them in Roam. To publish
+  them expanded instead, set **Collapsed blocks** to **Expanded** in the extension settings. Readers can open and
+  close blocks either way.
+- New: Republishing keeps the published page's open and collapsed blocks. Collapsing or expanding blocks in Roam
+  alone doesn't make a page show as changed; instead the status toast offers **Sync open/collapsed blocks**. roam.pub
+  remembers which blocks it has collapsed, so this works from any computer.
+- Improved: The status toast offers one action: **Republish** when the page changed, **Sync open/collapsed blocks**
+  when only collapsed blocks differ, or none when it's up to date, then **Add to collection…** and **Unpublish**.
+  Visibility is changed on roam.pub, from the page **Open** goes to; the toast after a first publish still offers
+  **Make public** and **Put on Discover**.
 - Fixed: For a page that's only in collections, the status toast offered **Make listed** and **Make unlisted**,
-  which did nothing, and called it unlisted. It now says the page is only in collections, where each collection sets
-  how it's listed.
+  which did nothing, and called it unlisted. It now says the page is only in collections.
 - Improved: The status toast is shorter and says when a page is encrypted, for example "Encrypted unlisted page, up
   to date. Last published Oct 8, 2026, 1:14 PM."
 - New: **Add to collection…** works for encrypted pages too, with no password to type. Roam Publish adds the page
@@ -37,10 +64,19 @@ What's new shows it once Roam Depot serves it. Every bullet starts with **Breaki
   you last published it, it asks first. Collections without a password that can encrypt are greyed out.
 
 ### Setup and settings
+- New: **Collapsed blocks** setting: **As in Roam** (the default) or **Expanded**, for how blocks collapsed in Roam
+  start out the first time you publish.
 - Improved: The extension's description lists roam.pub's main features, including end-to-end encryption and
   Download as PDF, in fewer words.
 - New: When roam.pub changes in a way that needs a newer Roam Publish, the extension says so and tells you where to
   update it, instead of failing with a confusing error.
+- Improved: **Fewer settings.** Change log, Sync published list, Status link text, Server URL and Reset Roam Publish
+  block settings are gone. The change log is managed from **Open dashboard**, the **Page…** and **Block…** menus
+  already sync, and the status link always reads "Roam Publish Status" (a link with other text gets it the next time
+  you publish that page). Your other choices carry over.
+- New: Pasting an **API key** checks it at once: the extension says which graph it works for, or what's wrong.
+- Improved: **Roam Publish block** is one setting: **Pages**, **Pages and blocks**, **Blocks only** or **Off**. It
+  replaces the two switches. **Block position** reads **First** or **Last**.
 
 ## 0.1.1 (2026-10-07)
 

@@ -41,7 +41,17 @@ export type PublicationCache = Record<string, CachedPublication>;
 let api: ExtensionAPI;
 
 export const DEFAULT_SHORTLINK_TAG = "[[Roam Publish]]";
-export const DEFAULT_SHORTLINK_TEXT = "Roam Publish Status";
+/** The status link's text, as [Roam Publish Status](link). */
+export const SHORTLINK_TEXT = "Roam Publish Status";
+
+/** Where the Roam Publish block is added, as the settings panel's select shows it. */
+export const BLOCK_CHOICES = ["Pages", "Pages and blocks", "Blocks only", "Off"] as const;
+type BlockChoice = (typeof BLOCK_CHOICES)[number];
+const BLOCK_SETTING = "shortlink-add";
+
+/** The Collapsed blocks setting's choices, as the settings panel shows and stores them. */
+export const COLLAPSED_AS_IN_ROAM = "As in Roam";
+export const COLLAPSED_EXPANDED = "Expanded";
 
 export function initState(extensionAPI: ExtensionAPI) {
   api = extensionAPI;
@@ -49,46 +59,84 @@ export function initState(extensionAPI: ExtensionAPI) {
   const existing = !!api.settings.get("api-key") || Object.keys(getCache()).length > 0;
   if (api.settings.get("shortlink-tag") == null)
     void save("shortlink-tag", existing ? "#published" : DEFAULT_SHORTLINK_TAG);
-  if (api.settings.get("shortlink-text") == null) void save("shortlink-text", DEFAULT_SHORTLINK_TEXT);
-  // Store defaults so the settings panel's switch and select show them.
-  if (api.settings.get("shortlink-enabled") == null) void save("shortlink-enabled", true);
-  if (api.settings.get("shortlink-position") == null) void save("shortlink-position", "top");
-  if (api.settings.get("shortlink-blocks") == null) void save("shortlink-blocks", false);
+  // Saved so the settings panel's selects show them. Both carry over what versions before 0.2.0 saved.
+  if (api.settings.get(BLOCK_SETTING) == null) void save(BLOCK_SETTING, legacyBlockChoice());
+  const position = api.settings.get("shortlink-position");
+  if (position !== "First" && position !== "Last") void save("shortlink-position", position === "bottom" ? "Last" : "First");
+  if (api.settings.get("collapsed-blocks") == null) void save("collapsed-blocks", COLLAPSED_AS_IN_ROAM);
+  if (api.settings.get("ask-where") == null) void save("ask-where", true);
+  if (!STATUS_CHOICES.includes(api.settings.get(STATUS_SETTING) as StatusChoice)) void save(STATUS_SETTING, STATUS_CHOICES[0]);
 }
 
-/**
- * Roam keeps an extension's settings in the graph after it's uninstalled, so reinstalling brings
- * back the old values rather than the defaults. This puts the Roam Publish block settings back.
- */
-export async function resetShortlinkSettings() {
-  await Promise.all([
-    save("shortlink-enabled", true),
-    save("shortlink-blocks", false),
-    save("shortlink-tag", DEFAULT_SHORTLINK_TAG),
-    save("shortlink-text", DEFAULT_SHORTLINK_TEXT),
-    save("shortlink-position", "top"),
+/** Where published pages and blocks are marked in Roam, as the settings panel's select shows it. */
+export const STATUS_CHOICES = ["Titles and blocks", "Titles only", "Off"] as const;
+type StatusChoice = (typeof STATUS_CHOICES)[number];
+export const STATUS_SETTING = "status-in-roam";
+/** Saved by the select's onChange too, so the marks redraw with the new choice right away. */
+export const saveStatusMarks = (choice: string) => save(STATUS_SETTING, choice);
+export const getStatusMarks = (): StatusChoice => {
+  const saved = api.settings.get(STATUS_SETTING);
+  return STATUS_CHOICES.includes(saved as StatusChoice) ? (saved as StatusChoice) : STATUS_CHOICES[0];
+};
+
+/** What the two switches before the select said: pages on unless switched off, blocks off unless on. */
+function legacyBlockChoice(): BlockChoice {
+  const pages = api.settings.get("shortlink-enabled") !== false;
+  const blocks = api.settings.get("shortlink-blocks") === true;
+  return pages ? (blocks ? "Pages and blocks" : "Pages") : blocks ? "Blocks only" : "Off";
+}
+
+function blockChoice(): BlockChoice {
+  const saved = api.settings.get(BLOCK_SETTING);
+  return BLOCK_CHOICES.includes(saved as BlockChoice) ? (saved as BlockChoice) : legacyBlockChoice();
+}
+
+/** Keeps the old switches in step with the select, for a device still on an earlier version. */
+export function saveLegacyBlockSwitches(choice: string) {
+  return Promise.all([
+    save("shortlink-enabled", choice === "Pages" || choice === "Pages and blocks"),
+    save("shortlink-blocks", choice === "Pages and blocks" || choice === "Blocks only"),
   ]);
 }
 
-export const getServer = () =>
-  ((api.settings.get("server-url") as string)?.trim() || __DEFAULT_SERVER__).replace(/\/+$/, "");
+/** Set when the extension is built (ROAM_PUBLISH_SERVER); roam.pub by default. */
+export const getServer = () => __DEFAULT_SERVER__.replace(/\/+$/, "");
 export const getApiKey = () => ((api.settings.get("api-key") as string) || "").trim();
 export const getAuthor = () => ((api.settings.get("author-name") as string) || "").trim();
-/** On unless switched off. */
-export const getShortlinkEnabled = () => api.settings.get("shortlink-enabled") !== false;
-/** The shortlink block's text; blank for none. */
+/** Published pages get a Roam Publish block. */
+export const getShortlinkEnabled = () => blockChoice() === "Pages" || blockChoice() === "Pages and blocks";
+/** Published blocks get a Roam Publish block. */
+export const getShortlinkOnBlocks = () => blockChoice() === "Pages and blocks" || blockChoice() === "Blocks only";
+/** The Roam Publish block's text; blank for none. */
+/** Whether Publish asks where a new page goes; on unless switched off. */
+export const getAskWhere = () => api.settings.get("ask-where") !== false;
 export const getShortlinkTag = () => ((api.settings.get("shortlink-tag") as string) ?? DEFAULT_SHORTLINK_TAG).trim();
-/** Shown for the link, as [text](link); blank for the bare link. */
-export const getShortlinkText = () => ((api.settings.get("shortlink-text") as string) ?? DEFAULT_SHORTLINK_TEXT).trim();
-/** Published blocks get a shortlink block only when this is on; pages always do. */
-export const getShortlinkOnBlocks = () => api.settings.get("shortlink-blocks") === true;
-export const getShortlinkPosition = () => (api.settings.get("shortlink-position") === "bottom" ? "bottom" : "top");
+/** How collapsed blocks start on a first publish: as in Roam unless set to Expanded. */
+export const getFirstFolds = () => (api.settings.get("collapsed-blocks") === COLLAPSED_EXPANDED ? "expanded" : "asIs");
+/** First or last under the page or block; "bottom" is how earlier versions saved Last. */
+export const getShortlinkPosition = () => {
+  const saved = api.settings.get("shortlink-position");
+  return saved === "Last" || saved === "bottom" ? "bottom" : "top";
+};
 
 export const getCache = (): PublicationCache =>
   (api.settings.get("publications") as PublicationCache) ?? {};
 
+/** Called after the published list changes (a publish, an unpublish, a sync), so status marks redraw. */
+const cacheListeners = new Set<() => void>();
+export function onCacheChange(fn: () => void) {
+  cacheListeners.add(fn);
+  return () => void cacheListeners.delete(fn);
+}
+
+/**
+ * Saved only when it changed: the list is synced every few minutes while status marks are on, and
+ * rewriting an unchanged (possibly large) setting each time is needless work for Roam.
+ */
 export async function setCache(cache: PublicationCache) {
+  if (JSON.stringify(withoutUndefined(cache)) === JSON.stringify(getCache())) return;
   await save("publications", cache);
+  cacheListeners.forEach((fn) => fn());
 }
 
 /** The key for encrypted pages' content hashes (seal.ts `keyedHash`), when this graph has one. */

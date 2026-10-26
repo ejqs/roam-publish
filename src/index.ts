@@ -1,4 +1,5 @@
 import { confirmChangeLogBlocks, confirmUnpublish, publish, publishStatus } from "./publish";
+import { startMarks, stopMarks } from "./decorate";
 import { createSettingsPanel } from "./settings";
 import { initState } from "./state";
 import { removeToasts, toast } from "./toast";
@@ -74,6 +75,7 @@ async function onload({ extensionAPI: api }: { extensionAPI: ExtensionAPI }) {
 
   for (const c of PALETTE) api.ui.commandPalette.addCommand({ label: c.label, callback: () => void withTarget(c.target, c.run) });
   confirmTimers = [setTimeout(confirm, 20_000), setInterval(confirm, CONFIRM_EVERY_MS)];
+  startMarks();
 }
 
 function onunload() {
@@ -84,6 +86,7 @@ function onunload() {
   confirmTimers.forEach((t) => clearTimeout(t));
   confirmTimers = [];
   removeToasts();
+  stopMarks();
 }
 
 export default { onload, onunload };

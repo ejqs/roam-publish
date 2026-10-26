@@ -117,11 +117,13 @@ jobs:
           git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
             commit -am "Roam Publish $GITHUB_REF_NAME"
           git push --force "https://x-access-token:$TOKEN@github.com/ejqs/roam-depot.git" "HEAD:refs/heads/$branch"
-          open=$(gh pr list --repo Roam-Research/roam-depot --head "$branch" --state open --json number --jq '.[].number')
+          # REST only: gh pr list/edit/create go through GraphQL, which also needs read:org on the token.
+          pulls=repos/Roam-Research/roam-depot/pulls
+          open=$(gh api "$pulls?head=ejqs:$branch&state=open" --jq '.[0].number // empty')
           if [ -n "$open" ]; then
-            gh pr edit "$open" --repo Roam-Research/roam-depot --body-file "$RUNNER_TEMP/body.md"
+            gh api -X PATCH "$pulls/$open" -F "body=@$RUNNER_TEMP/body.md" --silent
             echo "Updated Roam-Research/roam-depot#$open to $COMMIT."
           else
-            gh pr create --repo Roam-Research/roam-depot --base main --head "ejqs:$branch" \
-              --title "Roam Publish $GITHUB_REF_NAME" --body-file "$RUNNER_TEMP/body.md"
+            gh api "$pulls" -f base=main -f head="ejqs:$branch" -f title="Roam Publish $GITHUB_REF_NAME" \
+              -F "body=@$RUNNER_TEMP/body.md" --jq '"Opened " + .html_url'
           fi
