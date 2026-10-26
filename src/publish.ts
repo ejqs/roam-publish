@@ -1,5 +1,5 @@
 import { api, ApiError } from "./api";
-import { foldedUids, hashPayload, isShortlinkText, type Payload, refold, serialize, type Shortlinks } from "./serialize";
+import { foldedUids, hashPayload, isShortlinkText, type Node, type Payload, refold, serialize, type Shortlinks } from "./serialize";
 import {
   getApiKey,
   getAskWhere,
@@ -878,17 +878,33 @@ export async function unpublish(uid: string) {
   }
 }
 
+/** What the status toast and the title icon's pop-up say about a page or block. */
+export type StatusState = "unpublished" | "current" | "changed" | "unknown" | "removed" | "other";
+export type StatusView = {
+  state: StatusState;
+  kind: "page" | "block";
+  message: string;
+  intent: "success" | "danger" | "none";
+  link?: string;
+  actions: { label: string; onClick: () => void }[];
+  durationMs?: number;
+  /** The cached publication, when it's published. */
+  c?: CachedPublication;
+  /** Uids of the blocks it publishes (the Roam Publish block left out), for marking edited ones. */
+  uids?: string[];
+};
+
 /**
- * Whether a page or block is published, and if so whether it changed in Roam since: refreshes the
- * published list from the server first (falling back to the cache offline), then hashes the
- * content the way publishing does. Offers what can be done next: publish, or the one thing the
- * state calls for (republish, or sync open/collapsed blocks), add to collection and unpublish; its
- * link opens the status page on roam.pub, where visibility is changed. Writes nothing to the graph by itself.
+ * Whether a page or block is published, and if so whether it changed in Roam since, hashing the
+ * content the way publishing does, and the actions its state calls for: publish, or the one thing to
+ * do (republish, or sync open/collapsed blocks), add to collection and unpublish. With `sync`, the
+ * published list is refreshed from the server first (falling back to the cache offline); without,
+ * only the cache is read, so it costs no request. Null when the page or block can't be read.
  */
-export async function publishStatus(uid: string) {
-  try {
-    let cache: PublicationCache;
-    let offline = "";
+export async function statusView(uid: string, { sync }: { sync: boolean }): Promise<StatusView | null> {
+  let cache: PublicationCache;
+  let offline = "";
+  if (sync) {
     try {
       cache = await syncPublications({ quiet: true });
     } catch (e) {
@@ -896,80 +912,94 @@ export async function publishStatus(uid: string) {
       cache = getCache();
       offline = " (couldn't reach the server; this is from the last sync)";
     }
-    const c = cache[uid];
-    const payload = await serialize(uid, shortlinksOf(cache));
-    if (!payload) return toast("Couldn't read that page or block.", { intent: "danger" });
-    const label = payload.kind === "page" ? "Page" : "Block";
-    if (!c)
-      return toast(`${label} isn't published.${offline}`, {
-        actions: [
-          { label: `Publish ${payload.kind}`, onClick: () => void publish(uid) },
-          // Otherwise Publish asks, with encryption as one of the choices.
-          ...(getAskWhere() ? [] : [{ label: "Publish with encryption", onClick: () => void publish(uid, { encrypt: true }) }]),
-        ],
-      });
-    if (c.removed) return toast(`${label} was removed by a moderator.${offline}`, { intent: "danger", link: openLink(c) });
-    // A page only in collections has no listing of its own: each collection lists it.
-    const onlyInCollections = c.inGraph === false;
-    // "Unlisted page", "Encrypted public block", "Page on Discover", "Page in collections only".
-    const listed = onlyInCollections ? `${payload.kind} in collections only` : statusLabel(listingOf(c), payload.kind);
-    const what = upperFirst(c.encrypted ? `encrypted ${listed}` : listed);
-    if (c.mine === false)
-      return toast(`${what}, published by another member of this graph. Only they or the graph's owner can change it.${offline}`, {
-        link: openLink(c),
-      });
-    const since = new Date(c.updatedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
-    // Only which blocks are collapsed changing isn't a change to the content; it's said separately.
-    const published = c.folded;
-    const inRoam = foldedUids(payload.tree);
-    const keptPayload = folded(payload, published ? "keep" : "expanded", published);
-    const asIsHash = await hashLike(c.hash, payload);
-    const keptHash = await hashLike(c.hash, keptPayload);
-    // Encrypted in Roam elsewhere, and the graph's key for telling hasn't reached this Roam's settings.
-    if (asIsHash === null || keptHash === null)
-      return toast(
-        `${what}, last published ${since}. Can't tell here whether it changed. Republish to be sure.${offline}`,
-        {
-          link: openLink(c),
-          actions: [
-            { label: "Republish", onClick: () => void publish(uid, { folds: "asIs" }) },
-            ...collectionAction(uid),
-            { label: "Unpublish", onClick: () => void confirmUnpublish(uid, { checked: true }) },
-          ],
-          durationMs: 15000,
-        },
-      );
-    // From an older server that doesn't say, published elsewhere, the collapsed blocks aren't known: either way matches.
-    const changed = c.hash !== keptHash && c.hash !== asIsHash;
-    const foldsDiffer = published ? !sameFolds(inRoam, foldedUids(keptPayload.tree)) : inRoam.length > 0 && c.hash !== asIsHash;
-    // Only known for items published from this graph's extension settings.
-    const bylineChanged = c.author !== undefined && c.author !== getAuthor();
-    const upToDate = !changed && !bylineChanged;
-    // The one thing to do, if any: Republish (keeping the published open/collapsed blocks), or, when only
-    // those differ, sync them. Visibility is changed on the status page the toast links to.
-    const next = !upToDate
-      ? [republishAction(uid, published)]
-      : foldsDiffer
-        ? [syncFoldsAction(uid)]
-        : [];
-    const actions = [
+  } else cache = getCache();
+  const c = cache[uid];
+  const payload = await serialize(uid, shortlinksOf(cache));
+  if (!payload) return null;
+  const { kind } = payload;
+  const label = kind === "page" ? "Page" : "Block";
+  if (!c)
+    return {
+      state: "unpublished", kind, intent: "none", message: `${label} isn't published.${offline}`,
+      actions: [
+        { label: `Publish ${kind}`, onClick: () => void publish(uid) },
+        // Otherwise Publish asks, with encryption as one of the choices.
+        ...(getAskWhere() ? [] : [{ label: "Publish with encryption", onClick: () => void publish(uid, { encrypt: true }) }]),
+      ],
+    };
+  const uids = treeUids(payload.tree);
+  if (c.removed)
+    return { state: "removed", kind, c, uids, intent: "danger", message: `${label} was removed by a moderator.${offline}`, link: openLink(c), actions: [] };
+  // A page only in collections has no listing of its own: each collection lists it.
+  const onlyInCollections = c.inGraph === false;
+  // "Unlisted page", "Encrypted public block", "Page on Discover", "Page in collections only".
+  const listed = onlyInCollections ? `${kind} in collections only` : statusLabel(listingOf(c), kind);
+  const what = upperFirst(c.encrypted ? `encrypted ${listed}` : listed);
+  if (c.mine === false)
+    return {
+      state: "other", kind, c, uids, intent: "none", link: openLink(c), actions: [],
+      message: `${what}, published by another member of this graph. Only they or the graph's owner can change it.${offline}`,
+    };
+  const since = new Date(c.updatedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  // Only which blocks are collapsed changing isn't a change to the content; it's said separately.
+  const published = c.folded;
+  const inRoam = foldedUids(payload.tree);
+  const keptPayload = folded(payload, published ? "keep" : "expanded", published);
+  const asIsHash = await hashLike(c.hash, payload);
+  const keptHash = await hashLike(c.hash, keptPayload);
+  // Encrypted in Roam elsewhere, and the graph's key for telling hasn't reached this Roam's settings.
+  if (asIsHash === null || keptHash === null)
+    return {
+      state: "unknown", kind, c, uids, intent: "none", link: openLink(c), durationMs: 15000,
+      message: `${what}, last published ${since}. Can't tell here whether it changed. Republish to be sure.${offline}`,
+      actions: [
+        { label: "Republish", onClick: () => void publish(uid, { folds: "asIs" }) },
+        ...collectionAction(uid),
+        { label: "Unpublish", onClick: () => void confirmUnpublish(uid, { checked: true }) },
+      ],
+    };
+  // From an older server that doesn't say, published elsewhere, the collapsed blocks aren't known: either way matches.
+  const changed = c.hash !== keptHash && c.hash !== asIsHash;
+  const foldsDiffer = published ? !sameFolds(inRoam, foldedUids(keptPayload.tree)) : inRoam.length > 0 && c.hash !== asIsHash;
+  // Only known for items published from this graph's extension settings.
+  const bylineChanged = c.author !== undefined && c.author !== getAuthor();
+  const upToDate = !changed && !bylineChanged;
+  // The one thing to do, if any: Republish (keeping the published open/collapsed blocks), or, when only
+  // those differ, sync them. Visibility is changed on the status page the link opens.
+  const next = !upToDate ? [republishAction(uid, published)] : foldsDiffer ? [syncFoldsAction(uid)] : [];
+  const foldsNote = !foldsDiffer
+    ? ""
+    : upToDate || !published
+      ? ` Collapsed blocks differ from the published ${kind}.`
+      : ` Collapsed blocks differ from the published ${kind}; Republish keeps the published ones.`;
+  // Public, but nothing lists it (its graph's front page is off).
+  const listedNote = !onlyInCollections && listingOf(c) !== "unlisted" && c.listedNote ? ` ${c.listedNote}` : "";
+  return {
+    state: upToDate ? "current" : "changed", kind, c, uids, link: openLink(c), durationMs: 15000,
+    intent: upToDate ? "success" : "none",
+    message: upToDate
+      ? `${what}, up to date. Last published ${since}.${foldsNote}${offline}${listedNote}`
+      : `${what}, ${changed ? "changed" : "new author name"} since last published ${since}.${foldsNote}${offline}${listedNote}`,
+    actions: [
       ...next,
       ...collectionAction(uid),
       { label: "Unpublish", onClick: () => void confirmUnpublish(uid, { checked: true }) },
-    ];
-    const foldsNote = !foldsDiffer
-      ? ""
-      : upToDate || !published
-        ? ` Collapsed blocks differ from the published ${payload.kind}.`
-        : ` Collapsed blocks differ from the published ${payload.kind}; Republish keeps the published ones.`;
-    // Public, but nothing lists it (its graph's front page is off).
-    const listedNote = !onlyInCollections && listingOf(c) !== "unlisted" && c.listedNote ? ` ${c.listedNote}` : "";
-    toast(
-      upToDate
-        ? `${what}, up to date. Last published ${since}.${foldsNote}${offline}${listedNote}`
-        : `${what}, ${changed ? "changed" : "new author name"} since last published ${since}.${foldsNote}${offline}${listedNote}`,
-      { intent: upToDate ? "success" : "none", link: openLink(c), actions, durationMs: 15000 },
-    );
+    ],
+  };
+}
+
+const treeUids = (n: Node): string[] => [n.uid, ...n.children.flatMap(treeUids)];
+
+/**
+ * The status as a toast, from the page and block menus and the command palette. Syncs first. Writes
+ * nothing to the graph by itself.
+ */
+export async function publishStatus(uid: string) {
+  try {
+    const view = await statusView(uid, { sync: true });
+    if (!view) return toast("Couldn't read that page or block.", { intent: "danger" });
+    const { message, intent, link, actions, durationMs } = view;
+    toast(message, { intent, link, actions, durationMs });
   } catch (e) {
     report(e);
   }

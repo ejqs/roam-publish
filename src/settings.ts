@@ -1,5 +1,6 @@
 import { api } from "./api";
-import { BLOCK_CHOICES, COLLAPSED_AS_IN_ROAM, COLLAPSED_EXPANDED, getApiKey, getServer, saveLegacyBlockSwitches } from "./state";
+import { restartMarks } from "./decorate";
+import { BLOCK_CHOICES, STATUS_CHOICES, STATUS_SETTING, COLLAPSED_AS_IN_ROAM, COLLAPSED_EXPANDED, getApiKey, getServer, saveLegacyBlockSwitches, saveStatusMarks } from "./state";
 import { toast } from "./toast";
 
 /** Roam saves the key and calls onChange on every keystroke; the check waits until typing stops. */
@@ -64,6 +65,13 @@ export function createSettingsPanel(extensionAPI: ExtensionAPI) {
         description:
           "Publish asks: your graph, your graph encrypted, or a collection. Off: it goes where New pages go to says on roam.pub.",
         action: { type: "switch" },
+      },
+      {
+        id: STATUS_SETTING,
+        name: "Status in Roam",
+        description:
+          "An icon after published page titles; a ring on published blocks' bullets and a bar beside blocks edited since publishing.",
+        action: { type: "select", items: [...STATUS_CHOICES], onChange: (choice) => void saveStatusMarks(choice).then(restartMarks) },
       },
       {
         id: "collapsed-blocks",
