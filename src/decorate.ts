@@ -1,7 +1,7 @@
 import { editedSince, iconFor, uidInId } from "./marks";
 import { statusView, syncPublications, type StatusView } from "./publish";
 import { openDashboard, renderPageSettings, renderPageStats } from "./panels";
-import { getApiKey, getCache, getStatusMarks, getTopBar, onCacheChange } from "./state";
+import { getApiKey, getCache, getStatusMarks, getTopBar, listingOf, onCacheChange } from "./state";
 import { button as bpButton, closeDialogs, h, isDark } from "./ui";
 
 /**
@@ -367,7 +367,8 @@ function iconButton(uid: string, part: string, tab: Tab, label: string) {
 
 /** The title's icons: status always, then stats and settings where they apply. */
 function drawIcons(h: Element, existing: HTMLElement | null, uid: string, view: StatusView) {
-  const { icon, tone } = iconFor(view.state, view.c?.encrypted);
+  const c = view.c;
+  const { icon, tone } = iconFor(view.state, c?.encrypted, !!c && c.inGraph !== false && listingOf(c) === "unlisted");
   const parts = yours(view) ? "status stats settings" : "status";
   let group = existing;
   if (!group || group.dataset.parts !== parts) {

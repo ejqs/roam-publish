@@ -14,6 +14,8 @@ describe("status marks", () => {
   test("the title icon: a lock when encrypted, its tone by state", () => {
     assert.deepEqual(iconFor("changed", false), { icon: "globe", tone: "changed" });
     assert.deepEqual(iconFor("current", true), { icon: "lock", tone: "current" });
+    assert.deepEqual(iconFor("current", false, true), { icon: "eye-off", tone: "current" });
+    assert.equal(iconFor("current", true, true).icon, "lock");
     assert.equal(iconFor("unknown", false).tone, "muted");
     assert.equal(iconFor("removed", false).tone, "danger");
   });
