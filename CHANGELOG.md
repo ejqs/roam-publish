@@ -7,8 +7,8 @@ What's new shows it once Roam Depot serves it. Every bullet starts with **Breaki
 ## 0.3.0 (2026-10-26)
 
 ### Status in Roam
-- New: **Three icons after a published page's title**: status, stats and settings. The status icon is a globe, or a
-  lock when the page is encrypted: green when it's up to date, orange with a dot when it changed since you last
+- New: **Three icons after a published page's title**: status, stats and settings. The status icon is a globe, an
+  eye crossed out when the page is unlisted, or a lock when it's encrypted: green when it's up to date, orange with a dot when it changed since you last
   published it. Each opens a pop-up about that page, with the same actions as **Roam Publish: Page…**.
 - New: **Stats for each page** in its pop-up: views, upvotes and readers' countries, with what's new in the last 7
   days.

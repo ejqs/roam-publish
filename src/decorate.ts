@@ -1,7 +1,7 @@
 import { editedSince, iconFor, uidInId } from "./marks";
 import { statusView, syncPublications, type StatusView } from "./publish";
 import { openDashboard, renderPageSettings, renderPageStats } from "./panels";
-import { getApiKey, getCache, getStatusMarks, getTopBar, onCacheChange } from "./state";
+import { getApiKey, getCache, getStatusMarks, getTopBar, listingOf, onCacheChange } from "./state";
 import { button as bpButton, closeDialogs, h, isDark } from "./ui";
 
 /**
@@ -33,6 +33,7 @@ const MAX_MARKED = 500;
 
 const STYLES = `
 .${GROUP_CLASS} { display: inline-flex; align-items: center; gap: 2px; margin-left: 8px; vertical-align: middle; }
+h1.rm-title-display:has(textarea, input) .${GROUP_CLASS} { display: none; }
 .${ICON_CLASS} { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px;
   vertical-align: middle; border-radius: 3px; cursor: pointer; position: relative; user-select: none; }
 .${ICON_CLASS}:hover { background: rgba(138, 155, 168, 0.2); }
@@ -67,6 +68,8 @@ const STYLES = `
 .rp-form-field > .rp-list-row { padding: 2px 0; }
 .rp-link { cursor: pointer; }
 .rp-links { display: flex; flex-wrap: wrap; gap: 16px; }
+.rp-inline { display: flex; gap: 6px; align-items: center; margin-top: 4px; }
+.rp-inline > .bp3-html-select { flex: 1; min-width: 0; }
 .rp-row-end { justify-content: flex-end; }
 .rp-tiles.rp-tiles-3 { grid-template-columns: repeat(3, 1fr); margin-top: 10px; }
 .rp-tile-small { padding: 8px 10px; }
@@ -236,6 +239,8 @@ function recheckSoon(ms: number) {
   }, ms);
 }
 
+const editingTitle = (h: Element) => !!h.querySelector("textarea, input");
+
 /** The page title in a Roam title heading, without our icons. */
 function titleText(h: Element) {
   const node = [...h.childNodes].find((n) => n.nodeName === "#text" || (n.nodeName === "SPAN" && !ours(n)));
@@ -292,8 +297,11 @@ async function apply() {
   const edited = new Set<string>();
 
   for (const h of document.querySelectorAll("h1.rm-title-display")) {
-    const uid = await pageUid(titleText(h));
     const icon = h.querySelector(`.${GROUP_CLASS}`) as HTMLElement | null;
+    // While the title is being edited, Roam puts a text box in the heading: leave the (hidden) icons
+    // alone until it's done, so they neither jump above the title nor flicker with each keystroke.
+    if (editingTitle(h)) continue;
+    const uid = await pageUid(titleText(h));
     const c = uid ? cache[uid] : undefined;
     const state = c && uid ? check(uid) : undefined;
     if (!uid || !c || !state?.view) {
@@ -359,7 +367,8 @@ function iconButton(uid: string, part: string, tab: Tab, label: string) {
 
 /** The title's icons: status always, then stats and settings where they apply. */
 function drawIcons(h: Element, existing: HTMLElement | null, uid: string, view: StatusView) {
-  const { icon, tone } = iconFor(view.state, view.c?.encrypted);
+  const c = view.c;
+  const { icon, tone } = iconFor(view.state, c?.encrypted, !!c && c.inGraph !== false && listingOf(c) === "unlisted");
   const parts = yours(view) ? "status stats settings" : "status";
   let group = existing;
   if (!group || group.dataset.parts !== parts) {
@@ -373,6 +382,9 @@ function drawIcons(h: Element, existing: HTMLElement | null, uid: string, view: 
       group.append(iconButton(uid, "stats", "page", "Roam Publish: views and upvotes"), iconButton(uid, "settings", "settings", "Roam Publish: page settings"));
     group.querySelector('[data-part="stats"] > span')?.setAttribute("class", "bp3-icon bp3-icon-standard bp3-icon-timeline-bar-chart");
     group.querySelector('[data-part="settings"] > span')?.setAttribute("class", "bp3-icon bp3-icon-standard bp3-icon-cog");
+    h.appendChild(group);
+  } else if (group !== h.lastChild) {
+    // Roam redrew the title before the icons (after an edit): put them back after it.
     h.appendChild(group);
   }
   const el = group.firstElementChild as HTMLElement;

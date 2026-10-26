@@ -8,8 +8,9 @@ export function editedSince(times: [string, number][], publishedAt: string, root
 }
 
 /** How the title icon looks for a status: its Blueprint icon and tone. */
-export function iconFor(state: StatusState, encrypted: boolean | undefined) {
-  const icon = encrypted ? "lock" : "globe";
+export function iconFor(state: StatusState, encrypted: boolean | undefined, unlisted = false) {
+  // As roam.pub marks them: a lock when encrypted, a crossed-out eye when unlisted, a globe otherwise.
+  const icon = encrypted ? "lock" : unlisted ? "eye-off" : "globe";
   const tone =
     state === "current" ? "current" : state === "changed" ? "changed" : state === "removed" ? "danger" : "muted";
   return { icon, tone } as const;

@@ -736,11 +736,23 @@ function startsAs(c: Pick<CollectionChoice, "listing" | "access">) {
  * Asks which collection to add a published page to. Each one says how the page will start out
  * there, from the collection's own defaults, and whether it leaves the graph.
  */
+/** The collections a page can be added to, as dropdown options; a disabled one says why. */
+export async function collectionOptions(uid: string) {
+  const { collections } = await api<{ collections: CollectionChoice[] }>(`/api/ext/publications/${encodeURIComponent(uid)}/collections`);
+  return collections.map((c) => ({
+    value: c.id,
+    label: c.entryUrl
+      ? `${c.name} (already there)`
+      : c.blocked
+        ? `${c.name} (needs a password that can encrypt)`
+        : `${c.name}: ${startsAs(c)}${c.movesOutOfGraph ? ", leaves your graph" : ""}`,
+    disabled: !!c.entryUrl || !!c.blocked,
+  }));
+}
+
 export async function chooseCollection(uid: string) {
   try {
-    const { collections } = await api<{ collections: CollectionChoice[] }>(
-      `/api/ext/publications/${encodeURIComponent(uid)}/collections`,
-    );
+    const collections = await collectionOptions(uid);
     if (collections.length === 0)
       return toast("You're not in any collections yet. Create or join one on roam.pub.", {
         link: `${getServer()}/dashboard/collections`,
@@ -749,15 +761,7 @@ export async function chooseCollection(uid: string) {
     toast(`Add ${title ? `“${title}”` : "this"} to a collection. It starts out the way the collection says.`, {
       select: {
         placeholder: "Choose a collection…",
-        options: collections.map((c) => ({
-          value: c.id,
-          label: c.entryUrl
-            ? `${c.name} (already there)`
-            : c.blocked
-              ? `${c.name} (needs a password that can encrypt)`
-              : `${c.name}: ${startsAs(c)}${c.movesOutOfGraph ? ", leaves your graph" : ""}`,
-          disabled: !!c.entryUrl || !!c.blocked,
-        })),
+        options: collections,
         onChoose: (id) => void addToCollection(uid, id),
       },
       durationMs: 20000,
