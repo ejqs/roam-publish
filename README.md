@@ -1,247 +1,108 @@
 # Roam Publish
 
-Publish Roam Research pages and blocks to the web as clean, shareable pages on [roam.pub](https://roam.pub).
+**Publish Roam pages and blocks to the web as clean, shareable pages on [roam.pub](https://roam.pub). See each page's
+status, views and settings without leaving Roam.**
 
-**[See an example page →](https://roam.pub/ejqs/DyEQxo40V/roam-publish-kitchen-sink)**
+[Example page](https://roam.pub/ejqs/DyEQxo40V/roam-publish-kitchen-sink) · [What's new](https://roam.pub/updates) ·
+[Changelog](https://github.com/ejqs/roam-publish/blob/main/CHANGELOG.md) · [Report an issue](https://github.com/ejqs/roam-publish/issues)
 
-- **Share it your way.** Every page has a **Visibility**: **Unlisted** so only people with the link can read it,
-  **Public** on your graph's blog-style front page, or **Discover** on [Discover](https://roam.pub/discover) for
-  everyone on roam.pub to find.
-- **Lock it down.** Make a page **Password** or **Members**. Password pages can also be encrypted, and from
-  Roam Publish 0.2.0 they're encrypted in Roam before they're sent, so roam.pub never sees their text or title.
-- **Publish together.** Collections gather pages from different graphs and people in one place.
+![A published page in Roam with its status, stats and settings icons, and the stats pop-up open](https://raw.githubusercontent.com/ejqs/roam-publish/main/docs/readme/hero.png)
 
 > Roam Publish is a third-party service made by [@ejqs](https://ejqs.net). It is not affiliated with Roam Research.
 
-This repo is the **Roam Depot extension**. It adds the publish commands to Roam and sends the page you choose to the
-Roam Publish server. For how the extension and server fit together, see
-[roam-publish-docs](https://github.com/ejqs/roam-publish-docs).
-
-## Setup
+## Quick start
 
 1. Install **Roam Publish** from Roam Depot.
 2. Sign up at [roam.pub](https://roam.pub) and connect your graph with an **append-only** API token
-   (Roam: Settings → Graph → API tokens). Use a graph you own. roam.pub adds a block to today's daily note
-   (`roam.pub connected this graph (safe to delete)`), which you can delete afterwards.
-3. In Roam, open **Settings → Roam Publish** and click **Open dashboard**, which opens your API keys. Copy the key from the website and paste it into
-   **API key**; the extension says which graph it works for.
+   (Roam: Settings → Graph → API tokens).
+3. In Roam, open **Settings → Roam Publish**, click **Open dashboard**, copy your key and paste it into **API key**.
+4. Right-click a page title, choose **Roam Publish: Page…** and click **Publish**. The link is copied to your clipboard.
 
-> [!WARNING]
-> Verifying a graph may leave behind an `[[API Token: …]]` page in your graph that can't be deleted. Roam creates it
-> for the token. It isn't caused by roam.pub. If you know how to remove it reliably, email support@roam.pub.
+New pages are published **Unlisted**. Change that from the toast, the page's settings icon or roam.pub.
 
-**Shared graphs:** whoever connects a graph first owns it on roam.pub and invites others by email from the dashboard.
-After you accept, you get your own key for that graph. Members can only change pages they published.
+## Features
 
-**One key per graph.** A key only works in the graph it was made for. Pasted into another graph, publishing says
-which graph it belongs to, and nothing is published.
+### Publish pages and blocks
 
-**Lost your key?** Regenerate it at [roam.pub/dashboard/keys](https://roam.pub/dashboard/keys) and paste the new one.
-The old key stops working.
+Right-click a page title or bullet, or type "Roam Publish" in the command palette. Republish after edits with one
+click. Published pages keep Roam's formatting: block references, embeds, tables, kanban boards, math, code, Mermaid
+diagrams, images and video. Readers can fold blocks and zoom in, as in Roam.
 
-## Using it
+![A published page on roam.pub with its outline](https://raw.githubusercontent.com/ejqs/roam-publish/main/docs/readme/reader.png)
 
-1. Right-click a page title or a bullet.
-2. Choose **Roam Publish: Page…** or **Roam Publish: Block…**.
-3. Click **Publish**. The link is copied to your clipboard.
+### Access and visibility controls
 
-**On roam.pub** you also get these. Manage them from the [dashboard](https://roam.pub/dashboard), or click **Open
-dashboard** in the extension settings.
+- **Visibility:** Unlisted (link only), Public (your graph's front page) or Discover (roam.pub's
+  [Discover](https://roam.pub/discover)).
+- **Access:** lock a page with a **Password** or to **Members**.
+- **End-to-end encryption:** Password pages can be encrypted in Roam before they're sent, so roam.pub never sees
+  their text or title.
 
-- **Share pages easily.** Publish a page or block and get a link to share.
-- **Access and visibility controls.** Choose who finds your pages: Unlisted, Public or Discover, or lock them with a
-  Password or to Members.
-- **End-to-end encryption** for pages with a password.
-- **Download as PDF** for your readers, when you turn it on.
-- **Discover**, where readers find and upvote pages.
-- **RSS** for your readers.
+### Status in Roam
 
-**Publish to.** Publishing something new asks where it goes: your graph, your graph encrypted with its password,
-or one of your collections. It starts on your graph's **New pages go to** setting on roam.pub, so Publish is one
-click. Turn off **Ask where to publish** to skip the question.
+Published pages show three icons after their title: status, stats and settings.
 
-New pages and blocks are published **Unlisted**: only people with the link can see them. The toast offers **Make
-public** and **Put on Discover** right away, and **Add to collection…** when you're in a collection.
+![Status, stats and settings icons after a page title](https://raw.githubusercontent.com/ejqs/roam-publish/main/docs/readme/status.png)
 
-**Add to collection…** lists your collections and how the page starts out in each one, using that collection's own
-defaults (public, on Discover, password-protected or members only). When the collection is password-protected or
-members only and the page is more open in your graph, or the collection takes the pages added to it out of their
-graph, adding it takes it out of your graph, so the graph link can't get around the collection's lock. Encrypted pages
-can be added too, with no password to type: Roam Publish adds the page and republishes it, so it opens in the
-collection with the collection's password. Collections without a password that can encrypt are greyed out.
+- **Status:** a globe, an eye crossed out when Unlisted, or a lock when encrypted. Green when up to
+  date; orange with a dot when the page changed since you last published it.
+- **Blocks:** a ring on blocks published on their own, and a bar beside blocks edited since the last publish.
 
-**Collapsed blocks.** A page is published with its blocks collapsed as they are in Roam, or all expanded if you set
-**Collapsed blocks** to **Expanded**. Readers can open and close blocks either way. Republishing keeps the published
-page's open and collapsed blocks; when only those differ from Roam's, the status toast offers **Sync open/collapsed
-blocks** instead.
+Nothing is written to your graph to show these. Set **Status in Roam** to **Titles only** or **Off** to show less.
 
-Open the same menu again to check whether it's published and its visibility. It offers one action when there's
-something to do (**Republish** after edits, or **Sync open/collapsed blocks**), then **Add to collection…** and
-**Unpublish**. Visibility is changed on roam.pub, from the page **Open** goes to. A page can only go on Discover when
-it's open to everyone, shown in your graph, and your graph's front page and search engines are on. Unpublishing asks first: it deletes the page on roam.pub along with
-its access settings, passwords, views, upvotes and places in collections. On a shared graph, pages another member
-published show their status only; only they or the graph's owner can change them.
+### Page settings and stats
 
-You can also do all of this from the command palette: type "Roam Publish".
+The stats icon shows a page's views, upvotes and readers' countries. The settings icon changes its visibility,
+byline, view count, PDF download and collections. Passwords and members stay on roam.pub.
 
-**Status in Roam.** A published page shows three icons after its title: its status, its stats and its settings. The
-status icon is a globe, an eye crossed out when the page is unlisted, or a lock when it's encrypted. It's green when the page is up to date, and orange with a dot
-when it changed since you last published it. Each icon opens a pop-up about that page: its status, views, upvotes
-and readers' countries, and the same actions as the menu. A block published on its own gets a ring on its bullet, and blocks
-edited since their page was last published get a bar beside them. Nothing is written to your graph to show these.
-Set **Status in Roam** to **Titles only** or **Off** to show less.
+![The settings pop-up with visibility, byline, view count, PDF download and collections](https://raw.githubusercontent.com/ejqs/roam-publish/main/docs/readme/settings.png)
 
-**Settings in Roam.** The settings icon changes the page's settings on roam.pub: its visibility, byline, view count
-and PDF download. **Edit…** next to each of its collections does the same there, or takes it out of the collection.
-A collection's owner can change the collection's own settings from there too (**Collection settings…**). Access, passwords and members stay
-on roam.pub.
+### Dashboard
 
-**Dashboard.** The globe in Roam's top bar, or **Roam Publish: Open dashboard** in the command palette, shows your
-views per day, upvotes, readers' countries, most read pages, what changed since you published it, and your
-collections, for the last 7 or 30 days or all time. A graph member sees only the pages they published.
+The globe in Roam's top bar opens your views per day, upvotes, most read pages, pages changed since publishing and
+your collections, for the last 7 or 30 days or all time.
 
-**Keeping up to date.** When roam.pub changes in a way that needs a newer Roam Publish, the extension says so once and
-tells you where to update it (Settings → Roam Depot → Installed extensions), instead of failing with a confusing
-error.
+![The Roam Publish dashboard inside Roam](https://raw.githubusercontent.com/ejqs/roam-publish/main/docs/readme/dashboard.png)
 
-### Supported blocks
+### Collections
 
-The page or block is published with all its children. Everything published can be read by anyone with the link, so
-check references, embeds and children first. Nothing else from your graph is sent.
-
-- **Text formatting:** bold, italics, ^^highlights^^, ~~strikethrough~~, `inline code`, headings and text alignment.
-- **Links:** `[[page links]]`, `#tags` and aliases. They link to the other page when it's also published and listed,
-  and show as plain text when it isn't (so an unlisted page's link is never handed out).
-- **Collapsing and zooming:** readers fold any block with children, fold a whole page from its thread line, and
-  click a bullet or number to zoom into a block, as in Roam. Pages with headings get an outline.
-- **Block references** `((…))`: shown as the referenced text, up to 3 levels deep, including blocks outside the
-  published page.
-- **Embeds** `{{embed: …}}`: the embedded block or page with its children, up to 2 levels deep, and every embed when
-  a block has several.
-- **Views:** bullets, numbered lists and document view.
-- **Tables** `{{table}}` and **kanban boards** `{{kanban}}`.
-- **Math** `$$…$$`, rendered with KaTeX.
-- **Code blocks** with syntax highlighting, a language label and a copy button. Click inline code to copy it.
-- **Mermaid diagrams** (`{{mermaid}}`, or a code block set to Mermaid) are drawn, with a button to see the source.
-- **Quotes** `>`, **attributes** `Key:: value`, **TODO / DONE** checkboxes (read-only) and **horizontal rules** `---`.
-- **Images**, **video** (YouTube, Vimeo, Loom and video files), **audio**, **PDFs** and **iframes**.
-- **Tweets** show as a link to the post.
-
-### Unsupported blocks
-
-- **Diagrams and drawings** other than Mermaid (`{{diagram}}`, `{{drawing}}`, Excalidraw) show a "Diagram not shown"
-  placeholder.
-- **Queries and mentions** (`{{query}}`, `{{mentions}}`) show a placeholder. Their results aren't published.
-- **Interactive components** such as buttons, sliders, timers, counters and `roam/js` aren't shown.
-- **Block references more than 3 levels deep** and **embeds more than 2 levels deep** are left out.
-- **Files hosted in Roam** are linked, not copied. Files in encrypted graphs won't display.
+Gather pages from different graphs and people in one place. **Add to collection…** uses each collection's own
+access and visibility settings.
 
 ## Settings
 
 | Setting | What it does |
 | --- | --- |
-| **Dashboard** | Opens the roam.pub dashboard, at your API keys until you've added one. API keys, access, passwords, collections, members and the change log are managed there. |
-| **API key** | Your key for this graph (see Setup). Pasting it checks it at once and says which graph it works for. |
+| **API key** | Your key for this graph. Pasting it checks it and names the graph it works for. |
 | **Author name** | Your byline on pages that show authors. Blank: your @username. |
 | **Ask where to publish** | On (default): Publish asks where something new goes. Off: it goes where **New pages go to** says on roam.pub. |
-| **Status in Roam** | **Titles and blocks** (default): the icons after published page titles, rings on published blocks and bars beside edited blocks. **Titles only**, or **Off**. |
-| **Top bar button** | On (default): a globe in Roam's top bar opens the dashboard. Off: use the command palette. |
-| **Collapsed blocks** | **As in Roam** (default): blocks collapsed in Roam start collapsed on a first publish. **Expanded**: every block starts open. Republishing keeps the published page's. |
-| **Roam Publish block** | Where the block with the status link is added: **Pages** (default), **Pages and blocks**, **Blocks only** or **Off**. Off: nothing is written into your pages; roam.pub still keeps each page's status link and history. |
-| **Block position** | **First** or **Last** under the page or block. |
-| **Block tag** | The block's text. Default `[[Roam Publish]]` (graphs set up before this keep `#published`). Blank: no tag. |
+| **Status in Roam** | **Titles and blocks** (default), **Titles only** or **Off**. |
+| **Top bar button** | On (default): a globe in Roam's top bar opens the dashboard. |
+| **Collapsed blocks** | **As in Roam** (default) or **Expanded** on a first publish. |
+| **Roam Publish block** | Where the status link block is added: **Pages** (default), **Pages and blocks**, **Blocks only** or **Off**. |
+| **Block position** / **Block tag** | Where that block goes and its text (default `[[Roam Publish]]`). |
 
-Changing the tag edits existing blocks in place the next time you publish them. The status link always reads
-`Roam Publish Status`.
+## Privacy
 
-## Privacy and safety
+- **Only on your action.** Nothing leaves Roam until you publish. No analytics; the only server contacted is roam.pub.
+- **Written to your graph:** the Roam Publish block when you publish, and change log entries if you keep an
+  append-only token. That token can only add blocks. It can't read, edit or delete anything.
+- **Background requests:** status link uids about every 5 minutes, and your published pages list at most every 10
+  minutes. Both stop when the matching setting is **Off**.
 
-- **Only on your action:** nothing leaves Roam until you publish a page or block. No analytics, and the only server
-  contacted is roam.pub.
-- **One background request:** while Roam is open, about every 5 minutes, the extension tells roam.pub which status link
-  blocks still exist (uids only, no text). Setting **Roam Publish block** to **Off** stops it. See
-  [Use of the Append API](#use-of-the-append-api).
-- **Status in Roam** reads the list of your published pages that the extension already keeps, and checks the open
-  page in Roam; it sends nothing. To keep that list current, it asks roam.pub for it (titles, links and states of
-  your published pages; nothing from Roam is sent) at most every 10 minutes while Roam is in front, and saves it
-  only when it changed. **Status in Roam: Off** stops this.
-- **Settings and the dashboard** ask roam.pub only when you open them, and change settings only when you press Save.
-  The dashboard's numbers are ones roam.pub already keeps; its "Changed since published" list is worked out in Roam.
-- **Written to your graph:** the Roam Publish block when you publish, and change log entries if you kept an
-  append-only token. Nothing else.
-- **Encrypted graphs** are supported. The extension only sends the data you choose to publish.
-- **Encrypted pages:** a Password page that roam.pub encrypts is encrypted in Roam before it's sent (from 0.2.0), so
-  roam.pub only gets the encrypted page and never sees its text or title (it calls it "Encrypted page"). The
-  extension asks roam.pub for the passwords' public keys first; it never sees a password. Readers' browsers decrypt
-  the page with the password. This needs a Roam recent enough to have X25519 encryption; on an older one, the page
-  is sent as before, roam.pub encrypts it when it arrives, and the publish message says so. Each encrypted page says which way it was encrypted: see
-  [Encryption versions](https://roam.pub/privacy/encryption/versions).
-- **Your extension's version** is sent with every request, so roam.pub knows which versions are still in use before
-  it retires anything older ones rely on.
+Full details: [Data flow and the Append API](https://github.com/ejqs/roam-publish-docs/blob/main/docs/data-and-append-api.md),
+[Privacy policy](https://roam.pub/privacy), [Terms](https://roam.pub/terms).
 
-### Use of the Append API
+## Help
 
-roam.pub writes to your graph with Roam's Append API and an **append-only** token you create in Roam. That kind of
-token can only add blocks to its own graph. It can't read, edit, move or delete anything.
-
-- **Verifying your graph, once:** roam.pub adds `roam.pub connected this graph (safe to delete)` to today's daily note.
-  Only a graph's admins can create its tokens, so a successful write proves the graph is yours.
-- **The change log, if you keep the token:** roam.pub adds a dated entry under a page's status link whenever
-  something happens to it (published, listed, access changed, unpublished, and so on), including changes made
-  on the website. Entries hold the date, time, what happened and links, never page content.
-- **Your token:** entered on the website only, stored encrypted, never shown again. Pause the change log or remove the
-  token in the graph's settings on roam.pub (**Open dashboard** in the extension's settings), or revoke it in Roam.
-
-The status link (`roam.pub/p/…`) shows you and your graph's members where a page is published. **Don't share it:**
-anyone else is asked to log in or gets a "not found" page. Share the page's graph or collection link instead.
-
-For exactly what the extension reads, what it sends and how roam.pub uses the Append API, see
-[Data flow and the Append API](https://github.com/ejqs/roam-publish-docs/blob/main/docs/data-and-append-api.md).
-roam.pub's [Privacy policy](https://roam.pub/privacy) and [Terms](https://roam.pub/terms) cover the website and the
-extension.
-
-### Reporting a vulnerability
-
-If you find a security issue in the extension or on roam.pub, please report it privately to
-support@roam.pub or ejqs [at] ejqs [dot] net rather than opening a public issue. I'll reply as soon as I can.
-
-## Known unknowns
-
-- Images are published as links to Roam's hosting (typically Firebase Storage URLs). If Roam changes these or you
-  delete the image, the published image breaks.
-- Extension settings (including the API key) live in the graph. If collaborators on a shared graph see each other's
-  settings, they'd share one key and author name. This hasn't been confirmed.
-
-## Development
-
-```bash
-npm install
-ROAM_PUBLISH_SERVER=http://localhost:3000 npm run dev   # rebuilds extension.js on change
-npm run build       # production build
-npm run typecheck
-npm test            # serializer, hash parity with the server, encryption, API errors
-```
-
-In Roam: Settings → Roam Depot → enable Developer mode → load this folder.
-
-### Releasing
-
-CI runs the typecheck and Roam Depot's own `./build.sh` on every PR and push to `main`. To release: update `version` in
-`package.json` and add a matching `## x.y.z` section to `CHANGELOG.md`, then push a tag (`git tag v0.1.1 && git push
-origin v0.1.1`). The Release workflow publishes a GitHub Release with that changelog section. Then bump `source_commit`
-in your roam-depot PR to the released commit.
+- **Shared graphs, lost keys, supported blocks:** see the [guide](https://github.com/ejqs/roam-publish-docs/blob/main/docs/extension-guide.md).
+- **Bugs and ideas:** [open an issue](https://github.com/ejqs/roam-publish/issues) or email support@roam.pub.
+- **Security issues:** report privately to support@roam.pub.
 
 ## Credits
 
-Roam Publish adapts a small amount of code from these MIT-licensed projects, credited where it's used:
+Adapts code from [roamjs-components](https://github.com/RoamJS/roamjs-components) (MIT, Copyright (c) 2021 David
+Vargas). In-Roam marks follow [Reference Count](https://github.com/fbgallet/roam-extension-ref-count) by Fabrice
+Gallet (MIT). Development and release notes: [CONTRIBUTING.md](https://github.com/ejqs/roam-publish/blob/main/CONTRIBUTING.md).
 
-- [roamjs-components](https://github.com/RoamJS/roamjs-components) (Copyright (c) 2021 David Vargas): reading a block's
-  uid from Roam's element id (`src/marks.ts`).
-
-The approach to marking pages and blocks in Roam (one observer, attributes and CSS on Roam's own elements, everything
-removed on unload) follows [Reference Count](https://github.com/fbgallet/roam-extension-ref-count) by Fabrice Gallet
-(MIT), RoamJS's [roamjs-components](https://github.com/RoamJS/roamjs-components) and Roam Depot's review notes.
-
-## License
-
-[MIT](LICENSE)
+[MIT](https://github.com/ejqs/roam-publish/blob/main/LICENSE)
