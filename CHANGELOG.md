@@ -24,6 +24,10 @@ What's new shows it once Roam Depot serves it. Every bullet starts with **Breaki
   published have a dotted underline. Follows **Status in Roam** (**Titles and blocks**).
 - New: **Publish from the title.** Hover an unpublished page's title for a publish icon that opens the Publish
   pop-up.
+- New: **Publish linked pages too.** The Publish pop-up lists the pages it links to that aren't published yet;
+  checked ones are published right after it, the same way. It also says when text is copied in from other pages
+  (embeds and block references).
+- Fixed: A title icon's pop-up could open light in Roam's dark theme.
 - New: **Hold Cmd (Ctrl on Windows)** and a share icon shows by the bullet of the block under the pointer, like
   Roam's comment button. Click it to publish the block, or see its status if it's published.
 - New: A published block's ring has a small lock when it's behind a password, or a crossed-out eye when it's

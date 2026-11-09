@@ -1,5 +1,6 @@
 import { choiceInGraph, choiceOpts, publish, publishChoices, statusView, type StatusView } from "./publish";
 import { openDashboard, renderPageSettings, renderPageStats } from "./panels";
+import { borrowedWords, linkedContent } from "./linked";
 import { openSetup } from "./setup";
 import { getApiKey, type Listing } from "./state";
 import { toast } from "./toast";
@@ -168,13 +169,42 @@ async function drawPublishForm(root: HTMLElement, uid: string, view: StatusView,
   };
   where?.row.querySelector("select")?.addEventListener("change", draw);
   visibility.group.addEventListener("click", draw);
+  // Linked pages that aren't published, offered unchecked; filled in once they're found.
+  const extra = h("div", {});
+  const alsoChecked = new Map<string, HTMLInputElement>();
+  void linkedContent(uid).then(
+    ({ pages, embeds, refs }) => {
+      if (!frame.isOpen()) return;
+      const borrowed = borrowedWords(embeds, refs);
+      extra.replaceChildren(
+        ...(pages.length
+          ? [h("div", { class: "rp-form-row" }, h("span", { class: "rp-form-label" }, "Linked pages"), h("div", { class: "rp-form-field rp-linked" },
+              h("span", { class: "rp-note" }, `Not published yet. Checked ones are published too, the same way.`),
+              ...pages.map((p) => {
+                const box = h("input", { type: "checkbox" });
+                alsoChecked.set(p.uid, box);
+                return h("label", { class: "bp3-control bp3-checkbox rp-check" }, box, h("span", { class: "bp3-control-indicator" }), p.title);
+              })))]
+          : []),
+        ...(borrowed ? [h("div", { class: "rp-note rp-borrowed" }, `Includes text from other pages: ${borrowed}. It's copied in as it is now.`)] : []),
+      );
+      frame.relayout();
+    },
+    (e) => console.warn("[roam-publish] couldn't read linked pages", e),
+  );
   const go = button(
     `Publish ${view.kind}`,
     () => {
       const listing = visibility.get() as Listing;
       lastListing = listing;
+      const opts = { ...(choices ? choiceOpts(picked(), goTo) : { noAsk: true }), listing };
+      const also = [...alsoChecked].filter(([, box]) => box.checked).map(([u]) => u);
       frame.close();
-      void publish(uid, { ...(choices ? choiceOpts(picked(), goTo) : { noAsk: true }), listing });
+      // One after another, so each result shows in turn and the linked ones see this one published.
+      void (async () => {
+        await publish(uid, opts);
+        for (const u of also) await publish(u, opts);
+      })();
     },
     { intent: "primary", small: false },
   );
@@ -187,6 +217,7 @@ async function drawPublishForm(root: HTMLElement, uid: string, view: StatusView,
       : []),
     visibilityRow,
     collectionNote,
+    extra,
     h("div", { class: "rp-row rp-row-end" }, button("Cancel", frame.close, { small: false }), go),
   );
   draw();

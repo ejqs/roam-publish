@@ -84,6 +84,9 @@ h1.rm-title-display:hover .${GROUP_CLASS}[data-parts="publish"], .${GROUP_CLASS}
 .rp-form-field { min-width: 0; }
 .rp-form-field > .rp-list-row { padding: 2px 0; }
 .rp-link { cursor: pointer; }
+.rp-linked { max-height: 160px; overflow-y: auto; }
+.rp-linked .rp-check { margin: 2px 0 4px; }
+.rp-borrowed { margin: 8px 0 0 106px; }
 .roam-publish-dialog .rp-panel .rp-tabs { margin: -8px 0 12px; padding: 0; }
 .roam-publish-dialog .rp-panel .rp-pop-foot { margin: 12px 0 0; padding: 8px 0 0; }
 .roam-publish-dialog .rp-panel { min-height: 60px; }

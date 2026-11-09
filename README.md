@@ -26,8 +26,10 @@ Without a key, step 4 opens the setup steps right in Roam, with a field to paste
 
 ### Publish pages and blocks
 
-Right-click a page title or bullet, or type "Roam Publish" in the command palette. One pop-up asks where it goes
-(your graph, your graph encrypted, or a collection) and its visibility, before anything is published. Republish after
+Right-click a page title or bullet, hover an unpublished page's title for its publish icon, hold Cmd (Ctrl on
+Windows) for a share icon by a block's bullet, or type "Roam Publish" in the command palette. One pop-up asks where it
+goes (your graph, your graph encrypted, or a collection) and its visibility, before anything is published. It also
+lists linked pages that aren't published yet, to publish with it. Republish after
 edits with one click. Published pages keep Roam's formatting: block references, embeds, tables, kanban boards, math, code, Mermaid
 diagrams, images and video. Readers can fold blocks and zoom in, as in Roam.
 
@@ -47,9 +49,12 @@ Published pages show three icons after their title: status, stats and settings.
 
 ![Status, stats and settings icons after a page title](https://raw.githubusercontent.com/ejqs/roam-publish/main/docs/readme/status.png)
 
-- **Status:** a globe, an eye crossed out when Unlisted, or a lock when encrypted. Green when up to
+- **Status:** a globe, an eye crossed out when Unlisted, or a lock behind a password. Green when up to
   date; orange with a dot when the page changed since you last published it.
-- **Blocks:** a ring on blocks published on their own, and a bar beside blocks edited since the last publish.
+- **Links:** a small icon after [[links]] and #tags to published pages. On a published page, links to pages that
+  aren't published have a dotted underline.
+- **Blocks:** a ring on blocks published on their own (with a lock or crossed-out eye when not public), and a bar
+  beside blocks edited since the last publish.
 
 Nothing is written to your graph to show these. Set **Status in Roam** to **Titles only** or **Off** to show less.
 
@@ -105,6 +110,7 @@ Full details: [Data flow and the Append API](https://github.com/ejqs/roam-publis
 
 Adapts code from [roamjs-components](https://github.com/RoamJS/roamjs-components) (MIT, Copyright (c) 2021 David
 Vargas). In-Roam marks follow [Reference Count](https://github.com/fbgallet/roam-extension-ref-count) by Fabrice
-Gallet (MIT). Development and release notes: [CONTRIBUTING.md](https://github.com/ejqs/roam-publish/blob/main/CONTRIBUTING.md).
+Gallet (MIT). Link marks are a generated stylesheet, as in [Tag Painter](https://github.com/8bitgentleman/roam-depot-tag-painter)
+by Matt Vogel and [Magic Tags](https://github.com/rcvd/magic-tags) by Alexander Rink (both MIT). Development and release notes: [CONTRIBUTING.md](https://github.com/ejqs/roam-publish/blob/main/CONTRIBUTING.md).
 
 [MIT](https://github.com/ejqs/roam-publish/blob/main/LICENSE)

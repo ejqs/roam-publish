@@ -26,7 +26,8 @@ export function h<K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Attrs = 
 export function isDark(near: Element = document.body) {
   for (let e: Element | null = near; e; e = e.parentElement) {
     const m = /rgba?\((\d+), (\d+), (\d+)(?:, ([\d.]+))?\)/.exec(getComputedStyle(e).backgroundColor);
-    if (m && m[4] !== "0") return 0.299 * +m[1] + 0.587 * +m[2] + 0.114 * +m[3] < 128;
+    // Translucent backgrounds (a hovered icon's tint) say nothing about the theme: look further out.
+    if (m && (m[4] === undefined || +m[4] >= 0.5)) return 0.299 * +m[1] + 0.587 * +m[2] + 0.114 * +m[3] < 128;
   }
   return false;
 }
