@@ -60,11 +60,11 @@ export function initState(extensionAPI: ExtensionAPI) {
   if (api.settings.get("shortlink-tag") == null)
     void save("shortlink-tag", existing ? "#published" : DEFAULT_SHORTLINK_TAG);
   // Saved so the settings panel's selects show them. Both carry over what versions before 0.2.0 saved.
-  if (api.settings.get(BLOCK_SETTING) == null) void save(BLOCK_SETTING, legacyBlockChoice());
+  // New installs write nothing to the graph until the block is switched on; the title icons show status.
+  if (api.settings.get(BLOCK_SETTING) == null) void save(BLOCK_SETTING, existing ? legacyBlockChoice() : "Off");
   const position = api.settings.get("shortlink-position");
   if (position !== "First" && position !== "Last") void save("shortlink-position", position === "bottom" ? "Last" : "First");
   if (api.settings.get("collapsed-blocks") == null) void save("collapsed-blocks", COLLAPSED_AS_IN_ROAM);
-  if (api.settings.get("ask-where") == null) void save("ask-where", true);
   if (api.settings.get(TOP_BAR_SETTING) == null) void save(TOP_BAR_SETTING, true);
   if (!STATUS_CHOICES.includes(api.settings.get(STATUS_SETTING) as StatusChoice)) void save(STATUS_SETTING, STATUS_CHOICES[0]);
 }
@@ -108,11 +108,11 @@ export const getAuthor = () => ((api.settings.get("author-name") as string) || "
 export const getShortlinkEnabled = () => blockChoice() === "Pages" || blockChoice() === "Pages and blocks";
 /** Published blocks get a Roam Publish block. */
 export const getShortlinkOnBlocks = () => blockChoice() === "Pages and blocks" || blockChoice() === "Blocks only";
-/** The Roam Publish block's text; blank for none. */
-/** Whether Publish asks where a new page goes; on unless switched off. */
-export const getAskWhere = () => api.settings.get("ask-where") !== false;
+/** Saved from the setup dialog, as the settings panel's field saves it. */
+export const saveApiKey = (key: string) => save("api-key", key.trim());
 export const TOP_BAR_SETTING = "top-bar-button";
 export const getTopBar = () => api.settings.get(TOP_BAR_SETTING) !== false;
+/** The Roam Publish block's text; blank for none. */
 export const getShortlinkTag = () => ((api.settings.get("shortlink-tag") as string) ?? DEFAULT_SHORTLINK_TAG).trim();
 /** How collapsed blocks start on a first publish: as in Roam unless set to Expanded. */
 export const getFirstFolds = () => (api.settings.get("collapsed-blocks") === COLLAPSED_EXPANDED ? "expanded" : "asIs");

@@ -16,16 +16,18 @@ status, views and settings without leaving Roam.**
 2. Sign up at [roam.pub](https://roam.pub) and connect your graph with an **append-only** API token
    (Roam: Settings → Graph → API tokens).
 3. In Roam, open **Settings → Roam Publish**, click **Open dashboard**, copy your key and paste it into **API key**.
-4. Right-click a page title, choose **Roam Publish: Page…** and click **Publish**. The link is copied to your clipboard.
+4. Right-click a page title and choose **Roam Publish: Page…**. Pick where it goes and its visibility, then click
+   **Publish page**. The link is copied to your clipboard.
 
-New pages are published **Unlisted**. Change that from the toast, the page's settings icon or roam.pub.
+Without a key, step 4 opens the setup steps right in Roam, with a field to paste the key.
 
 ## Features
 
 ### Publish pages and blocks
 
-Right-click a page title or bullet, or type "Roam Publish" in the command palette. Republish after edits with one
-click. Published pages keep Roam's formatting: block references, embeds, tables, kanban boards, math, code, Mermaid
+Right-click a page title or bullet, or type "Roam Publish" in the command palette. One pop-up asks where it goes
+(your graph, your graph encrypted, or a collection) and its visibility, before anything is published. Republish after
+edits with one click. Published pages keep Roam's formatting: block references, embeds, tables, kanban boards, math, code, Mermaid
 diagrams, images and video. Readers can fold blocks and zoom in, as in Roam.
 
 ![A published page on roam.pub with its outline](https://raw.githubusercontent.com/ejqs/roam-publish/main/docs/readme/reader.png)
@@ -75,18 +77,17 @@ access and visibility settings.
 | --- | --- |
 | **API key** | Your key for this graph. Pasting it checks it and names the graph it works for. |
 | **Author name** | Your byline on pages that show authors. Blank: your @username. |
-| **Ask where to publish** | On (default): Publish asks where something new goes. Off: it goes where **New pages go to** says on roam.pub. |
 | **Status in Roam** | **Titles and blocks** (default), **Titles only** or **Off**. |
 | **Top bar button** | On (default): a globe in Roam's top bar opens the dashboard. |
 | **Collapsed blocks** | **As in Roam** (default) or **Expanded** on a first publish. |
-| **Roam Publish block** | Where the status link block is added: **Pages** (default), **Pages and blocks**, **Blocks only** or **Off**. |
+| **Roam Publish block** | **Off** (default for new installs): nothing is written to your graph. Or a block with the status link, where roam.pub writes the change log: **Pages**, **Pages and blocks** or **Blocks only**. |
 | **Block position** / **Block tag** | Where that block goes and its text (default `[[Roam Publish]]`). |
 
 ## Privacy
 
 - **Only on your action.** Nothing leaves Roam until you publish. No analytics; the only server contacted is roam.pub.
-- **Written to your graph:** the Roam Publish block when you publish, and change log entries if you keep an
-  append-only token. That token can only add blocks. It can't read, edit or delete anything.
+- **Written to your graph:** nothing, unless you turn on the Roam Publish block; then that block when you publish, and
+  change log entries if you keep an append-only token. That token can only add blocks. It can't read, edit or delete anything.
 - **Background requests:** status link uids about every 5 minutes, and your published pages list at most every 10
   minutes. Both stop when the matching setting is **Off**.
 

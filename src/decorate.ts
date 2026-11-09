@@ -1,8 +1,10 @@
 import { editedSince, iconFor, uidInId } from "./marks";
 import { statusView, syncPublications, type StatusView } from "./publish";
-import { openDashboard, renderPageSettings, renderPageStats } from "./panels";
+import { openDashboard } from "./panels";
+import { renderPanel, type Tab, yours } from "./panel";
+import { openSetup } from "./setup";
 import { getApiKey, getCache, getStatusMarks, getTopBar, listingOf, onCacheChange } from "./state";
-import { button as bpButton, closeDialogs, h, isDark } from "./ui";
+import { closeDialogs, h, isDark } from "./ui";
 
 /**
  * Status marks in Roam: three icons after the title of a published page (status, stats, settings), a ring on the bullet of a block
@@ -57,16 +59,26 @@ h1.rm-title-display:has(textarea, input) .${GROUP_CLASS} { display: none; }
   box-shadow: 0 0 0 1px rgba(16, 22, 26, 0.1), 0 2px 4px rgba(16, 22, 26, 0.2), 0 8px 24px rgba(16, 22, 26, 0.2); }
 #${POPOVER_ID}.rp-dark { background: #30404d; color: #f5f8fa; }
 #${POPOVER_ID} { max-height: calc(100vh - 120px); overflow-y: auto; }
-#${POPOVER_ID} .rp-tabs { display: flex; gap: 16px; margin: -12px -14px 12px; padding: 0 14px; border-bottom: 1px solid rgba(138, 155, 168, 0.3); }
-#${POPOVER_ID} .rp-tab { padding: 8px 0 6px; border: 0; border-bottom: 2px solid transparent; background: none; color: inherit; font: inherit; cursor: pointer; }
-#${POPOVER_ID} .rp-tab[aria-selected="true"] { color: #106ba3; border-bottom-color: #106ba3; }
-#${POPOVER_ID}.rp-dark .rp-tab[aria-selected="true"] { color: #48aff0; border-bottom-color: #48aff0; }
-#${POPOVER_ID} .rp-pop-foot { display: flex; justify-content: flex-end; margin: 12px -14px -12px; padding: 8px 14px; border-top: 1px solid rgba(138, 155, 168, 0.3); }
+.rp-panel .rp-tabs { display: flex; gap: 16px; margin: -12px -14px 12px; padding: 0 14px; border-bottom: 1px solid rgba(138, 155, 168, 0.3); }
+.rp-panel .rp-tab { padding: 8px 0 6px; border: 0; border-bottom: 2px solid transparent; background: none; color: inherit; font: inherit; cursor: pointer; }
+.rp-panel .rp-tab[aria-selected="true"] { color: #106ba3; border-bottom-color: #106ba3; }
+.bp3-dark .rp-panel .rp-tab[aria-selected="true"], #${POPOVER_ID}.rp-dark .rp-tab[aria-selected="true"] { color: #48aff0; border-bottom-color: #48aff0; }
+.rp-panel .rp-pop-foot { display: flex; justify-content: flex-end; margin: 12px -14px -12px; padding: 8px 14px; border-top: 1px solid rgba(138, 155, 168, 0.3); }
 .rp-form-row { display: grid; grid-template-columns: 96px 1fr; gap: 10px; align-items: start; margin: 8px 0; }
 .rp-form-label { font-weight: 600; font-size: 13px; padding-top: 4px; }
 .rp-form-field { min-width: 0; }
 .rp-form-field > .rp-list-row { padding: 2px 0; }
 .rp-link { cursor: pointer; }
+.roam-publish-dialog .rp-panel .rp-tabs { margin: -8px 0 12px; padding: 0; }
+.roam-publish-dialog .rp-panel .rp-pop-foot { margin: 12px 0 0; padding: 8px 0 0; }
+.roam-publish-dialog .rp-panel { min-height: 60px; }
+.roam-publish-dialog:has(.rp-panel) { padding-bottom: 0; }
+.rp-step { display: grid; grid-template-columns: 24px 1fr; gap: 8px; margin: 12px 0; }
+.rp-step-n { width: 20px; height: 20px; border-radius: 50%; background: #137cbd; color: #fff; font-size: 12px; font-weight: 600;
+  display: inline-flex; align-items: center; justify-content: center; }
+.rp-key { margin-top: 6px; }
+.rp-key input { font-family: monospace; }
+.rp-panel [hidden] { display: none !important; }
 .rp-links { display: flex; flex-wrap: wrap; gap: 16px; }
 .rp-inline { display: flex; gap: 6px; align-items: center; margin-top: 4px; }
 .rp-inline > .bp3-html-select { flex: 1; min-width: 0; }
@@ -148,8 +160,9 @@ export function startTopbar(on = getTopBar()) {
       "span",
       { class: `bp3-button bp3-minimal bp3-small bp3-icon-globe-network ${TOPBAR_CLASS}`, role: "button", tabindex: 0, title: "Roam Publish dashboard", "aria-label": "Roam Publish dashboard" },
     );
-    b.addEventListener("click", openDashboard);
-    b.addEventListener("keydown", (e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), openDashboard()));
+    const open = () => (getApiKey() ? openDashboard() : openSetup(openDashboard));
+    b.addEventListener("click", open);
+    b.addEventListener("keydown", (e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), open()));
     bar.append(b);
   };
   mount();
@@ -336,10 +349,6 @@ async function apply() {
   for (const el of document.querySelectorAll(`[${ATTR}]`)) if (!marks.has(el)) el.removeAttribute(ATTR);
 }
 
-type Tab = "page" | "settings";
-
-/** Stats and settings only for pages this key may change: published, not removed, not another member's. */
-const yours = (view: StatusView) => view.state !== "unpublished" && view.state !== "removed" && view.state !== "other";
 
 function iconButton(uid: string, part: string, tab: Tab, label: string) {
   const el = document.createElement("span");
@@ -420,8 +429,7 @@ async function openPopover(anchor: HTMLElement, uid: string, tab: Tab) {
   pop.dataset.anchor = anchor.dataset.part;
   pop.setAttribute("role", "dialog");
   pop.className = isDark(anchor) ? "rp-dark bp3-dark" : "";
-  pop.textContent = "Checking…";
-  anchor.setAttribute("aria-expanded", "true");
+    anchor.setAttribute("aria-expanded", "true");
   const place = () => {
     const r = anchor.getBoundingClientRect();
     pop.style.top = `${r.bottom + 8}px`;
@@ -443,71 +451,10 @@ async function openPopover(anchor: HTMLElement, uid: string, tab: Tab) {
     window.removeEventListener("resize", place);
   };
 
-  let view: StatusView | null = null;
-  try {
-    view = await statusView(uid, { sync: true });
-  } catch (e) {
-    pop.textContent = e instanceof Error ? e.message : "Couldn't check the status.";
-  }
-  if (!pop.isConnected || !view) return;
-  const v = view;
-  const body = h("div", { class: "rp-tab-body" });
-  const tabs: [Tab, string, () => void][] = [["page", "This page", () => drawPage(body, uid, v, place)]];
-  if (yours(v)) tabs.push(["settings", "Settings", () => void renderPageSettings(body, uid, () => recheckSoon(0)).then(place)]);
-  const bar = h("div", { class: "rp-tabs", role: "tablist" });
-  const select = (t: Tab) => {
-    const i = Math.max(0, tabs.findIndex(([k]) => k === t));
-    bar.querySelectorAll("[role=tab]").forEach((b, j) => b.setAttribute("aria-selected", String(i === j)));
-    tabs[i][2]();
-    place();
-  };
-  for (const [k, label] of tabs) bar.append(h("button", { type: "button", class: "rp-tab", role: "tab", onclick: () => select(k) }, label));
-  pop.replaceChildren(bar, body);
-  select(tab);
+  pop.classList.add("rp-panel");
+  const view = await renderPanel(pop, uid, tab, { relayout: place, close: closePopover, isOpen: () => pop.isConnected, onChange: () => recheckSoon(0) });
+  if (!view) return;
   // What the pop-up found is the freshest status: draw it.
   checked.set(uid, { view, edited: checked.get(uid)?.edited ?? new Set() });
   schedule();
-}
-
-/** "This page": the status, the page's stats, its actions and the way to the dashboard. */
-function drawPage(root: HTMLElement, uid: string, view: StatusView, place: () => void) {
-  const stats = h("div", {});
-  const { message, actions } = drawStatus(view);
-  // Stats sit between the status and its actions.
-  root.replaceChildren(
-    message,
-    stats,
-    actions,
-    h(
-      "div",
-      { class: "rp-pop-foot" },
-      h("a", { class: "rp-link", href: "#", onclick: (e: Event) => (e.preventDefault(), closePopover(), openDashboard()) }, "Open dashboard"),
-    ),
-  );
-  if (yours(view)) void renderPageStats(stats, uid).then(place);
-}
-
-/** The status, as the status toast says it, with its actions. */
-function drawStatus(view: StatusView) {
-  const row = h("div", { class: "rp-row" });
-  const button = (label: string, onClick: () => void, primary: boolean) =>
-    row.append(
-      bpButton(
-        label,
-        () => {
-          closePopover();
-          onClick();
-        },
-        label === "Unpublish" ? { minimal: true, intent: "danger" } : { intent: primary ? "primary" : undefined },
-      ),
-    );
-  const last = view.actions.filter((a) => a.label === "Unpublish");
-  view.actions
-    .filter((a) => !last.includes(a))
-    .forEach((a, i) => button(a.label, a.onClick, i === 0 && /^(Republish|Publish|Sync)/.test(a.label)));
-  // Links come from the server's responses; only ever open web pages from them.
-  const link = view.link;
-  if (link && /^https?:\/\//i.test(link)) button("Open ↗", () => void window.open(link, "_blank", "noopener"), false);
-  last.forEach((a) => button(a.label, a.onClick, false));
-  return { message: h("div", {}, view.message), actions: row.childElementCount ? row : "" };
 }

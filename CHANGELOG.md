@@ -4,6 +4,30 @@ All notable changes to the Roam Publish extension. Each version is dated when it
 What's new shows it once Roam Depot serves it. Every bullet starts with **Breaking:**, **New:**, **Improved:** or
 **Fixed:**; a breaking change comes with a new major version.
 
+## Unreleased
+
+### Publishing
+- Improved: **One Publish pop-up.** **Roam Publish: Page…**, **Block…**, the command palette and the title icons
+  all open the same pop-up. For something new it asks where it goes (your graph, your graph encrypted, or a
+  collection) and, in your graph, its visibility (**Unlisted**, **Public** or **Discover**), then publishes with one
+  click. Before, visibility was changed after the page was already published.
+- Improved: Messages after publishing follow Roam's light and dark themes, and only report the result. Add to
+  collection is in the pop-up's **Settings** tab.
+- New: **Copy status link** in the pop-up, for the page's permanent link on roam.pub.
+
+### Commands
+- Improved: **Fewer commands.** **Roam Publish: Publish or update current page…** and **Publish or update focused
+  block…** open the pop-up; **Unpublish current page** and **Open dashboard** stay. The separate status and
+  "with encryption" commands are gone: encryption is a **Publish to** choice. If you gave one of the old commands a
+  hotkey, set it again on the new one.
+
+### Setup and settings
+- New: **Setup in Roam.** Without an API key, publishing or the top bar globe opens the setup steps with a field to
+  paste the key, checked as you paste it.
+- Improved: New installs write nothing to your graph: **Roam Publish block** starts **Off**, since the title icons
+  show each page's status. Graphs set up before keep their choice.
+- Improved: The **Ask where to publish** setting is gone, as the pop-up always shows where something new goes.
+
 ## 0.3.0 (2026-10-26)
 
 ### Status in Roam

@@ -1,29 +1,30 @@
-import { confirmChangeLogBlocks, confirmUnpublish, publish, publishStatus } from "./publish";
+import { confirmChangeLogBlocks, confirmUnpublish, setAskHandler } from "./publish";
 import { addStyles, removeStyles, startMarks, startTopbar, stopMarks, stopTopbar } from "./decorate";
+import { openPanel } from "./panel";
 import { openDashboard } from "./panels";
+import { openSetup } from "./setup";
 import { createSettingsPanel } from "./settings";
-import { initState } from "./state";
+import { getApiKey, initState } from "./state";
 import { removeToasts, toast } from "./toast";
 
 const BLOCK_MENU = "Roam Publish: Block…";
 const PAGE_MENU = "Roam Publish: Page…";
 
-const publishEncrypted = (uid: string) => publish(uid, { encrypt: true });
+/** The Roam Publish pop-up: the Publish form for something new, or its status, stats, settings and actions. */
+const showPanel = async (uid: string) => openPanel(uid);
 
-/** Command palette: the current page, or the block being edited. */
+/**
+ * Command palette: the current page, or the block being edited. The pop-up has Publish, Republish and
+ * the rest, so there's one command each; Unpublish has its own, as it can't be undone.
+ */
 const PALETTE: { label: string; target: "page" | "block"; run: (uid: string) => Promise<void> }[] = [
-  { label: "Roam Publish: Publish current page", target: "page", run: publish },
-  { label: "Roam Publish: Publish current page with encryption", target: "page", run: publishEncrypted },
+  { label: "Roam Publish: Publish or update current page…", target: "page", run: showPanel },
+  { label: "Roam Publish: Publish or update focused block…", target: "block", run: showPanel },
   { label: "Roam Publish: Unpublish current page", target: "page", run: confirmUnpublish },
-  { label: "Roam Publish: Current page status", target: "page", run: publishStatus },
-  { label: "Roam Publish: Publish focused block", target: "block", run: publish },
-  { label: "Roam Publish: Publish focused block with encryption", target: "block", run: publishEncrypted },
-  { label: "Roam Publish: Unpublish focused block", target: "block", run: confirmUnpublish },
-  { label: "Roam Publish: Focused block status", target: "block", run: publishStatus },
 ];
 
 /** Commands that need no page or block. */
-const GLOBAL = [{ label: "Roam Publish: Open dashboard", run: openDashboard }];
+const GLOBAL = [{ label: "Roam Publish: Open dashboard", run: () => (getApiKey() ? openDashboard() : openSetup(openDashboard)) }];
 
 let extensionAPI: ExtensionAPI;
 let confirmTimers: ReturnType<typeof setTimeout>[] = [];
@@ -74,8 +75,10 @@ async function onload({ extensionAPI: api }: { extensionAPI: ExtensionAPI }) {
 
   const { ui } = window.roamAlphaAPI;
   // One entry per menu: it shows the status and offers what can be done from there.
-  ui.blockContextMenu.addCommand({ label: BLOCK_MENU, callback: (c) => void publishStatus(c["block-uid"]) });
-  ui.pageContextMenu.addCommand({ label: PAGE_MENU, callback: (c) => void withPageUid(c, publishStatus) });
+  ui.blockContextMenu.addCommand({ label: BLOCK_MENU, callback: (c) => void showPanel(c["block-uid"]) });
+  ui.pageContextMenu.addCommand({ label: PAGE_MENU, callback: (c) => void withPageUid(c, showPanel) });
+  // Publishing something new (Publish in a toast, say) opens the pop-up to pick where it goes first.
+  setAskHandler(openPanel);
 
   for (const c of PALETTE) api.ui.commandPalette.addCommand({ label: c.label, callback: () => void withTarget(c.target, c.run) });
   for (const c of GLOBAL) api.ui.commandPalette.addCommand({ label: c.label, callback: c.run });
@@ -89,6 +92,7 @@ function onunload() {
   const { ui } = window.roamAlphaAPI;
   ui.blockContextMenu.removeCommand({ label: BLOCK_MENU });
   ui.pageContextMenu.removeCommand({ label: PAGE_MENU });
+  setAskHandler(null);
   for (const c of [...PALETTE, ...GLOBAL]) extensionAPI?.ui.commandPalette.removeCommand({ label: c.label });
   confirmTimers.forEach((t) => clearTimeout(t));
   confirmTimers = [];

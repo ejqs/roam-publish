@@ -3,19 +3,34 @@ import { generateKeyPairSync } from "node:crypto";
 import { beforeEach, describe, mock, test } from "node:test";
 import {
   addToCollection,
-  chooseCollection,
+  collectionOptions,
   confirmChangeLogBlocks,
-  confirmLeaveDiscover,
   confirmUnpublish,
+  choiceInGraph,
+  choiceOpts,
   publish,
-  publishStatus,
+  publishChoices,
+  type PublishChoices,
+  setAskHandler,
   statusView,
   syncPublications,
 } from "../src/publish";
 import { recheckCanSeal } from "../src/seal";
 import { hashPayload, serialize } from "../src/serialize";
 import { getShortlinkEnabled, getShortlinkOnBlocks, getShortlinkPosition, initState, withoutUndefined } from "../src/state";
+import { toast } from "../src/toast";
 import { fakeRoam } from "./fake-roam";
+
+/** The status as the pop-up says it, shown as a toast so its message and buttons can be read here. */
+async function publishStatus(uid: string) {
+  try {
+    const view = await statusView(uid, { sync: true });
+    if (!view) return toast("Couldn't read that page or block.", { intent: "danger" });
+    toast(view.message, { intent: view.intent, link: view.link, actions: view.actions });
+  } catch (e) {
+    toast((e as Error).message, { intent: "danger" });
+  }
+}
 
 (globalThis as unknown as { __DEFAULT_SERVER__: string }).__DEFAULT_SERVER__ = "https://roam.pub";
 mock.timers.enable({ apis: ["setTimeout"] });
@@ -117,8 +132,8 @@ describe("publish", () => {
     await publish("page1");
     assert.deepEqual(calls.map((c) => c.method), ["POST"]);
     assert.match(toasts.at(-1)!, /published as unlisted/);
-    // An older server doesn't say whether it can go on Discover, so only Make public is offered.
-    assert.deepEqual(actions().map((b) => b.textContent), ["Make public"]);
+    // Visibility is picked in the Publish pop-up before publishing, so the result offers nothing more.
+    assert.equal(actions().length, 0);
     // No clipboard here, so it doesn't claim the link was copied.
     assert.doesNotMatch(toasts.at(-1)!, /Link copied/);
   });
@@ -254,15 +269,11 @@ describe("Publish with encryption", () => {
   }];
   const unpublished = { "GET /api/ext/publications": (): [number, unknown] => [200, { publications: [] }] };
 
-  test("the pop-up for a page that isn't published offers it next to Publish when Publish doesn't ask", async () => {
+  test("the status of a page that isn't published offers Publish, which asks where (encryption is a choice there)", async () => {
     settings.set("publications", {});
     server(unpublished);
     await publishStatus("page1");
     assert.deepEqual(actions().map((b) => b.textContent), ["Publish page"]);
-    buttons = [];
-    settings.set("ask-where", false);
-    await publishStatus("page1");
-    assert.deepEqual(actions().map((b) => b.textContent), ["Publish page", "Publish with encryption"]);
   });
 
   test("asks roam.pub for it, encrypts in Roam and says it opens with the graph password", async () => {
@@ -433,7 +444,8 @@ describe("saved settings", () => {
   test("first-time setup saves the defaults, so the settings panel shows them", () => {
     settings.clear();
     initState({ settings: { get: (k: string) => settings.get(k) ?? null, set: refusingSet } } as never);
-    assert.equal(settings.get("shortlink-add"), "Pages");
+    // A new install writes nothing to the graph until the Roam Publish block is switched on.
+    assert.equal(settings.get("shortlink-add"), "Off");
     assert.equal(settings.get("shortlink-position"), "First");
     assert.equal(settings.get("collapsed-blocks"), "As in Roam");
     assert.equal(settings.get("shortlink-tag"), "[[Roam Publish]]");
@@ -451,6 +463,8 @@ describe("saved settings", () => {
       if (pages != null) settings.set("shortlink-enabled", pages);
       if (blocks != null) settings.set("shortlink-blocks", blocks);
       settings.set("shortlink-position", "bottom");
+      // Set up before 0.4.0: what it had carries over.
+      settings.set("api-key", "rp_test");
       initState({ settings: { get: (k: string) => settings.get(k) ?? null, set: refusingSet } } as never);
       assert.equal(settings.get("shortlink-add"), choice);
       assert.equal(getShortlinkEnabled(), pages !== false);
@@ -507,84 +521,108 @@ describe("publish where?", () => {
   const NONE = { "GET /api/ext/publications": () => [200, { publications: [] }] as [number, unknown] };
   beforeEach(() => settings.set("publications", {}));
 
-  test("asks before publishing something new, starting on where New pages go to says", async () => {
-    const calls = server({ ...NONE, "GET /api/ext/places": () => [200, places()] });
-    await publish("page1");
-    assert.deepEqual(calls.map((c) => c.path).filter((p) => p !== "/api/ext/publications"), ["/api/ext/places"]);
-    assert.match(toasts.at(-1)!, /Publish “Page” to:/);
-    assert.deepEqual(optionsOf(selects[0]), [
+  const labels = (c: PublishChoices) => c.options.map((o) => o.label);
+
+  test("something new opens the Publish pop-up first, before anything is sent or written", async () => {
+    const calls = server(NONE);
+    const asked: string[] = [];
+    setAskHandler((uid) => asked.push(uid));
+    try {
+      await publish("page1");
+    } finally {
+      setAskHandler(null);
+    }
+    assert.deepEqual(asked, ["page1"]);
+    assert.ok(!calls.some((c) => c.method === "POST"));
+    // A republish doesn't ask.
+    settings.set("publications", cached());
+    setAskHandler((uid) => asked.push(uid));
+    try {
+      await publish("page1");
+    } finally {
+      setAskHandler(null);
+    }
+    assert.deepEqual(asked, ["page1"]);
+  });
+
+  test("the pop-up's choices start on where New pages go to says", async () => {
+    server({ ...NONE, "GET /api/ext/places": () => [200, places()] });
+    const c = (await publishChoices())!;
+    assert.deepEqual(labels(c), [
       "Graph: notes (Open)",
       "Graph: notes (Password, encrypted)",
       "Collection: Writing (Open)",
       "Collection: Private (Password, encrypted)",
     ]);
-    assert.equal(selects[0].value, "graph");
-    // One click publishes there.
-    button("Publish")!.click!();
-    assert.deepEqual((await posted(calls)).body.to, ["graph"]);
+    assert.equal(c.value, "graph");
+    assert.ok(choiceInGraph("graph", c.goTo) && choiceInGraph("graph-encrypted", c.goTo) && !choiceInGraph("c1", c.goTo));
   });
 
+  const SEAL = { "GET /api/ext/publications/page1/seal": (): [number, unknown] => [200, { encrypt: false }] };
+
   test("a collection picked is where it goes, and the seal plan is asked for it", async () => {
-    const calls = server({ ...NONE, "GET /api/ext/places": () => [200, places()] });
-    await publish("page1");
-    selects[0].value = "c2";
-    button("Publish")!.click!();
-    assert.deepEqual((await posted(calls)).body.to, ["c2"]);
+    const calls = server({ ...NONE, ...SEAL, "GET /api/ext/places": () => [200, places()] });
+    const c = (await publishChoices())!;
+    await publish("page1", choiceOpts("c2", c.goTo));
+    assert.deepEqual(calls.find((x) => x.method === "POST")!.body.to, ["c2"]);
+    assert.equal(calls.find((x) => x.path.endsWith("/seal"))!.search, "?to=c2");
   });
 
   test("starts on New pages go to when that's several places, and sends them all", async () => {
     const calls = server({ ...NONE, "GET /api/ext/places": () => [200, places({ newPagesGoTo: ["graph", "c1"] })] });
-    await publish("page1");
-    assert.equal(optionsOf(selects[0])[0], "New pages setting: notes + Writing");
-    button("Publish")!.click!();
-    assert.deepEqual((await posted(calls)).body.to, ["graph", "c1"]);
+    const c = (await publishChoices())!;
+    assert.equal(labels(c)[0], "New pages setting: notes + Writing");
+    assert.ok(choiceInGraph(c.value, c.goTo));
+    await publish("page1", choiceOpts(c.value, c.goTo));
+    assert.deepEqual(calls.find((x) => x.method === "POST")!.body.to, ["graph", "c1"]);
   });
 
-  test("doesn't ask with nothing to choose, when switched off, or for a republish", async () => {
-    // No collection, and the graph can't be published encrypted: nothing to choose.
-    const graphOnly = { name: "notes", access: "open", encrypted: false, encryptBlocked: "No password" };
-    let calls = server({ ...NONE, "GET /api/ext/places": () => [200, places({ collections: [], graph: graphOnly })] });
-    await publish("page1");
-    assert.equal((await posted(calls)).body.to, undefined);
-
-    settings.set("ask-where", false);
-    settings.set("publications", {});
-    calls = server({ ...NONE, "GET /api/ext/places": () => [200, places()] });
-    await publish("page1");
-    assert.ok(!calls.some((c) => c.path === "/api/ext/places"));
-    assert.ok(await posted(calls));
-
-    settings.set("ask-where", true);
-    settings.set("publications", cached());
-    calls = server({ "GET /api/ext/places": () => [200, places()] });
-    await publish("page1");
-    assert.ok(!calls.some((c) => c.path === "/api/ext/places"));
+  test("a roam.pub without places: no choices, and it goes where New pages go to says", async () => {
+    server(NONE);
+    assert.equal(await publishChoices(), null);
   });
 
   test("encrypted is one of the choices; picking it publishes with encryption", async () => {
-    const calls = server({ ...NONE, "GET /api/ext/places": () => [200, places({ collections: [] })] });
-    await publish("page1");
-    assert.deepEqual(optionsOf(selects[0]), ["Graph: notes (Open)", "Graph: notes (Password, encrypted)"]);
-    selects[0].value = "graph-encrypted";
-    button("Publish")!.click!();
-    for (let i = 0; i < 1000 && !calls.some((c) => c.path.endsWith("/seal")); i++) await new Promise((r) => setImmediate(r));
+    const calls = server({ ...NONE, ...SEAL, "GET /api/ext/places": () => [200, places({ collections: [] })] });
+    const c = (await publishChoices())!;
+    assert.deepEqual(labels(c), ["Graph: notes (Open)", "Graph: notes (Password, encrypted)"]);
+    await publish("page1", choiceOpts("graph-encrypted", c.goTo));
     // Refused here (the fake plan can't encrypt), so it asked roam.pub with encrypt=1 and sent nothing.
-    for (let i = 0; i < 1000 && !/can't publish with encryption/.test(toasts.at(-1) ?? ""); i++) await new Promise((r) => setImmediate(r));
-    assert.ok(!calls.some((c) => c.method === "POST"));
+    assert.equal(calls.find((x) => x.path.endsWith("/seal"))!.search, "?encrypt=1");
+    assert.ok(!calls.some((x) => x.method === "POST"));
   });
 
   test("encrypted can't be picked without a graph password that can encrypt, and isn't offered when the graph encrypts anyway", async () => {
     server({ ...NONE, "GET /api/ext/places": () => [200, places({ graph: { name: "notes", access: "open", encrypted: false, encryptBlocked: "No password" } })] });
-    await publish("page1");
-    const enc = (selects[0].children as El[]).find((o) => o.value === "graph-encrypted")!;
-    assert.equal(enc.textContent, "Graph: notes (Password, encrypted), needs a graph password that can encrypt");
-    assert.equal(enc.disabled, true);
+    let c = (await publishChoices())!;
+    const enc = c.options.find((o) => o.value === "graph-encrypted")!;
+    assert.equal(enc.disabled, "needs a graph password that can encrypt");
 
-    selects = [];
     server({ ...NONE, "GET /api/ext/places": () => [200, places({ graph: { name: "notes", access: "password", encrypted: true, encryptBlocked: null } })] });
-    await publish("page1");
-    assert.deepEqual(optionsOf(selects[0])[0], "Graph: notes (Password, encrypted)");
-    assert.equal(optionsOf(selects[0]).length, 3);
+    c = (await publishChoices())!;
+    assert.equal(labels(c)[0], "Graph: notes (Password, encrypted)");
+    assert.equal(c.options.length, 3);
+  });
+
+  test("the visibility picked is set right after the first publish, and the result says so", async () => {
+    const calls = server({
+      ...NONE,
+      "PATCH /api/ext/publications/page1": () => [200, { visibility: "public", listing: "listed", url: "https://roam.pub/notes/x" }],
+    });
+    await publish("page1", { noAsk: true, listing: "listed" });
+    assert.deepEqual(calls.find((x) => x.method === "PATCH")!.body, { listing: "listed" });
+    assert.match(toasts.at(-1)!, /^Page published, public\./);
+    assert.equal((settings.get("publications") as Record<string, { listing?: string }>).page1.listing, "listed");
+  });
+
+  test("Unlisted needs no second request, and a refused visibility keeps it unlisted and says why", async () => {
+    let calls = server(NONE);
+    await publish("page1", { noAsk: true, listing: "unlisted" });
+    assert.ok(!calls.some((x) => x.method === "PATCH"));
+    settings.set("publications", {});
+    calls = server({ ...NONE, "PATCH /api/ext/publications/page1": () => [400, { error: "Search engines are off for this graph." }] });
+    await publish("page1", { noAsk: true, listing: "discover" });
+    assert.match(toasts.at(-1)!, /published as unlisted.*It's unlisted for now: Search engines are off for this graph\./);
   });
 
   test("Publish with encryption doesn't ask: it goes to the graph", async () => {
@@ -606,45 +644,32 @@ describe("add to collection", () => {
   ];
   const tick = () => new Promise((r) => setImmediate(r));
 
-  test("isn't offered to someone with no collections", async () => {
-    server({ "POST /api/ext/publications": (b) => [200, { status: "created", url: "https://roam.pub/g/x", contentHash: b.contentHash, visibility: "unlisted", listing: "unlisted", collections: 0 }] });
-    await publish("page1");
-    assert.ok(!button("Add to collection…"));
-  });
-
-  test("the publish toast offers it; the dropdown says how the page starts in each, and adding moves it when stricter", async () => {
+  test("the choices say how the page starts in each, and adding moves it when stricter", async () => {
     const calls = server({
-      "POST /api/ext/publications": (b) => [200, { status: "created", url: "https://roam.pub/g/x", contentHash: b.contentHash, visibility: "unlisted", listing: "unlisted", collections: 3 }],
       "GET /api/ext/publications/page1/collections": () => [200, { collections: choices }],
       "POST /api/ext/publications/page1/collections": () => [200, {
         name: "Private", entryUrl: "https://roam.pub/c/bbb", listing: "listed", access: "password",
         movedOutOfGraph: true, encrypted: false, url: "https://roam.pub/c/bbb",
       }],
     });
-    await publish("page1");
-    button("Add to collection…")!.click!();
-    await tick();
-    assert.match(toasts.at(-1)!, /Add “Page” to a collection/);
-    const sel = selects.at(-1)!;
-    const options = (sel.children as El[]).slice(1).map((o) => [o.textContent, !!o.disabled]);
+    const options = (await collectionOptions("page1")).map((o) => [o.label, o.disabled]);
     assert.deepEqual(options, [
       ["Writing (already there)", true],
       ["Best of: public and on Discover", false],
       ["Private: password-protected, leaves your graph", false],
     ]);
-    sel.value = "c3";
-    sel.click!();
-    await tick();
+    await addToCollection("page1", "c3");
     assert.deepEqual(calls.at(-1), { method: "POST", path: "/api/ext/publications/page1/collections", body: { collectionId: "c3" } });
     assert.match(toasts.at(-1)!, /^Added to Private, password-protected there\. It left your graph, so its graph link can't get around the password\./);
     assert.equal((settings.get("publications") as Record<string, { url: string }>).page1.url, "https://roam.pub/c/bbb");
   });
 
-  test("a new page that went only to collections isn't called unlisted or offered Make public", async () => {
-    server({ "POST /api/ext/publications": (b) => [200, { status: "created", url: "https://roam.pub/c/aaa", contentHash: b.contentHash, visibility: "unlisted", listing: "unlisted", inGraph: false, encrypted: true, collections: 2 }] });
-    await publish("page1");
+  test("a new page that went only to collections isn't called unlisted, nor its visibility changed", async () => {
+    const calls = server({ "POST /api/ext/publications": (b) => [200, { status: "created", url: "https://roam.pub/c/aaa", contentHash: b.contentHash, visibility: "unlisted", listing: "unlisted", inGraph: false, encrypted: true }] });
+    await publish("page1", { noAsk: true, to: ["c1"], listing: "listed" });
     assert.match(toasts.at(-1)!, /^Page published to collections only\./);
-    assert.deepEqual(actions().map((b) => b.textContent), ["Add to collection…"]);
+    assert.ok(!calls.some((c) => c.method === "PATCH"));
+    assert.equal(actions().length, 0);
   });
 
   describe("an encrypted page", () => {
@@ -665,8 +690,7 @@ describe("add to collection", () => {
           { ...choices[2], movesOutOfGraph: false, blocked: null },
         ] }],
       });
-      await chooseCollection("page1");
-      const options = (selects.at(-1)!.children as El[]).slice(1).map((o) => [o.textContent, !!o.disabled]);
+      const options = (await collectionOptions("page1")).map((o) => [o.label, o.disabled]);
       assert.deepEqual(options, [
         ["Best of (needs a password that can encrypt)", true],
         ["Private: password-protected", false],
@@ -700,16 +724,6 @@ describe("add to collection", () => {
     });
   });
 
-  test("the status toast offers it too", async () => {
-    server({
-      "GET /api/ext/publications": () => [200, {
-        collections: 1,
-        publications: [{ rootUid: "page1", kind: "page", title: "Page", url: "https://roam.pub/g/x", contentHash: "x", visibility: "unlisted", listing: "unlisted", updatedAt: "" }],
-      }],
-    });
-    await publishStatus("page1");
-    assert.ok(button("Add to collection…"));
-  });
 });
 
 describe("unpublish", () => {
@@ -804,53 +818,23 @@ describe("status", () => {
     assert.deepEqual(labels(), ["Unpublish"]);
   });
 
-  test("a first publish offers the other two listings", async () => {
+  test("a first publish picked as Discover says so", async () => {
     settings.set("publications", {});
     const calls = server(created());
-    await publish("page1");
-    assert.match(toasts.at(-1)!, /published as unlisted/);
-    assert.deepEqual(labels().filter((l) => /^(Make|Put)/.test(l ?? "")), ["Make public", "Put on Discover"]);
-    button("Put on Discover")!.click!();
-    await new Promise((r) => setImmediate(r));
+    await publish("page1", { noAsk: true, listing: "discover" });
     assert.deepEqual(calls.at(-1)!.body, { listing: "discover" });
-    assert.match(toasts.at(-1)!, /Now on Discover/);
-  });
-
-  test("asks before taking a page off Discover", async () => {
-    settings.set("publications", cached({ visibility: "public", listing: "discover" }));
-    const calls = server(created());
-    confirmLeaveDiscover("page1", "unlisted");
-    assert.equal(calls.length, 0);
-    assert.match(toasts.at(-1)!, /Take “Page” off roam.pub\/discover\? .*only people with the link/);
-    buttons.findLast((b) => b.textContent === "Cancel")!.click!();
-    await new Promise((r) => setImmediate(r));
-    assert.equal(calls.length, 0);
-    confirmLeaveDiscover("page1", "unlisted");
-    buttons.findLast((b) => b.textContent === "Make unlisted")!.click!();
-    await new Promise((r) => setImmediate(r));
-    assert.deepEqual(calls.at(-1)!.body, { listing: "unlisted" });
-    assert.match(toasts.at(-1)!, /Now unlisted/);
-  });
-
-  test("a first publish leaves out Put on Discover when it can't be", async () => {
-    settings.set("publications", {});
-    server(created({ discoverBlocked: "Turn on search engines in Sharing to make pages Discoverable." }));
-    await publish("page1");
-    assert.deepEqual(labels().filter((l) => /^(Make|Put)/.test(l ?? "")), ["Make public"]);
+    assert.match(toasts.at(-1)!, /^Page published, public and on Discover\./);
   });
 
   test("doesn't claim the front page lists a page when the graph's front page is off", async () => {
     const note = "Your graph's front page is off, so nothing lists this page yet: only people with the link will find it.";
     settings.set("publications", {});
     server({
-      ...created({ discoverBlocked: "Turn on this graph's front page in Sharing to make pages Discoverable." }),
+      ...created(),
       "PATCH /api/ext/publications/page1": (b) => [200, { visibility: "public", listing: b.listing, discoverBlocked: null, listedNote: note, url: "https://roam.pub/g/x" }],
     });
-    await publish("page1");
-    button("Make public")!.click!();
-    await new Promise((r) => setImmediate(r));
-    assert.match(toasts.at(-1)!, /^Now public, but your graph's front page is off/);
-    assert.doesNotMatch(toasts.at(-1)!, /on your graph's front page/);
+    await publish("page1", { noAsk: true, listing: "listed" });
+    assert.match(toasts.at(-1)!, /^Page published, public\. Your graph's front page is off/);
   });
 
   test("the status of a public page says when nothing lists it", async () => {
@@ -871,10 +855,10 @@ describe("status", () => {
     await publishStatus("page1");
     assert.match(toasts.at(-1)!, /^Page in collections only, /);
     assert.doesNotMatch(toasts.at(-1)!, /unlisted|Discoverable/);
-    assert.deepEqual(labels().filter((l) => l !== "Republish"), ["Add to collection…", "Unpublish"]);
+    assert.deepEqual(labels().filter((l) => l !== "Republish"), ["Unpublish"]);
   });
 
-  test("an encrypted page can be added to collections from Roam too", async () => {
+  test("an encrypted page only in collections isn't called unlisted either", async () => {
     server({
       "GET /api/ext/publications": () => [200, {
         collections: 2,
@@ -883,8 +867,7 @@ describe("status", () => {
       }],
     });
     await publishStatus("page1");
-    assert.doesNotMatch(toasts.at(-1)!, /roam\.pub/);
-    assert.deepEqual(labels().filter((l) => l !== "Republish"), ["Add to collection…", "Unpublish"]);
+    assert.match(toasts.at(-1)!, /^Encrypted page in collections only, /);
   });
 
   test("an older server that only says public still gets the new words", async () => {
