@@ -49,11 +49,11 @@ Published pages show three icons after their title: status, stats and settings.
 
 ![Status, stats and settings icons after a page title](https://raw.githubusercontent.com/ejqs/roam-publish/main/docs/readme/status.png)
 
-- **Status:** a globe, an eye crossed out when Unlisted, or a lock behind a password. Green when up to
+- **Status:** a globe, a link when Unlisted (link only), or a lock behind a password. Green when up to
   date; orange with a dot when the page changed since you last published it.
 - **Links:** a small icon after [[links]] and #tags to published pages. On a published page, links to pages that
   aren't published have a dotted underline.
-- **Blocks:** a ring on blocks published on their own (with a lock or crossed-out eye when not public), and a bar
+- **Blocks:** a ring on blocks published on their own (with a lock or link icon when not public), and a bar
   beside blocks edited since the last publish.
 
 Nothing is written to your graph to show these. Set **Status in Roam** to **Titles only** or **Off** to show less.

@@ -20,7 +20,7 @@ What's new shows it once Roam Depot serves it. Every bullet starts with **Breaki
 - Improved: Pages and blocks behind a password say so: the status reads "Password-locked" or "Members-only",
   and the title icon is a lock, as for encrypted ones.
 - New: **Marks on links.** A small icon after [[links]] and #tags to published pages: a globe when public, a
-  crossed-out eye when unlisted, a lock behind a password. On a published page, links to pages that aren't
+  link when unlisted (link only), a lock behind a password. Pages that aren't published get no icon. On a published page, links to pages that aren't
   published have a dotted underline. Follows **Status in Roam** (**Titles and blocks**).
 - New: **Publish from the title.** Hover an unpublished page's title for a publish icon that opens the Publish
   pop-up.
@@ -28,9 +28,11 @@ What's new shows it once Roam Depot serves it. Every bullet starts with **Breaki
   checked ones are published right after it, the same way. It also says when text is copied in from other pages
   (embeds and block references).
 - Fixed: A title icon's pop-up could open light in Roam's dark theme.
+- Improved: Unlisted pages show a link icon (link only) instead of a crossed-out eye, which read like "not
+  published".
 - New: **Hold Cmd (Ctrl on Windows)** and a share icon shows by the bullet of the block under the pointer, like
   Roam's comment button. Click it to publish the block, or see its status if it's published.
-- New: A published block's ring has a small lock when it's behind a password, or a crossed-out eye when it's
+- New: A published block's ring has a small lock when it's behind a password, or a link icon when it's
   unlisted, as page titles do.
 
 ### Commands

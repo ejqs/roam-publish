@@ -14,7 +14,7 @@ describe("status marks", () => {
   test("the title icon: a lock when encrypted, its tone by state", () => {
     assert.deepEqual(iconFor("changed", false), { icon: "globe", tone: "changed" });
     assert.deepEqual(iconFor("current", true), { icon: "lock", tone: "current" });
-    assert.deepEqual(iconFor("current", false, true), { icon: "eye-off", tone: "current" });
+    assert.deepEqual(iconFor("current", false, true), { icon: "link", tone: "current" });
     assert.equal(iconFor("current", true, true).icon, "lock");
     assert.equal(iconFor("unknown", false).tone, "muted");
     assert.equal(iconFor("removed", false).tone, "danger");
@@ -47,13 +47,13 @@ describe("link marks", () => {
       [
         { title: "Deep Work", icon: "globe" },
         { title: "Diary", icon: "lock" },
-        { title: "Draft", icon: "eye-off" },
+        { title: "Draft", icon: "link" },
       ],
       "data-roam-publish",
     );
     assert.match(css, /\[data-link-title="Deep Work"\] > \.rm-page-ref::after,\n\.rm-page-ref--tag\[data-tag="Deep Work"\]::after \{ content: "\\e666"; \}/);
     assert.match(css, /\[data-link-title="Diary"\] > \.rm-page-ref::after,\n\.rm-page-ref--tag\[data-tag="Diary"\]::after \{ content: "\\e625"; \}/);
-    assert.match(css, /data-tag="Draft"\]::after \{ content: "\\e6cc"; \}/);
+    assert.match(css, /data-tag="Draft"\]::after \{ content: "\\e62d"; \}/);
     assert.match(css, /\[data-roam-publish~="page"\] \[data-link-title\] > \.rm-page-ref \{ text-decoration: underline dotted/);
     assert.match(css, /\[data-link-title="Draft"\] > \.rm-page-ref \{ text-decoration: none !important; \}/);
     // Pseudo-elements never go inside :is(), which would drop the whole rule.

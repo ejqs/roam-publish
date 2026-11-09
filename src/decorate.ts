@@ -67,7 +67,7 @@ h1.rm-title-display:hover .${GROUP_CLASS}[data-parts="publish"], .${GROUP_CLASS}
 .rm-block-main:is([${ATTR}~="locked"], [${ATTR}~="unlisted"]) .rm-bullet::after { position: absolute; right: -7px; bottom: -4px;
   font-family: "Icons16", "blueprint-icons-16"; font-size: 10px; line-height: 10px; font-weight: 400; color: #8a9ba8; pointer-events: none; }
 .rm-block-main[${ATTR}~="locked"] .rm-bullet::after { content: "\\e625"; }
-.rm-block-main[${ATTR}~="unlisted"] .rm-bullet::after { content: "\\e6cc"; }
+.rm-block-main[${ATTR}~="unlisted"] .rm-bullet::after { content: "\\e62d"; }
 .rm-block-main[${ATTR}~="published-changed"] .rm-bullet__inner { box-shadow: 0 0 0 3px rgba(217, 130, 43, 0.35); background-color: #d9822b; }
 #${POPOVER_ID} { position: fixed; z-index: 30; width: 420px; max-width: calc(100vw - 24px); box-sizing: border-box; padding: 12px 14px;
   border-radius: 4px; font-size: 14px; line-height: 1.45; background: #fff; color: #182026;
@@ -368,7 +368,7 @@ async function apply() {
       // A small badge on the ring says when it isn't public, as the title icons do for pages.
       const c = state.view.c;
       const { icon } = iconFor(state.view.state, !!c && lockedOf(c), !!c && c.inGraph !== false && listingOf(c) === "unlisted");
-      const badge = icon === "lock" ? "locked" : icon === "eye-off" ? "unlisted" : null;
+      const badge = icon === "lock" ? "locked" : icon === "link" ? "unlisted" : null;
       els.forEach((el) => {
         mark(el.closest(".rm-block-main"), m);
         if (badge) mark(el.closest(".rm-block-main"), badge);

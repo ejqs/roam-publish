@@ -9,9 +9,9 @@ export function editedSince(times: [string, number][], publishedAt: string, root
 
 /** How the title icon looks for a status: its Blueprint icon and tone. */
 export function iconFor(state: StatusState, locked: boolean | undefined, unlisted = false) {
-  // As roam.pub marks them: a lock behind a password (encrypted or not) or members only, a crossed-out
-  // eye when unlisted, a globe otherwise.
-  const icon = locked ? "lock" : unlisted ? "eye-off" : "globe";
+  // A lock behind a password (encrypted or not) or members only, a link when unlisted (only people with the
+  // link), a globe otherwise. Nothing at all when it isn't published, so no icon can be read as "not published".
+  const icon = locked ? "lock" : unlisted ? "link" : "globe";
   const tone =
     state === "current" ? "current" : state === "changed" ? "changed" : state === "removed" ? "danger" : "muted";
   return { icon, tone } as const;
@@ -38,7 +38,7 @@ export function uidFromBlockId(id: string): string | null {
 }
 
 /** Blueprint's Icons16 glyphs, as Roam's Blueprint stylesheet draws them. */
-const GLYPH: Record<"globe" | "eye-off" | "lock", string> = { globe: "e666", "eye-off": "e6cc", lock: "e625" };
+const GLYPH: Record<"globe" | "link" | "lock", string> = { globe: "e666", link: "e62d", lock: "e625" };
 
 /** A page title as a quoted CSS string, for an attribute selector. */
 export const cssString = (s: string) => `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\a ")}"`;
@@ -49,7 +49,7 @@ export const cssString = (s: string) => `"${s.replace(/\\/g, "\\\\").replace(/"/
  * Copyright (c) 2022 Alexander Rink), which draw a Blueprint Icons16 glyph on `span.rm-page-ref--tag[data-tag=…]`.
  *
  * The stylesheet for links to published pages: a small gray icon after each [[link]] and #tag to one
- * (a lock behind a password, a crossed-out eye when unlisted, a globe otherwise), grouped by icon so it's
+ * (a lock behind a password, a link when unlisted, a globe otherwise), grouped by icon so it's
  * one rule each. `pageAttr` marks a published page's container: there, links to pages not published
  * get a dotted underline, cleared for the published ones and in its linked references.
  */
