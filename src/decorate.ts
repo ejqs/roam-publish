@@ -1,6 +1,7 @@
 import { editedSince, iconFor, uidInId } from "./marks";
 import { statusView, syncPublications, type StatusView } from "./publish";
 import { openDashboard } from "./panels";
+import { refreshLinks, removeLinks } from "./links";
 import { renderPanel, type Tab, yours } from "./panel";
 import { openSetup } from "./setup";
 import { getApiKey, getCache, getStatusMarks, getTopBar, listingOf, lockedOf, onCacheChange } from "./state";
@@ -49,6 +50,15 @@ h1.rm-title-display:has(textarea, input) .${GROUP_CLASS} { display: none; }
 .${ICON_CLASS}[data-tone="danger"] { color: #db3737; }
 .${ICON_CLASS}[data-tone="muted"], .${ICON_CLASS}[data-part="stats"], .${ICON_CLASS}[data-part="settings"] { color: #8a9ba8; }
 .${ICON_CLASS}[aria-expanded="true"] { background: rgba(138, 155, 168, 0.2); }
+.${GROUP_CLASS}[data-parts="publish"] { opacity: 0; transition: opacity 0.12s; }
+h1.rm-title-display:hover .${GROUP_CLASS}[data-parts="publish"], .${GROUP_CLASS}[data-parts="publish"]:focus-within,
+.${GROUP_CLASS}[data-parts="publish"]:has([aria-expanded="true"]) { opacity: 1; }
+@media (hover: none) { .${GROUP_CLASS}[data-parts="publish"] { opacity: 0.45; } }
+.${ICON_CLASS}[data-part="publish"] { color: #8a9ba8; }
+.${ICON_CLASS}[data-part="publish"]:hover { color: #137cbd; }
+.${ICON_CLASS}[data-part="publish"]::after { content: "+"; position: absolute; right: 1px; bottom: 1px; width: 11px; height: 11px;
+  border-radius: 50%; background: #8a9ba8; color: #fff; font: 700 11px/11px sans-serif; text-align: center; }
+.${ICON_CLASS}[data-part="publish"]:hover::after { background: #137cbd; }
 .rm-block-main[${ATTR}~="edited"] { position: relative; }
 .rm-block-main[${ATTR}~="edited"]::before { content: ""; position: absolute; left: -10px; top: 5px; bottom: 5px; width: 3px;
   border-radius: 2px; background: #d9822b; }
@@ -194,7 +204,8 @@ export function startMarks() {
   running = true;
   observer = new MutationObserver(onMutations);
   observer.observe(document.querySelector(".roam-app") ?? document.body, { childList: true, subtree: true });
-  unlisten = onCacheChange(() => recheckSoon(0));
+  unlisten = onCacheChange(() => (recheckSoon(0), void refreshLinks(ATTR)));
+  void refreshLinks(ATTR);
   window.addEventListener("focus", syncIfStale);
   syncIfStale();
   schedule();
@@ -211,6 +222,7 @@ export function stopMarks() {
   unlisten = null;
   window.removeEventListener("focus", syncIfStale);
   closePopover();
+  removeLinks();
   document.querySelectorAll(`.${GROUP_CLASS}`).forEach((e) => e.remove());
   document.querySelectorAll(`[${ATTR}]`).forEach((e) => e.removeAttribute(ATTR));
   checked.clear();
@@ -260,6 +272,8 @@ function recheckSoon(ms: number) {
   recheck = setTimeout(() => {
     checked.clear();
     schedule();
+    // A page may have been renamed.
+    if (running) void refreshLinks(ATTR);
   }, ms);
 }
 
@@ -328,11 +342,14 @@ async function apply() {
     const uid = await pageUid(titleText(h));
     const c = uid ? cache[uid] : undefined;
     const state = c && uid ? check(uid) : undefined;
-    if (!uid || !c || !state?.view) {
-      if (!c) icon?.remove();
+    if (uid && !c) {
+      drawPublishIcon(h, icon, uid);
       continue;
     }
+    if (!uid || !c || !state?.view) continue;
     drawIcons(h, icon, uid, state.view);
+    // A published page of yours: links in it to pages that aren't published get a dotted underline (links.ts).
+    if (yours(state.view) && getStatusMarks() === "Titles and blocks") mark(h.closest(".roam-log-page, .rm-sidebar-outline, .roam-article"), "page");
     state.edited.forEach((u) => edited.add(u));
   }
 
@@ -380,12 +397,14 @@ function iconButton(uid: string, part: string, tab: Tab, label: string) {
   el.setAttribute("aria-label", label);
   // A click on the title starts editing it in Roam; the icons' clicks stay with the icons.
   for (const type of ["mousedown", "mouseup", "click"]) el.addEventListener(type, (e) => e.stopPropagation());
-  el.addEventListener("click", () => void openPopover(el, uid, tab));
+  // Without a key, the setup steps first, then the pop-up.
+  const open = () => (getApiKey() ? void openPopover(el, uid, tab) : openSetup(() => void openPopover(el, uid, tab)));
+  el.addEventListener("click", open);
   el.addEventListener("keydown", (e) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
       e.stopPropagation();
-      void openPopover(el, uid, tab);
+      open();
     }
   });
   el.appendChild(document.createElement("span"));
@@ -422,6 +441,26 @@ function drawIcons(h: Element, existing: HTMLElement | null, uid: string, view: 
     el.title = view.message;
     el.setAttribute("aria-label", `Roam Publish: ${view.message}`);
   }
+}
+
+/**
+ * An unpublished page's title: one publish icon (a globe with a plus), hidden until the title is
+ * hovered or the icon focused, and faint on touch screens, where there's no hover.
+ */
+function drawPublishIcon(h: Element, existing: HTMLElement | null, uid: string) {
+  if (existing?.dataset.parts === "publish") {
+    if (existing !== h.lastChild) h.appendChild(existing);
+    return;
+  }
+  existing?.remove();
+  const group = document.createElement("span");
+  group.className = GROUP_CLASS;
+  group.contentEditable = "false";
+  group.dataset.parts = "publish";
+  const el = iconButton(uid, "publish", "page", "Publish this page…");
+  el.firstElementChild!.className = "bp3-icon bp3-icon-standard bp3-icon-globe";
+  group.append(el);
+  h.appendChild(group);
 }
 
 let closeListeners: (() => void) | null = null;
