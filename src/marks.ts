@@ -30,3 +30,9 @@ export function uidInId(id: string, uids: ReadonlySet<string>): string | null {
   for (const uid of uids) if (uid.length !== 9 && id.endsWith(`-${uid}`)) return uid;
   return null;
 }
+
+/** The uid at the end of a Roam block element's id ("block-input-{window}-{uid}"); uids are 9 characters. */
+export function uidFromBlockId(id: string): string | null {
+  const m = /-([\w-]{9})$/.exec(id);
+  return m ? m[1] : null;
+}

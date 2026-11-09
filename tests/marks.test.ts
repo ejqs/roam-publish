@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { editedSince, iconFor, uidInId } from "../src/marks";
+import { editedSince, iconFor, uidFromBlockId, uidInId } from "../src/marks";
 
 describe("status marks", () => {
   test("blocks edited after the last publish, never the root", () => {
@@ -27,4 +27,10 @@ describe("status marks", () => {
     assert.equal(uidInId("block-input-main-xbcDEF123", uids), null);
     assert.equal(uidInId("block-input-main-windowabcDEF123", uids), null);
   });
+});
+
+test("the block uid comes from the end of a Roam block element's id", () => {
+  assert.equal(uidFromBlockId("block-input-uuid1a2b3c4d-5e6f-body-outline-abc123XYZ"), "abc123XYZ");
+  assert.equal(uidFromBlockId("block-input-x-a_b-c1234"), "a_b-c1234");
+  assert.equal(uidFromBlockId("block-input-short"), null);
 });

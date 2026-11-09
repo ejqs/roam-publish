@@ -4,6 +4,7 @@ import { openPanel } from "./panel";
 import { openDashboard } from "./panels";
 import { openSetup } from "./setup";
 import { createSettingsPanel } from "./settings";
+import { startShare, stopShare } from "./share";
 import { getApiKey, initState } from "./state";
 import { removeToasts, toast } from "./toast";
 
@@ -85,6 +86,7 @@ async function onload({ extensionAPI: api }: { extensionAPI: ExtensionAPI }) {
   confirmTimers = [setTimeout(confirm, 20_000), setInterval(confirm, CONFIRM_EVERY_MS)];
   addStyles();
   startMarks();
+  startShare();
   startTopbar();
 }
 
@@ -98,6 +100,7 @@ function onunload() {
   confirmTimers = [];
   removeToasts();
   stopMarks();
+  stopShare();
   stopTopbar();
   removeStyles();
 }
