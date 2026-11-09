@@ -14,7 +14,8 @@ status, views and settings without leaving Roam.**
 
 1. Install **Roam Publish** from Roam Depot.
 2. Sign up at [roam.pub](https://roam.pub) and connect your graph with an **append-only** API token
-   (Roam: Settings → Graph → API tokens).
+   (Roam: Settings → Graph → API tokens). This verifies that you own the graph: roam.pub adds a block to today's
+   daily note, which you can delete afterwards.
 3. In Roam, open **Settings → Roam Publish**, click **Open dashboard**, copy your key and paste it into **API key**.
 4. Right-click a page title and choose **Roam Publish: Page…**. Pick where it goes and its visibility, then click
    **Publish page**. The link is copied to your clipboard.

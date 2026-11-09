@@ -54,7 +54,7 @@ export function openSetup(then?: () => void) {
       1,
       "Sign up at roam.pub and connect this graph with an ",
       h("b", {}, "append-only"),
-      " API token (Roam: Settings → Graph → API tokens).",
+      " API token (Roam: Settings → Graph → API tokens). This verifies that you own the graph: roam.pub adds a block to today's daily note, which you can delete afterwards.",
     ),
     step(2, "On roam.pub, open ", h("b", {}, "API keys"), " and copy this graph's key.", h("div", { class: "rp-row" }, button("Open roam.pub ↗", () => openUrl(`${getServer()}/dashboard/keys`)))),
     step(3, "Paste it here. It's saved in Settings → Roam Publish, where you can change it later.", h("div", { class: "rp-key" }, input), status),
