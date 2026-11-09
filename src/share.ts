@@ -4,7 +4,7 @@ import { getCache } from "./state";
 import { isDark } from "./ui";
 
 /**
- * Hold Cmd (Ctrl elsewhere) and a share icon shows beside the block under the pointer, the way Roam
+ * Hold Cmd (Ctrl elsewhere) and a share icon shows beside the bullet of the block under the pointer, the way Roam
  * shows its comment button on a held Cmd. Clicking it opens the block's Roam Publish pop-up. Pressing
  * another key with it (a shortcut) or leaving the window hides it.
  *
@@ -66,12 +66,16 @@ function show() {
   place(main);
 }
 
-/** At the block's top right, left of where Roam puts its comment button. */
+/** Just left of the block's bullet, centred on it, in the gutter Roam leaves there. */
 function place(main: Element) {
   if (!button) return;
-  const r = main.getBoundingClientRect();
-  button.style.top = `${r.top + 2}px`;
-  button.style.left = `${r.right - 56}px`;
+  const bullet = main.querySelector(".rm-bullet") ?? main;
+  const r = bullet.getBoundingClientRect();
+  // Left of the collapse arrow too, when the block has one, so neither covers the other.
+  const caret = main.querySelector(".rm-caret");
+  const left = caret ? Math.min(r.left, caret.getBoundingClientRect().left) : r.left;
+  button.style.top = `${r.top + r.height / 2 - 10}px`;
+  button.style.left = `${left - 22}px`;
 }
 
 function onKeyDown(e: KeyboardEvent) {

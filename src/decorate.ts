@@ -123,12 +123,11 @@ h1.rm-title-display:has(textarea, input) .${GROUP_CLASS} { display: none; }
 .rp-list-row > :first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rp-foot { margin-top: 16px; }
 .${TOPBAR_CLASS} { margin: 0 2px; }
-#roam-publish-share { position: fixed; z-index: 20; width: 24px; height: 24px; display: inline-flex; align-items: center;
-  justify-content: center; border-radius: 3px; cursor: pointer; color: #5c7080; background: #fff;
-  box-shadow: 0 0 0 1px rgba(16, 22, 26, 0.15), 0 1px 2px rgba(16, 22, 26, 0.2); }
-#roam-publish-share:hover { background: #ebf1f5; color: #182026; }
-#roam-publish-share.rp-dark { background: #30404d; color: #a7b6c2; }
-#roam-publish-share.rp-dark:hover { background: #394b59; color: #f5f8fa; }
+#roam-publish-share { position: fixed; z-index: 20; width: 20px; height: 20px; display: inline-flex; align-items: center;
+  justify-content: center; cursor: pointer; color: #a7b6c2; }
+#roam-publish-share:hover { color: #5c7080; }
+#roam-publish-share.rp-dark { color: #738694; }
+#roam-publish-share.rp-dark:hover { color: #bfccd6; }
 #roam-publish-share .bp3-icon::before { font-size: 14px; line-height: 14px; }
 `;
 
