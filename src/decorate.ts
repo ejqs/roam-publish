@@ -3,7 +3,7 @@ import { statusView, syncPublications, type StatusView } from "./publish";
 import { openDashboard } from "./panels";
 import { renderPanel, type Tab, yours } from "./panel";
 import { openSetup } from "./setup";
-import { getApiKey, getCache, getStatusMarks, getTopBar, listingOf, onCacheChange } from "./state";
+import { getApiKey, getCache, getStatusMarks, getTopBar, listingOf, lockedOf, onCacheChange } from "./state";
 import { closeDialogs, h, isDark } from "./ui";
 
 /**
@@ -53,6 +53,11 @@ h1.rm-title-display:has(textarea, input) .${GROUP_CLASS} { display: none; }
 .rm-block-main[${ATTR}~="edited"]::before { content: ""; position: absolute; left: -10px; top: 5px; bottom: 5px; width: 3px;
   border-radius: 2px; background: #d9822b; }
 .rm-block-main[${ATTR}~="published"] .rm-bullet__inner { box-shadow: 0 0 0 3px rgba(15, 153, 96, 0.35); background-color: #0f9960; }
+.rm-block-main:is([${ATTR}~="locked"], [${ATTR}~="unlisted"]) .rm-bullet { position: relative; }
+.rm-block-main:is([${ATTR}~="locked"], [${ATTR}~="unlisted"]) .rm-bullet::after { position: absolute; right: -7px; bottom: -4px;
+  font-family: "Icons16", "blueprint-icons-16"; font-size: 10px; line-height: 10px; font-weight: 400; color: #8a9ba8; pointer-events: none; }
+.rm-block-main[${ATTR}~="locked"] .rm-bullet::after { content: "\\e625"; }
+.rm-block-main[${ATTR}~="unlisted"] .rm-bullet::after { content: "\\e6cc"; }
 .rm-block-main[${ATTR}~="published-changed"] .rm-bullet__inner { box-shadow: 0 0 0 3px rgba(217, 130, 43, 0.35); background-color: #d9822b; }
 #${POPOVER_ID} { position: fixed; z-index: 30; width: 420px; max-width: calc(100vw - 24px); box-sizing: border-box; padding: 12px 14px;
   border-radius: 4px; font-size: 14px; line-height: 1.45; background: #fff; color: #182026;
@@ -334,7 +339,14 @@ async function apply() {
       if (!state?.view) continue;
       state.edited.forEach((u) => edited.add(u));
       const m = state.view.state === "changed" ? "published-changed" : "published";
-      els.forEach((el) => mark(el.closest(".rm-block-main"), m));
+      // A small badge on the ring says when it isn't public, as the title icons do for pages.
+      const c = state.view.c;
+      const { icon } = iconFor(state.view.state, !!c && lockedOf(c), !!c && c.inGraph !== false && listingOf(c) === "unlisted");
+      const badge = icon === "lock" ? "locked" : icon === "eye-off" ? "unlisted" : null;
+      els.forEach((el) => {
+        mark(el.closest(".rm-block-main"), m);
+        if (badge) mark(el.closest(".rm-block-main"), badge);
+      });
     }
     if (edited.size)
       for (const el of document.querySelectorAll(".roam-block[id], .rm-block__input[id]")) {
@@ -377,7 +389,7 @@ function iconButton(uid: string, part: string, tab: Tab, label: string) {
 /** The title's icons: status always, then stats and settings where they apply. */
 function drawIcons(h: Element, existing: HTMLElement | null, uid: string, view: StatusView) {
   const c = view.c;
-  const { icon, tone } = iconFor(view.state, c?.encrypted, !!c && c.inGraph !== false && listingOf(c) === "unlisted");
+  const { icon, tone } = iconFor(view.state, !!c && lockedOf(c), !!c && c.inGraph !== false && listingOf(c) === "unlisted");
   const parts = yours(view) ? "status stats settings" : "status";
   let group = existing;
   if (!group || group.dataset.parts !== parts) {

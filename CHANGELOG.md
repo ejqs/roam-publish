@@ -14,6 +14,13 @@ What's new shows it once Roam Depot serves it. Every bullet starts with **Breaki
 - Improved: Messages after publishing follow Roam's light and dark themes, and only report the result. Add to
   collection is in the pop-up's **Settings** tab.
 - New: **Copy status link** in the pop-up, for the page's permanent link on roam.pub.
+- Improved: **Discover** can't be picked for a page that starts behind a password or members only, since roam.pub
+  only puts pages anyone can read there. Before, it was refused after publishing.
+- Improved: When **Password, encrypted** can't be picked, the pop-up says why under **Publish to**.
+- Improved: Pages and blocks behind a password say so: the status reads "Password-locked" or "Members-only",
+  and the title icon is a lock, as for encrypted ones.
+- New: A published block's ring has a small lock when it's behind a password, or a crossed-out eye when it's
+  unlisted, as page titles do.
 
 ### Commands
 - Improved: **Fewer commands.** **Roam Publish: Publish or update current page…** and **Publish or update focused

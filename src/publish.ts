@@ -17,6 +17,7 @@ import {
   listingOf,
   type PublicationCache,
   type Visibility,
+  type Access,
 } from "./state";
 import { toast } from "./toast";
 import { canSeal, hashLike, keyedHash, type SealPlan, sealTree } from "./seal";
@@ -38,6 +39,8 @@ type Remote = {
   inGraph?: boolean;
   /** Sealed with a password (from servers that say). */
   encrypted?: boolean;
+  /** Its access in its graph, null when only in collections (from servers that say). */
+  access?: Access | null;
   updatedAt: string;
   /** Taken down by a moderator (from servers that say). */
   removed?: boolean;
@@ -172,7 +175,7 @@ export async function syncPublications(opts: { quiet?: boolean } = {}) {
       // last published from here.
       title: (p.encrypted && previous[p.rootUid]?.title) || p.title, visibility: p.visibility, updatedAt: p.updatedAt,
       listing: p.listing, discoverBlocked: p.discoverBlocked, listedNote: p.listedNote,
-      inGraph: p.inGraph, encrypted: p.encrypted,
+      inGraph: p.inGraph, encrypted: p.encrypted, access: p.access,
       shortUrl: p.shortUrl, anchorUid: p.anchorUid, places: p.places, removed: p.removed, mine: p.mine,
       // The server doesn't send bylines; keep the one sent with the last publish from here.
       author: previous[p.rootUid]?.author,
@@ -483,6 +486,8 @@ export async function publish(uid: string, opts: PublishOpts = {}): Promise<void
         hash: res.contentHash, url: res.url, title: payload.title, kind: payload.kind,
         visibility: res.visibility, listing: res.listing, discoverBlocked: res.discoverBlocked,
         inGraph: res.inGraph, encrypted: res.encrypted ?? cache[uid]?.encrypted,
+        // Not in publish responses: kept from the last sync, and filled in by the next one.
+        access: cache[uid]?.access,
         updatedAt: new Date().toISOString(), author,
         // Which blocks are collapsed on the website now, for "keep" and for telling when Roam differs.
         folded: foldedUids(payload.tree),
@@ -493,6 +498,7 @@ export async function publish(uid: string, opts: PublishOpts = {}): Promise<void
     // The visibility picked in the Publish pop-up: new pages start the way the graph says, then change.
     let listing = listingOf(res);
     let listingNote = "";
+    let listingFailed = false;
     if (res.status === "created" && opts.listing && res.inGraph !== false && opts.listing !== listing) {
       try {
         const now = await api<ListingResponse>(`/api/ext/publications/${encodeURIComponent(uid)}`, {
@@ -503,6 +509,7 @@ export async function publish(uid: string, opts: PublishOpts = {}): Promise<void
         listing = listingOf(now);
         if (listing !== "unlisted" && now.listedNote) listingNote = ` ${now.listedNote}`;
       } catch (e) {
+        listingFailed = true;
         listingNote = ` It's ${LISTED[listing]} for now: ${e instanceof Error ? e.message : "its visibility couldn't be changed"}`;
       }
     }
@@ -524,7 +531,8 @@ export async function publish(uid: string, opts: PublishOpts = {}): Promise<void
               ? `${label} published as unlisted: only people with the link can see it.${copiedNote}${listingNote}`
               : `${label} published, ${LISTED[listing]}.${copiedNote}${listingNote}`;
     toast(roamCantEncrypt ? msg + encryptedByRoamPub(res.status === "unchanged") : msg, {
-      intent: res.status === "unchanged" && !opts.addedTo ? "none" : "success",
+      // Published, but not with the visibility picked: not a plain success.
+      intent: (res.status === "unchanged" && !opts.addedTo) || listingFailed ? "none" : "success",
       link: opts.addedTo?.entryUrl ?? getCache()[uid]?.url ?? res.url,
       durationMs: roamCantEncrypt || listingNote ? 20000 : undefined,
     });
@@ -543,6 +551,9 @@ export async function publish(uid: string, opts: PublishOpts = {}): Promise<void
 /** What the status calls a page or block, and how a publish result says where it's listed. */
 const statusLabel = (listing: Listing, kind: "page" | "block") =>
   listing === "discover" ? `${kind} on Discover` : `${listing === "listed" ? "public" : "unlisted"} ${kind}`;
+/** How a status starts for a page behind a password or members only: "encrypted ", "password-locked ". */
+export const lockWord = (c: { encrypted?: boolean; access?: Access | null }) =>
+  c.encrypted ? "encrypted " : c.access === "password" ? "password-locked " : c.access === "members" ? "members-only " : "";
 const LISTED: Record<Listing, string> = { unlisted: "unlisted", listed: "public", discover: "public and on Discover" };
 
 type Places = {
@@ -552,7 +563,6 @@ type Places = {
   /** Where roam.pub's New pages go to puts a new page: "graph" and collection ids. */
   newPagesGoTo: string[];
 };
-type Access = "open" | "password" | "members";
 
 /** How a new page starts out in a place, as the dropdown says it. */
 const ACCESS_WORDS: Record<Access, string> = { open: "Open", password: "Password", members: "Members only" };
@@ -568,6 +578,10 @@ export type PublishChoices = {
   /** The choice it starts on: where roam.pub's New pages go to says. */
   value: string;
   goTo: string[];
+  /** Choices whose page starts behind a password or members only in its graph, so it can't go on Discover. */
+  locked: string[];
+  /** Why Publish with encryption is unavailable, in roam.pub's words, when it's offered but can't be picked. */
+  encryptBlocked: string | null;
 };
 
 /**
@@ -596,12 +610,16 @@ export async function publishChoices(): Promise<PublishChoices | null> {
       ? [{
           value: ENCRYPTED,
           label: `Graph: ${places.graph.name} (Password, encrypted)`,
-          disabled: places.graph.encryptBlocked ? "needs a graph password that can encrypt" : null,
+          // Why is said under the dropdown: a long reason in the option itself gets cut off.
+          disabled: places.graph.encryptBlocked ? "unavailable" : null,
         }]
       : []),
     ...places.collections.map((c) => ({ value: c.id, label: `Collection: ${c.name} (${startsWords(c)})` })),
   ];
-  return { options, value: several ? NEW_PAGES : (goTo[0] ?? "graph"), goTo };
+  const graphLocked = places.graph.access !== "open" || places.graph.encrypted;
+  const locked = [ENCRYPTED, ...(graphLocked ? ["graph", NEW_PAGES] : [])];
+  const encryptBlocked = offerEncrypted ? (places.graph.encryptBlocked ?? null) : null;
+  return { options, value: several ? NEW_PAGES : (goTo[0] ?? "graph"), goTo, locked, encryptBlocked };
 }
 
 /** The publish options for a choice from publishChoices. */
@@ -846,9 +864,9 @@ export async function statusView(uid: string, { sync }: { sync: boolean }): Prom
     return { state: "removed", kind, c, uids, intent: "danger", message: `${label} was removed by a moderator.${offline}`, link: openLink(c), actions: [] };
   // A page only in collections has no listing of its own: each collection lists it.
   const onlyInCollections = c.inGraph === false;
-  // "Unlisted page", "Encrypted public block", "Page on Discover", "Page in collections only".
+  // "Unlisted page", "Encrypted public block", "Password-locked unlisted block", "Page in collections only".
   const listed = onlyInCollections ? `${kind} in collections only` : statusLabel(listingOf(c), kind);
-  const what = upperFirst(c.encrypted ? `encrypted ${listed}` : listed);
+  const what = upperFirst(`${lockWord(c)}${listed}`);
   if (c.mine === false)
     return {
       state: "other", kind, c, uids, intent: "none", link: openLink(c), actions: [],

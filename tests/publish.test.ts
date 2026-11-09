@@ -14,6 +14,7 @@ import {
   setAskHandler,
   statusView,
   syncPublications,
+  lockWord,
 } from "../src/publish";
 import { recheckCanSeal } from "../src/seal";
 import { hashPayload, serialize } from "../src/serialize";
@@ -38,6 +39,8 @@ mock.timers.enable({ apis: ["setTimeout"] });
 /** Just enough DOM for toasts: the messages shown, and their buttons by label. */
 type El = { textContent?: string; style: object; click?: () => void; [k: string]: unknown };
 const toasts: string[] = [];
+/** Each toast's classes, in the same order: its intent. */
+const toastClasses: string[] = [];
 let buttons: El[] = [];
 let selects: El[] = [];
 const el = (): El => ({
@@ -50,7 +53,7 @@ const el = (): El => ({
   remove() {},
   appendChild(c: El) {
     (this.children as El[]).push(c);
-    if (this === container && c.textContent) toasts.push(c.textContent);
+    if (this === container && c.textContent) toasts.push(c.textContent), toastClasses.push(String(c.className ?? ""));
   },
 });
 const container = el();
@@ -596,12 +599,33 @@ describe("publish where?", () => {
     server({ ...NONE, "GET /api/ext/places": () => [200, places({ graph: { name: "notes", access: "open", encrypted: false, encryptBlocked: "No password" } })] });
     let c = (await publishChoices())!;
     const enc = c.options.find((o) => o.value === "graph-encrypted")!;
-    assert.equal(enc.disabled, "needs a graph password that can encrypt");
+    assert.equal(enc.disabled, "unavailable");
+    // roam.pub's reason is said in full under the dropdown.
+    assert.equal(c.encryptBlocked, "No password");
 
     server({ ...NONE, "GET /api/ext/places": () => [200, places({ graph: { name: "notes", access: "password", encrypted: true, encryptBlocked: null } })] });
     c = (await publishChoices())!;
     assert.equal(labels(c)[0], "Graph: notes (Password, encrypted)");
     assert.equal(c.options.length, 3);
+  });
+
+  test("choices that start behind a password can't go on Discover", async () => {
+    server({ ...NONE, "GET /api/ext/places": () => [200, places({ newPagesGoTo: ["graph", "c1"] })] });
+    let c = (await publishChoices())!;
+    assert.deepEqual(c.locked, ["graph-encrypted"]);
+    assert.equal(c.encryptBlocked, null);
+
+    server({ ...NONE, "GET /api/ext/places": () => [200, places({ graph: { name: "notes", access: "password", encrypted: false, encryptBlocked: "Too short" } })] });
+    c = (await publishChoices())!;
+    assert.deepEqual(c.locked, ["graph-encrypted", "graph", "new-pages"]);
+  });
+
+  test("a password-locked or members-only page says so; an encrypted one says encrypted", () => {
+    assert.equal(lockWord({ access: "password" }), "password-locked ");
+    assert.equal(lockWord({ access: "members" }), "members-only ");
+    assert.equal(lockWord({ access: "password", encrypted: true }), "encrypted ");
+    assert.equal(lockWord({ access: "open" }), "");
+    assert.equal(lockWord({}), "");
   });
 
   test("the visibility picked is set right after the first publish, and the result says so", async () => {
@@ -623,6 +647,8 @@ describe("publish where?", () => {
     calls = server({ ...NONE, "PATCH /api/ext/publications/page1": () => [400, { error: "Search engines are off for this graph." }] });
     await publish("page1", { noAsk: true, listing: "discover" });
     assert.match(toasts.at(-1)!, /published as unlisted.*It's unlisted for now: Search engines are off for this graph\./);
+    // Not the visibility picked, so not a plain success.
+    assert.doesNotMatch(toastClasses.at(-1)!, /intent-success/);
   });
 
   test("Publish with encryption doesn't ask: it goes to the graph", async () => {

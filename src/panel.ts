@@ -131,6 +131,7 @@ const LISTING_NOTE: Record<Listing, string> = {
   listed: "On your graph's front page.",
   discover: "On your graph's front page and roam.pub/discover.",
 };
+const DISCOVER_LOCKED = "Discover is only for pages anyone can read.";
 /** The visibility picked last time, so publishing many pages the same way is one click each. */
 let lastListing: Listing = "unlisted";
 
@@ -157,9 +158,12 @@ async function drawPublishForm(root: HTMLElement, uid: string, view: StatusView,
   const collectionNote = h("div", { class: "rp-form-row" }, h("span", {}), h("span", { class: "rp-note" }, "It starts out the way the collection says."));
   const draw = () => {
     const inGraph = choiceInGraph(picked(), goTo);
+    // Password and members-only pages can't go on Discover: roam.pub would refuse it after publishing.
+    const locked = !!choices?.locked.includes(picked());
+    visibility.block("discover", locked ? DISCOVER_LOCKED : null);
     visibilityRow.hidden = !inGraph;
     collectionNote.hidden = inGraph;
-    note.textContent = LISTING_NOTE[visibility.get() as Listing];
+    note.textContent = LISTING_NOTE[visibility.get() as Listing] + (locked ? ` ${DISCOVER_LOCKED}` : "");
     frame.relayout();
   };
   where?.row.querySelector("select")?.addEventListener("change", draw);
@@ -176,7 +180,11 @@ async function drawPublishForm(root: HTMLElement, uid: string, view: StatusView,
   );
   root.replaceChildren(
     h("div", {}, view.message),
-    ...(where ? [h("div", { class: "rp-form-row" }, h("span", { class: "rp-form-label" }, "Publish to"), h("div", { class: "rp-form-field" }, where.row))] : []),
+    ...(where
+      ? [h("div", { class: "rp-form-row" }, h("span", { class: "rp-form-label" }, "Publish to"), h("div", { class: "rp-form-field" }, where.row,
+          // Why "Password, encrypted" can't be picked, in full: the option itself only says it's unavailable.
+          choices?.encryptBlocked ? h("span", { class: "rp-note" }, `Encrypted: ${choices.encryptBlocked}`) : ""))]
+      : []),
     visibilityRow,
     collectionNote,
     h("div", { class: "rp-row rp-row-end" }, button("Cancel", frame.close, { small: false }), go),

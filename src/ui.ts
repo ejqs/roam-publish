@@ -86,7 +86,18 @@ export function segmented(label: string, options: Option[], value: string) {
     group.append(b);
   }
   draw();
-  return { group, get: () => chosen };
+  /** Turns one choice off (saying why in its title) or back on; a chosen one that goes off moves to the first. */
+  const block = (value: string, why: string | null) => {
+    const b = group.querySelector<HTMLButtonElement>(`button[data-value="${value}"]`);
+    if (!b) return;
+    b.disabled = !!why;
+    b.classList.toggle("bp3-disabled", !!why);
+    if (why) b.title = why;
+    else b.removeAttribute("title");
+    if (why && chosen === value) chosen = options[0].value;
+    draw();
+  };
+  return { group, get: () => chosen, block };
 }
 
 export function switchField(label: string, checked: boolean, opts: { disabled?: string | null | boolean; note?: string } = {}) {

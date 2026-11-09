@@ -14,6 +14,8 @@ export type CachedPublication = {
   inGraph?: boolean;
   /** Sealed with a password, so collections are added on roam.pub (from servers that say). */
   encrypted?: boolean;
+  /** Its access in its graph; null when it's only in collections (from servers that say). */
+  access?: Access | null;
   updatedAt: string;
   /** Author name sent with the last publish; republishing with a new one updates the byline. */
   author?: string;
@@ -31,6 +33,11 @@ export type CachedPublication = {
   mine?: boolean;
 };
 export type Visibility = "public" | "unlisted";
+export type Access = "open" | "password" | "members";
+
+/** Behind a password or members only: encrypted, or locked on roam.pub. */
+export const lockedOf = (c: { encrypted?: boolean; access?: Access | null }) =>
+  !!c.encrypted || c.access === "password" || c.access === "members";
 export type Listing = "unlisted" | "listed" | "discover";
 
 /** Where it's listed; older servers only say public or unlisted. */
