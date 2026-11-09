@@ -26,7 +26,8 @@ export function h<K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Attrs = 
 export function isDark(near: Element = document.body) {
   for (let e: Element | null = near; e; e = e.parentElement) {
     const m = /rgba?\((\d+), (\d+), (\d+)(?:, ([\d.]+))?\)/.exec(getComputedStyle(e).backgroundColor);
-    if (m && m[4] !== "0") return 0.299 * +m[1] + 0.587 * +m[2] + 0.114 * +m[3] < 128;
+    // Translucent backgrounds (a hovered icon's tint) say nothing about the theme: look further out.
+    if (m && (m[4] === undefined || +m[4] >= 0.5)) return 0.299 * +m[1] + 0.587 * +m[2] + 0.114 * +m[3] < 128;
   }
   return false;
 }
@@ -86,7 +87,18 @@ export function segmented(label: string, options: Option[], value: string) {
     group.append(b);
   }
   draw();
-  return { group, get: () => chosen };
+  /** Turns one choice off (saying why in its title) or back on; a chosen one that goes off moves to the first. */
+  const block = (value: string, why: string | null) => {
+    const b = group.querySelector<HTMLButtonElement>(`button[data-value="${value}"]`);
+    if (!b) return;
+    b.disabled = !!why;
+    b.classList.toggle("bp3-disabled", !!why);
+    if (why) b.title = why;
+    else b.removeAttribute("title");
+    if (why && chosen === value) chosen = options[0].value;
+    draw();
+  };
+  return { group, get: () => chosen, block };
 }
 
 export function switchField(label: string, checked: boolean, opts: { disabled?: string | null | boolean; note?: string } = {}) {

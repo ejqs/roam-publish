@@ -14,18 +14,23 @@ status, views and settings without leaving Roam.**
 
 1. Install **Roam Publish** from Roam Depot.
 2. Sign up at [roam.pub](https://roam.pub) and connect your graph with an **append-only** API token
-   (Roam: Settings → Graph → API tokens).
+   (Roam: Settings → Graph → API tokens). This verifies that you own the graph: roam.pub adds a block to today's
+   daily note, which you can delete afterwards.
 3. In Roam, open **Settings → Roam Publish**, click **Open dashboard**, copy your key and paste it into **API key**.
-4. Right-click a page title, choose **Roam Publish: Page…** and click **Publish**. The link is copied to your clipboard.
+4. Right-click a page title and choose **Roam Publish: Page…**. Pick where it goes and its visibility, then click
+   **Publish page**. The link is copied to your clipboard.
 
-New pages are published **Unlisted**. Change that from the toast, the page's settings icon or roam.pub.
+Without a key, step 4 opens the setup steps right in Roam, with a field to paste the key.
 
 ## Features
 
 ### Publish pages and blocks
 
-Right-click a page title or bullet, or type "Roam Publish" in the command palette. Republish after edits with one
-click. Published pages keep Roam's formatting: block references, embeds, tables, kanban boards, math, code, Mermaid
+Right-click a page title or bullet, hover an unpublished page's title for its publish icon, hold Cmd (Ctrl on
+Windows) for a share icon by a block's bullet, or type "Roam Publish" in the command palette. One pop-up asks where it
+goes (your graph, your graph encrypted, or a collection) and its visibility, before anything is published. It also
+lists linked pages that aren't published yet, to publish with it. Republish after
+edits with one click. Published pages keep Roam's formatting: block references, embeds, tables, kanban boards, math, code, Mermaid
 diagrams, images and video. Readers can fold blocks and zoom in, as in Roam.
 
 ![A published page on roam.pub with its outline](https://raw.githubusercontent.com/ejqs/roam-publish/main/docs/readme/reader.png)
@@ -44,9 +49,12 @@ Published pages show three icons after their title: status, stats and settings.
 
 ![Status, stats and settings icons after a page title](https://raw.githubusercontent.com/ejqs/roam-publish/main/docs/readme/status.png)
 
-- **Status:** a globe, an eye crossed out when Unlisted, or a lock when encrypted. Green when up to
+- **Status:** a globe, a link when Unlisted (link only), or a lock behind a password. Green when up to
   date; orange with a dot when the page changed since you last published it.
-- **Blocks:** a ring on blocks published on their own, and a bar beside blocks edited since the last publish.
+- **Links:** a small icon after [[links]] and #tags to published pages. On a published page, links to pages that
+  aren't published have a dotted underline.
+- **Blocks:** a ring on blocks published on their own (with a lock or link icon when not public), and a bar
+  beside blocks edited since the last publish.
 
 Nothing is written to your graph to show these. Set **Status in Roam** to **Titles only** or **Off** to show less.
 
@@ -75,18 +83,17 @@ access and visibility settings.
 | --- | --- |
 | **API key** | Your key for this graph. Pasting it checks it and names the graph it works for. |
 | **Author name** | Your byline on pages that show authors. Blank: your @username. |
-| **Ask where to publish** | On (default): Publish asks where something new goes. Off: it goes where **New pages go to** says on roam.pub. |
 | **Status in Roam** | **Titles and blocks** (default), **Titles only** or **Off**. |
 | **Top bar button** | On (default): a globe in Roam's top bar opens the dashboard. |
 | **Collapsed blocks** | **As in Roam** (default) or **Expanded** on a first publish. |
-| **Roam Publish block** | Where the status link block is added: **Pages** (default), **Pages and blocks**, **Blocks only** or **Off**. |
+| **Roam Publish block** | **Off** (default for new installs): nothing is written to your graph. Or a block with the status link, where roam.pub writes the change log: **Pages**, **Pages and blocks** or **Blocks only**. |
 | **Block position** / **Block tag** | Where that block goes and its text (default `[[Roam Publish]]`). |
 
 ## Privacy
 
 - **Only on your action.** Nothing leaves Roam until you publish. No analytics; the only server contacted is roam.pub.
-- **Written to your graph:** the Roam Publish block when you publish, and change log entries if you keep an
-  append-only token. That token can only add blocks. It can't read, edit or delete anything.
+- **Written to your graph:** nothing, unless you turn on the Roam Publish block; then that block when you publish, and
+  change log entries if you keep an append-only token. That token can only add blocks. It can't read, edit or delete anything.
 - **Background requests:** status link uids about every 5 minutes, and your published pages list at most every 10
   minutes. Both stop when the matching setting is **Off**.
 
@@ -103,6 +110,7 @@ Full details: [Data flow and the Append API](https://github.com/ejqs/roam-publis
 
 Adapts code from [roamjs-components](https://github.com/RoamJS/roamjs-components) (MIT, Copyright (c) 2021 David
 Vargas). In-Roam marks follow [Reference Count](https://github.com/fbgallet/roam-extension-ref-count) by Fabrice
-Gallet (MIT). Development and release notes: [CONTRIBUTING.md](https://github.com/ejqs/roam-publish/blob/main/CONTRIBUTING.md).
+Gallet (MIT). Link marks are a generated stylesheet, as in [Tag Painter](https://github.com/8bitgentleman/roam-depot-tag-painter)
+by Matt Vogel and [Magic Tags](https://github.com/rcvd/magic-tags) by Alexander Rink (both MIT). Development and release notes: [CONTRIBUTING.md](https://github.com/ejqs/roam-publish/blob/main/CONTRIBUTING.md).
 
 [MIT](https://github.com/ejqs/roam-publish/blob/main/LICENSE)

@@ -48,6 +48,17 @@ export function checkMinVersion(min: string | null) {
   );
 }
 
+/** Whether a key works for this graph, in words: the graph it's for, or what's wrong. */
+export async function verifyKey(key: string): Promise<{ ok: boolean; message: string }> {
+  if (!key.startsWith("rp_")) return { ok: false, message: "API keys start with rp_. Copy the key from API keys on roam.pub." };
+  try {
+    const { graphName } = await api<{ graphName?: string }>("/api/ext/changelog", { key });
+    return { ok: true, message: graphName ? `API key works for ${graphName}.` : "API key works." };
+  } catch (e) {
+    return { ok: false, message: (e as Error).message };
+  }
+}
+
 /** `key` checks a key before it's saved (the settings panel); otherwise the saved one is sent. */
 export async function api<T>(path: string, { auth, key: keyToCheck, ...init }: RequestInit & { auth?: boolean; key?: string } = {}): Promise<T> {
   const headers: Record<string, string> = { "content-type": "application/json" };

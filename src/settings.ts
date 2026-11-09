@@ -1,4 +1,4 @@
-import { api } from "./api";
+import { verifyKey } from "./api";
 import { restartMarks, startTopbar, stopTopbar } from "./decorate";
 import { BLOCK_CHOICES, STATUS_CHOICES, STATUS_SETTING, TOP_BAR_SETTING, COLLAPSED_AS_IN_ROAM, COLLAPSED_EXPANDED, getApiKey, getServer, saveLegacyBlockSwitches, saveStatusMarks } from "./state";
 import { toast } from "./toast";
@@ -16,16 +16,8 @@ export function checkKeySoon(value: string) {
 }
 
 async function checkKey(key: string) {
-  if (!key.startsWith("rp_")) {
-    toast("API keys start with rp_. Copy the key from API keys on the dashboard.", { intent: "danger" });
-    return;
-  }
-  try {
-    const { graphName } = await api<{ graphName?: string }>("/api/ext/changelog", { key });
-    toast(graphName ? `API key works for ${graphName}.` : "API key works.", { intent: "success" });
-  } catch (e) {
-    toast((e as Error).message, { intent: "danger" });
-  }
+  const { ok, message } = await verifyKey(key);
+  toast(message, { intent: ok ? "success" : "danger" });
 }
 
 export function createSettingsPanel(extensionAPI: ExtensionAPI) {
@@ -60,13 +52,6 @@ export function createSettingsPanel(extensionAPI: ExtensionAPI) {
         action: { type: "input", placeholder: "Your name" },
       },
       {
-        id: "ask-where",
-        name: "Ask where to publish",
-        description:
-          "Publish asks: your graph, your graph encrypted, or a collection. Off: it goes where New pages go to says on roam.pub.",
-        action: { type: "switch" },
-      },
-      {
         id: STATUS_SETTING,
         name: "Status in Roam",
         description:
@@ -96,19 +81,19 @@ export function createSettingsPanel(extensionAPI: ExtensionAPI) {
         id: "shortlink-add",
         name: "Roam Publish block",
         description:
-          "A block with the status link, where roam.pub writes the change log. For you and your graph's members; never published.",
+          "Off (new installs): nothing is written to your graph. On: a block with the status link, where roam.pub writes the change log. Never published.",
         action: { type: "select", items: [...BLOCK_CHOICES], onChange: (choice) => void saveLegacyBlockSwitches(choice) },
       },
       {
         id: "shortlink-position",
         name: "Block position",
-        description: "First or last under the page or block.",
+        description: "With Roam Publish block on: first or last under the page or block.",
         action: { type: "select", items: ["First", "Last"] },
       },
       {
         id: "shortlink-tag",
         name: "Block tag",
-        description: "The block's text. Blank: no tag. Existing blocks update when next published.",
+        description: "With Roam Publish block on: the block's text. Blank: no tag. Existing blocks update when next published.",
         action: { type: "input", placeholder: "No tag" },
       },
     ],
