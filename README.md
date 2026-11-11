@@ -29,8 +29,11 @@ Without a key, step 4 opens the setup steps right in Roam, with a field to paste
 Right-click a page title or bullet, hover an unpublished page's title for its publish icon, hold Cmd (Ctrl on
 Windows) for a share icon by a block's bullet, or type "Roam Publish" in the command palette. One pop-up asks where it
 goes (your graph, your graph encrypted, or a collection) and its visibility, before anything is published. It also
-lists linked pages that aren't published yet, to publish with it. Republish after
-edits with one click. Published pages keep Roam's formatting: block references, embeds, tables, kanban boards, math, code, Mermaid
+lists linked pages that aren't published yet, to publish with it.
+
+![The Publish pop-up with Publish to, Visibility and linked pages that aren't published yet](https://raw.githubusercontent.com/ejqs/roam-publish/main/docs/readme/publish.png)
+
+Republish after edits with one click. Published pages keep Roam's formatting: block references, embeds, tables, kanban boards, math, code, Mermaid
 diagrams, images and video. Readers can fold blocks and zoom in, as in Roam.
 
 ![A published page on roam.pub with its outline](https://raw.githubusercontent.com/ejqs/roam-publish/main/docs/readme/reader.png)
@@ -47,7 +50,7 @@ diagrams, images and video. Readers can fold blocks and zoom in, as in Roam.
 
 Published pages show three icons after their title: status, stats and settings.
 
-![Status, stats and settings icons after a page title](https://raw.githubusercontent.com/ejqs/roam-publish/main/docs/readme/status.png)
+![An unlisted page's link icon, stats and settings after its title, with icons after links to published pages](https://raw.githubusercontent.com/ejqs/roam-publish/main/docs/readme/status.png)
 
 - **Status:** a globe, a link when Unlisted (link only), or a lock behind a password. Green when up to
   date; orange with a dot when the page changed since you last published it.
