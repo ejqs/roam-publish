@@ -31,6 +31,18 @@ jobs:
           git fetch origin main
           git merge-base --is-ancestor HEAD origin/main \
             || { echo "::error::$GITHUB_REF_NAME ($(git rev-parse HEAD)) isn't on main, so it isn't released."; exit 1; }
+      - name: The version must not have shipped yet
+        # Once Roam Research merged this version's Roam Depot pull request, it has shipped: a moved tag would publish
+        # the Release again and open a second pull request for the same version. Later changes are a new version.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          shipped=$(gh api "repos/Roam-Research/roam-depot/pulls?head=ejqs:roam-publish-$GITHUB_REF_NAME&state=closed" \
+            --jq '[.[] | select(.merged_at != null)][0].html_url // empty')
+          if [ -n "$shipped" ]; then
+            echo "::error::$GITHUB_REF_NAME already shipped ($shipped), so its tag must not move. Release the change as a new version."
+            exit 1
+          fi
       - uses: actions/setup-node@v4
         with:
           node-version: 22
