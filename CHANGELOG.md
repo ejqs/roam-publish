@@ -4,7 +4,7 @@ All notable changes to the Roam Publish extension. Each version is dated when it
 What's new shows it once Roam Depot serves it. Every bullet starts with **Breaking:**, **New:**, **Improved:** or
 **Fixed:**; a breaking change comes with a new major version.
 
-## Unreleased
+## 0.4.0 (2026-11-11)
 
 ### Publishing
 - Improved: **One Publish pop-up.** **Roam Publish: Page…**, **Block…**, the command palette and the title icons
@@ -20,8 +20,9 @@ What's new shows it once Roam Depot serves it. Every bullet starts with **Breaki
 - Improved: Pages and blocks behind a password say so: the status reads "Password-locked" or "Members-only",
   and the title icon is a lock, as for encrypted ones.
 - New: **Marks on links.** A small icon after [[links]] and #tags to published pages: a globe when public, a
-  link when unlisted (link only), a lock behind a password. Pages that aren't published get no icon. On a published page, links to pages that aren't
-  published have a dotted underline. Follows **Status in Roam** (**Titles and blocks**).
+  link when unlisted (link only), a lock behind a password. Pages that aren't published get no icon. On a
+  published page, links to pages that aren't published have a dotted underline. Follows **Status in Roam**
+  (**Titles and blocks**).
 - New: **Publish from the title.** Hover an unpublished page's title for a publish icon that opens the Publish
   pop-up.
 - New: **Publish linked pages too.** The Publish pop-up lists the pages it links to that aren't published yet;
