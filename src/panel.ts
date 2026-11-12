@@ -13,7 +13,7 @@ import { button, callout, dialog, h, segmented, selectField } from "./ui";
  * block happens here, so toasts only report results.
  */
 
-export type Tab = "page" | "settings";
+export type Tab = "page" | "stats" | "settings";
 
 /** Stats and settings only for pages this key may change: published, not removed, not another member's. */
 export const yours = (view: StatusView) => view.state !== "unpublished" && view.state !== "removed" && view.state !== "other";
@@ -50,7 +50,11 @@ export async function renderPanel(root: HTMLElement, uid: string, tab: Tab, fram
   const v = view;
   const body = h("div", { class: "rp-tab-body" });
   const tabs: [Tab, string, () => void][] = [["page", v.state === "unpublished" ? "Publish" : `This ${v.kind}`, () => drawPage(body, uid, v, frame)]];
-  if (yours(v)) tabs.push(["settings", "Settings", () => void renderPageSettings(body, uid, frame.onChange).then(frame.relayout)]);
+  if (yours(v))
+    tabs.push(
+      ["stats", "Stats", () => drawStats(body, uid, frame)],
+      ["settings", "Settings", () => void renderPageSettings(body, uid, frame.onChange).then(frame.relayout)],
+    );
   const bar = h("div", { class: "rp-tabs", role: "tablist" });
   const select = (t: Tab) => {
     const i = Math.max(0, tabs.findIndex(([k]) => k === t));
@@ -77,20 +81,25 @@ export function openPanel(uid: string, tab: Tab = "page") {
 /** "This page": the Publish form when it isn't published; otherwise the status, the page's stats and its actions. */
 function drawPage(root: HTMLElement, uid: string, view: StatusView, frame: Frame) {
   if (view.state === "unpublished") return void drawPublishForm(root, uid, view, frame);
-  const stats = h("div", {});
   const { message, actions } = drawStatus(view, frame.close);
-  // Stats sit between the status and its actions.
-  root.replaceChildren(
-    message,
-    stats,
-    actions,
-    h(
-      "div",
-      { class: "rp-pop-foot" },
-      h("a", { class: "rp-link", href: "#", onclick: (e: Event) => (e.preventDefault(), frame.close(), openDashboard()) }, "Open dashboard"),
-    ),
+  root.replaceChildren(message, actions, dashboardFoot(frame));
+}
+
+const dashboardFoot = (frame: Frame) =>
+  h(
+    "div",
+    { class: "rp-pop-foot" },
+    h("a", { class: "rp-link", href: "#", onclick: (e: Event) => (e.preventDefault(), frame.close(), openDashboard()) }, "Open dashboard"),
   );
-  if (yours(view)) void renderPageStats(stats, uid).then(frame.relayout);
+
+/** "Stats": the page's views, upvotes and readers' countries. */
+function drawStats(root: HTMLElement, uid: string, frame: Frame) {
+  const stats = h("div", {}, h("div", { class: "rp-muted" }, "Loading…"));
+  root.replaceChildren(stats, dashboardFoot(frame));
+  void renderPageStats(stats, uid).then(() => {
+    if (stats.isConnected && !stats.childElementCount) stats.append(h("div", { class: "rp-muted" }, "Stats aren't available right now."));
+    frame.relayout();
+  });
 }
 
 /** The status, as the pop-up says it, with its actions. */

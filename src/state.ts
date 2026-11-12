@@ -134,6 +134,16 @@ export const getCache = (): PublicationCache =>
 
 /** Called after the published list changes (a publish, an unpublish, a sync), so status marks redraw. */
 const cacheListeners = new Set<() => void>();
+
+/** Pages and blocks being published right now, so their titles show it before roam.pub answers. */
+const publishingNow = new Set<string>();
+export const isPublishing = (uid: string) => publishingNow.has(uid);
+export function setPublishing(uid: string, on: boolean) {
+  if (on === publishingNow.has(uid)) return;
+  if (on) publishingNow.add(uid);
+  else publishingNow.delete(uid);
+  cacheListeners.forEach((fn) => fn());
+}
 export function onCacheChange(fn: () => void) {
   cacheListeners.add(fn);
   return () => void cacheListeners.delete(fn);
