@@ -4,6 +4,57 @@ All notable changes to the Roam Publish extension. Each version is dated when it
 What's new shows it once Roam Depot serves it. Every bullet starts with **Breaking:**, **New:**, **Improved:** or
 **Fixed:**; a breaking change comes with a new major version.
 
+## 0.4.0 (2026-11-11)
+
+### Publishing
+- Improved: **One Publish pop-up.** **Roam Publish: Page…**, **Block…**, the command palette and the title icons
+  all open the same pop-up. For something new it asks where it goes (your graph, your graph encrypted, or a
+  collection) and, in your graph, its visibility (**Unlisted**, **Public** or **Discover**), then publishes with one
+  click. Before, visibility was changed after the page was already published.
+- Improved: Messages after publishing follow Roam's light and dark themes, and only report the result. Add to
+  collection is in the pop-up's **Settings** tab.
+- New: **Copy status link** in the pop-up, for the page's permanent link on roam.pub.
+- Improved: **Discover** can't be picked for a page that starts behind a password or members only, since roam.pub
+  only puts pages anyone can read there. Before, it was refused after publishing.
+- Improved: When **Password, encrypted** can't be picked, the pop-up says why under **Publish to**.
+- Improved: Pages and blocks behind a password say so: the status reads "Password-locked" or "Members-only",
+  and the title icon is a lock, as for encrypted ones.
+- New: **Marks on links.** A small icon after [[links]] and #tags to published pages: a globe when public, a
+  link when unlisted (link only), a lock behind a password. Pages that aren't published get no icon. On a
+  published page, links to pages that aren't published have a dotted underline. Follows **Status in Roam**
+  (**Titles and blocks**).
+- New: **Publish from the title.** Hover an unpublished page's title for a publish icon that opens the Publish
+  pop-up.
+- New: **Publish linked pages too.** The Publish pop-up lists the pages it links to that aren't published yet;
+  checked ones are published right after it, the same way. It also says when text is copied in from other pages
+  (embeds and block references).
+- Fixed: A title icon's pop-up could open light in Roam's dark theme.
+- Improved: Unlisted pages show a link icon (link only) instead of a crossed-out eye, which read like "not
+  published".
+- New: **Hold Cmd (Ctrl on Windows)** and a share icon shows by the bullet of the block under the pointer, like
+  Roam's comment button. Click it to publish the block, or see its status if it's published.
+- New: A published block's ring has a small lock when it's behind a password, or a link icon when it's
+  unlisted, as page titles do.
+- Improved: Each icon after a published page's title opens its own tab: status opens **This page** (its status
+  and actions), stats opens the new **Stats** tab, and settings opens **Settings**. Before, status and stats
+  opened the same thing.
+- Improved: A page's title shows a fading icon as soon as you click **Publish**, and its status, stats and
+  settings icons as soon as roam.pub has it.
+- Fixed: Switching tabs in a title icon's pop-up could move the pop-up to the top left corner of the window.
+
+### Commands
+- Improved: **Fewer commands.** **Roam Publish: Publish or update current page…** and **Publish or update focused
+  block…** open the pop-up; **Unpublish current page** and **Open dashboard** stay. The separate status and
+  "with encryption" commands are gone: encryption is a **Publish to** choice. If you gave one of the old commands a
+  hotkey, set it again on the new one.
+
+### Setup and settings
+- New: **Setup in Roam.** Without an API key, publishing or the top bar globe opens the setup steps with a field to
+  paste the key, checked as you paste it.
+- Improved: New installs write nothing to your graph: **Roam Publish block** starts **Off**, since the title icons
+  show each page's status. Graphs set up before keep their choice.
+- Improved: The **Ask where to publish** setting is gone, as the pop-up always shows where something new goes.
+
 ## 0.3.0 (2026-10-26)
 
 ### Status in Roam

@@ -1,8 +1,11 @@
 import { editedSince, iconFor, uidInId } from "./marks";
 import { statusView, syncPublications, type StatusView } from "./publish";
-import { openDashboard, renderPageSettings, renderPageStats } from "./panels";
-import { getApiKey, getCache, getStatusMarks, getTopBar, listingOf, onCacheChange } from "./state";
-import { button as bpButton, closeDialogs, h, isDark } from "./ui";
+import { openDashboard } from "./panels";
+import { refreshLinks, removeLinks } from "./links";
+import { renderPanel, type Tab, yours } from "./panel";
+import { openSetup } from "./setup";
+import { type CachedPublication, getApiKey, getCache, getStatusMarks, getTopBar, isPublishing, listingOf, lockedOf, onCacheChange } from "./state";
+import { closeDialogs, h, isDark } from "./ui";
 
 /**
  * Status marks in Roam: three icons after the title of a published page (status, stats, settings), a ring on the bullet of a block
@@ -46,27 +49,56 @@ h1.rm-title-display:has(textarea, input) .${GROUP_CLASS} { display: none; }
   border-radius: 50%; background: #d9822b; }
 .${ICON_CLASS}[data-tone="danger"] { color: #db3737; }
 .${ICON_CLASS}[data-tone="muted"], .${ICON_CLASS}[data-part="stats"], .${ICON_CLASS}[data-part="settings"] { color: #8a9ba8; }
+.${ICON_CLASS}[data-tone="pending"] { color: #8a9ba8; animation: roam-publish-pending 1s ease-in-out infinite alternate; }
+@keyframes roam-publish-pending { from { opacity: 1; } to { opacity: 0.35; } }
 .${ICON_CLASS}[aria-expanded="true"] { background: rgba(138, 155, 168, 0.2); }
+.${GROUP_CLASS}[data-parts="publish"] { opacity: 0; transition: opacity 0.12s; }
+h1.rm-title-display:hover .${GROUP_CLASS}[data-parts="publish"], .${GROUP_CLASS}[data-parts="publish"]:focus-within,
+.${GROUP_CLASS}[data-parts="publish"]:has([aria-expanded="true"]) { opacity: 1; }
+@media (hover: none) { .${GROUP_CLASS}[data-parts="publish"] { opacity: 0.45; } }
+.${ICON_CLASS}[data-part="publish"] { color: #8a9ba8; }
+.${ICON_CLASS}[data-part="publish"]:hover { color: #137cbd; }
+.${ICON_CLASS}[data-part="publish"]::after { content: "+"; position: absolute; right: 1px; bottom: 1px; width: 11px; height: 11px;
+  border-radius: 50%; background: #8a9ba8; color: #fff; font: 700 11px/11px sans-serif; text-align: center; }
+.${ICON_CLASS}[data-part="publish"]:hover::after { background: #137cbd; }
 .rm-block-main[${ATTR}~="edited"] { position: relative; }
 .rm-block-main[${ATTR}~="edited"]::before { content: ""; position: absolute; left: -10px; top: 5px; bottom: 5px; width: 3px;
   border-radius: 2px; background: #d9822b; }
 .rm-block-main[${ATTR}~="published"] .rm-bullet__inner { box-shadow: 0 0 0 3px rgba(15, 153, 96, 0.35); background-color: #0f9960; }
+.rm-block-main:is([${ATTR}~="locked"], [${ATTR}~="unlisted"]) .rm-bullet { position: relative; }
+.rm-block-main:is([${ATTR}~="locked"], [${ATTR}~="unlisted"]) .rm-bullet::after { position: absolute; right: -7px; bottom: -4px;
+  font-family: "Icons16", "blueprint-icons-16"; font-size: 10px; line-height: 10px; font-weight: 400; color: #8a9ba8; pointer-events: none; }
+.rm-block-main[${ATTR}~="locked"] .rm-bullet::after { content: "\\e625"; }
+.rm-block-main[${ATTR}~="unlisted"] .rm-bullet::after { content: "\\e62d"; }
 .rm-block-main[${ATTR}~="published-changed"] .rm-bullet__inner { box-shadow: 0 0 0 3px rgba(217, 130, 43, 0.35); background-color: #d9822b; }
 #${POPOVER_ID} { position: fixed; z-index: 30; width: 420px; max-width: calc(100vw - 24px); box-sizing: border-box; padding: 12px 14px;
   border-radius: 4px; font-size: 14px; line-height: 1.45; background: #fff; color: #182026;
   box-shadow: 0 0 0 1px rgba(16, 22, 26, 0.1), 0 2px 4px rgba(16, 22, 26, 0.2), 0 8px 24px rgba(16, 22, 26, 0.2); }
 #${POPOVER_ID}.rp-dark { background: #30404d; color: #f5f8fa; }
 #${POPOVER_ID} { max-height: calc(100vh - 120px); overflow-y: auto; }
-#${POPOVER_ID} .rp-tabs { display: flex; gap: 16px; margin: -12px -14px 12px; padding: 0 14px; border-bottom: 1px solid rgba(138, 155, 168, 0.3); }
-#${POPOVER_ID} .rp-tab { padding: 8px 0 6px; border: 0; border-bottom: 2px solid transparent; background: none; color: inherit; font: inherit; cursor: pointer; }
-#${POPOVER_ID} .rp-tab[aria-selected="true"] { color: #106ba3; border-bottom-color: #106ba3; }
-#${POPOVER_ID}.rp-dark .rp-tab[aria-selected="true"] { color: #48aff0; border-bottom-color: #48aff0; }
-#${POPOVER_ID} .rp-pop-foot { display: flex; justify-content: flex-end; margin: 12px -14px -12px; padding: 8px 14px; border-top: 1px solid rgba(138, 155, 168, 0.3); }
+.rp-panel .rp-tabs { display: flex; gap: 16px; margin: -12px -14px 12px; padding: 0 14px; border-bottom: 1px solid rgba(138, 155, 168, 0.3); }
+.rp-panel .rp-tab { padding: 8px 0 6px; border: 0; border-bottom: 2px solid transparent; background: none; color: inherit; font: inherit; cursor: pointer; }
+.rp-panel .rp-tab[aria-selected="true"] { color: #106ba3; border-bottom-color: #106ba3; }
+.bp3-dark .rp-panel .rp-tab[aria-selected="true"], #${POPOVER_ID}.rp-dark .rp-tab[aria-selected="true"] { color: #48aff0; border-bottom-color: #48aff0; }
+.rp-panel .rp-pop-foot { display: flex; justify-content: flex-end; margin: 12px -14px -12px; padding: 8px 14px; border-top: 1px solid rgba(138, 155, 168, 0.3); }
 .rp-form-row { display: grid; grid-template-columns: 96px 1fr; gap: 10px; align-items: start; margin: 8px 0; }
 .rp-form-label { font-weight: 600; font-size: 13px; padding-top: 4px; }
 .rp-form-field { min-width: 0; }
 .rp-form-field > .rp-list-row { padding: 2px 0; }
 .rp-link { cursor: pointer; }
+.rp-linked { max-height: 160px; overflow-y: auto; }
+.rp-linked .rp-check { margin: 2px 0 4px; }
+.rp-borrowed { margin: 8px 0 0 106px; }
+.roam-publish-dialog .rp-panel .rp-tabs { margin: -8px 0 12px; padding: 0; }
+.roam-publish-dialog .rp-panel .rp-pop-foot { margin: 12px 0 0; padding: 8px 0 0; }
+.roam-publish-dialog .rp-panel { min-height: 60px; }
+.roam-publish-dialog:has(.rp-panel) { padding-bottom: 0; }
+.rp-step { display: grid; grid-template-columns: 24px 1fr; gap: 8px; margin: 12px 0; }
+.rp-step-n { width: 20px; height: 20px; border-radius: 50%; background: #137cbd; color: #fff; font-size: 12px; font-weight: 600;
+  display: inline-flex; align-items: center; justify-content: center; }
+.rp-key { margin-top: 6px; }
+.rp-key input { font-family: monospace; }
+.rp-panel [hidden] { display: none !important; }
 .rp-links { display: flex; flex-wrap: wrap; gap: 16px; }
 .rp-inline { display: flex; gap: 6px; align-items: center; margin-top: 4px; }
 .rp-inline > .bp3-html-select { flex: 1; min-width: 0; }
@@ -106,6 +138,12 @@ h1.rm-title-display:has(textarea, input) .${GROUP_CLASS} { display: none; }
 .rp-list-row > :first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rp-foot { margin-top: 16px; }
 .${TOPBAR_CLASS} { margin: 0 2px; }
+#roam-publish-share { position: fixed; z-index: 20; width: 20px; height: 20px; display: inline-flex; align-items: center;
+  justify-content: center; cursor: pointer; color: #a7b6c2; }
+#roam-publish-share:hover { color: #5c7080; }
+#roam-publish-share.rp-dark { color: #738694; }
+#roam-publish-share.rp-dark:hover { color: #bfccd6; }
+#roam-publish-share .bp3-icon::before { font-size: 14px; line-height: 14px; }
 `;
 
 type Checked = { view: StatusView | null; edited: Set<string> };
@@ -148,8 +186,9 @@ export function startTopbar(on = getTopBar()) {
       "span",
       { class: `bp3-button bp3-minimal bp3-small bp3-icon-globe-network ${TOPBAR_CLASS}`, role: "button", tabindex: 0, title: "Roam Publish dashboard", "aria-label": "Roam Publish dashboard" },
     );
-    b.addEventListener("click", openDashboard);
-    b.addEventListener("keydown", (e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), openDashboard()));
+    const open = () => (getApiKey() ? openDashboard() : openSetup(openDashboard));
+    b.addEventListener("click", open);
+    b.addEventListener("keydown", (e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), open()));
     bar.append(b);
   };
   mount();
@@ -170,7 +209,8 @@ export function startMarks() {
   running = true;
   observer = new MutationObserver(onMutations);
   observer.observe(document.querySelector(".roam-app") ?? document.body, { childList: true, subtree: true });
-  unlisten = onCacheChange(() => recheckSoon(0));
+  unlisten = onCacheChange(() => (recheckSoon(0), void refreshLinks(ATTR)));
+  void refreshLinks(ATTR);
   window.addEventListener("focus", syncIfStale);
   syncIfStale();
   schedule();
@@ -187,6 +227,7 @@ export function stopMarks() {
   unlisten = null;
   window.removeEventListener("focus", syncIfStale);
   closePopover();
+  removeLinks();
   document.querySelectorAll(`.${GROUP_CLASS}`).forEach((e) => e.remove());
   document.querySelectorAll(`[${ATTR}]`).forEach((e) => e.removeAttribute(ATTR));
   checked.clear();
@@ -236,6 +277,8 @@ function recheckSoon(ms: number) {
   recheck = setTimeout(() => {
     checked.clear();
     schedule();
+    // A page may have been renamed.
+    if (running) void refreshLinks(ATTR);
   }, ms);
 }
 
@@ -304,11 +347,17 @@ async function apply() {
     const uid = await pageUid(titleText(h));
     const c = uid ? cache[uid] : undefined;
     const state = c && uid ? check(uid) : undefined;
-    if (!uid || !c || !state?.view) {
-      if (!c) icon?.remove();
+    // Being published: say so at once, and show it published as soon as roam.pub answers, before the check.
+    const pending = !!uid && isPublishing(uid) && !state?.view;
+    if (uid && !c && !pending) {
+      drawPublishIcon(h, icon, uid);
       continue;
     }
-    drawIcons(h, icon, uid, state.view);
+    if (!uid || !(state?.view || pending)) continue;
+    drawIcons(h, icon, uid, state?.view ?? publishingView(c));
+    if (!c || !state?.view) continue;
+    // A published page of yours: links in it to pages that aren't published get a dotted underline (links.ts).
+    if (yours(state.view) && getStatusMarks() === "Titles and blocks") mark(h.closest(".roam-log-page, .rm-sidebar-outline, .roam-article"), "page");
     state.edited.forEach((u) => edited.add(u));
   }
 
@@ -321,7 +370,14 @@ async function apply() {
       if (!state?.view) continue;
       state.edited.forEach((u) => edited.add(u));
       const m = state.view.state === "changed" ? "published-changed" : "published";
-      els.forEach((el) => mark(el.closest(".rm-block-main"), m));
+      // A small badge on the ring says when it isn't public, as the title icons do for pages.
+      const c = state.view.c;
+      const { icon } = iconFor(state.view.state, !!c && lockedOf(c), !!c && c.inGraph !== false && listingOf(c) === "unlisted");
+      const badge = icon === "lock" ? "locked" : icon === "link" ? "unlisted" : null;
+      els.forEach((el) => {
+        mark(el.closest(".rm-block-main"), m);
+        if (badge) mark(el.closest(".rm-block-main"), badge);
+      });
     }
     if (edited.size)
       for (const el of document.querySelectorAll(".roam-block[id], .rm-block__input[id]")) {
@@ -336,15 +392,12 @@ async function apply() {
   for (const el of document.querySelectorAll(`[${ATTR}]`)) if (!marks.has(el)) el.removeAttribute(ATTR);
 }
 
-type Tab = "page" | "settings";
-
-/** Stats and settings only for pages this key may change: published, not removed, not another member's. */
-const yours = (view: StatusView) => view.state !== "unpublished" && view.state !== "removed" && view.state !== "other";
 
 function iconButton(uid: string, part: string, tab: Tab, label: string) {
   const el = document.createElement("span");
   el.className = ICON_CLASS;
   el.dataset.part = part;
+  el.dataset.uid = uid;
   el.contentEditable = "false";
   el.setAttribute("role", "button");
   el.setAttribute("aria-haspopup", "dialog");
@@ -353,23 +406,33 @@ function iconButton(uid: string, part: string, tab: Tab, label: string) {
   el.setAttribute("aria-label", label);
   // A click on the title starts editing it in Roam; the icons' clicks stay with the icons.
   for (const type of ["mousedown", "mouseup", "click"]) el.addEventListener(type, (e) => e.stopPropagation());
-  el.addEventListener("click", () => void openPopover(el, uid, tab));
+  // Without a key, the setup steps first, then the pop-up.
+  const open = () => (getApiKey() ? void openPopover(el, uid, tab) : openSetup(() => void openPopover(el, uid, tab)));
+  el.addEventListener("click", open);
   el.addEventListener("keydown", (e) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
       e.stopPropagation();
-      void openPopover(el, uid, tab);
+      open();
     }
   });
   el.appendChild(document.createElement("span"));
   return el;
 }
 
+/** What the title shows while it's being published: "Publishing…", then published once roam.pub has it. */
+const publishingView = (c: CachedPublication | undefined): StatusView =>
+  c
+    ? { state: "current", kind: c.kind, c, intent: "none", actions: [], message: "Published." }
+    : { state: "unknown", kind: "page", intent: "none", actions: [], message: "Publishing…" };
+
 /** The title's icons: status always, then stats and settings where they apply. */
 function drawIcons(h: Element, existing: HTMLElement | null, uid: string, view: StatusView) {
   const c = view.c;
-  const { icon, tone } = iconFor(view.state, c?.encrypted, !!c && c.inGraph !== false && listingOf(c) === "unlisted");
-  const parts = yours(view) ? "status stats settings" : "status";
+  const { icon, tone: shown } = iconFor(view.state, !!c && lockedOf(c), !!c && c.inGraph !== false && listingOf(c) === "unlisted");
+  const tone = !c && view.state === "unknown" ? "pending" : shown;
+  // Nothing to show stats or settings for until roam.pub has it.
+  const parts = yours(view) && c ? "status stats settings" : "status";
   let group = existing;
   if (!group || group.dataset.parts !== parts) {
     group?.remove();
@@ -379,7 +442,7 @@ function drawIcons(h: Element, existing: HTMLElement | null, uid: string, view: 
     group.dataset.parts = parts;
     group.append(iconButton(uid, "status", "page", ""));
     if (parts !== "status")
-      group.append(iconButton(uid, "stats", "page", "Roam Publish: views and upvotes"), iconButton(uid, "settings", "settings", "Roam Publish: page settings"));
+      group.append(iconButton(uid, "stats", "stats", "Roam Publish: views and upvotes"), iconButton(uid, "settings", "settings", "Roam Publish: page settings"));
     group.querySelector('[data-part="stats"] > span')?.setAttribute("class", "bp3-icon bp3-icon-standard bp3-icon-timeline-bar-chart");
     group.querySelector('[data-part="settings"] > span')?.setAttribute("class", "bp3-icon bp3-icon-standard bp3-icon-cog");
     h.appendChild(group);
@@ -397,6 +460,26 @@ function drawIcons(h: Element, existing: HTMLElement | null, uid: string, view: 
   }
 }
 
+/**
+ * An unpublished page's title: one publish icon (a globe with a plus), hidden until the title is
+ * hovered or the icon focused, and faint on touch screens, where there's no hover.
+ */
+function drawPublishIcon(h: Element, existing: HTMLElement | null, uid: string) {
+  if (existing?.dataset.parts === "publish") {
+    if (existing !== h.lastChild) h.appendChild(existing);
+    return;
+  }
+  existing?.remove();
+  const group = document.createElement("span");
+  group.className = GROUP_CLASS;
+  group.contentEditable = "false";
+  group.dataset.parts = "publish";
+  const el = iconButton(uid, "publish", "page", "Publish this page…");
+  el.firstElementChild!.className = "bp3-icon bp3-icon-standard bp3-icon-globe";
+  group.append(el);
+  h.appendChild(group);
+}
+
 let closeListeners: (() => void) | null = null;
 
 function closePopover() {
@@ -407,10 +490,11 @@ function closePopover() {
 }
 
 /**
- * The pop-up under the title icons, about this page only: "This page" (status, stats and actions)
- * and "Settings". Synced with roam.pub first, as the menus are.
+ * The pop-up under the title icons, about this page only: "This page" (status and actions), "Stats"
+ * and "Settings", each icon opening its own tab. Synced with roam.pub first, as the menus are.
  */
-async function openPopover(anchor: HTMLElement, uid: string, tab: Tab) {
+async function openPopover(clicked: HTMLElement, uid: string, tab: Tab) {
+  let anchor = clicked;
   const open = document.getElementById(POPOVER_ID);
   if (open?.dataset.uid === uid && open.dataset.anchor === anchor.dataset.part) return closePopover();
   closePopover();
@@ -420,9 +504,16 @@ async function openPopover(anchor: HTMLElement, uid: string, tab: Tab) {
   pop.dataset.anchor = anchor.dataset.part;
   pop.setAttribute("role", "dialog");
   pop.className = isDark(anchor) ? "rp-dark bp3-dark" : "";
-  pop.textContent = "Checking…";
-  anchor.setAttribute("aria-expanded", "true");
+    anchor.setAttribute("aria-expanded", "true");
   const place = () => {
+    // Roam redraws a title now and then (after a save, say), and the icons with it: follow the new icon.
+    if (!anchor.isConnected) {
+      const again = document.querySelector<HTMLElement>(`.${ICON_CLASS}[data-uid="${CSS.escape(uid)}"][data-part="${anchor.dataset.part}"]`);
+      // None on screen yet: stay where it is rather than jump to the corner.
+      if (!again) return;
+      anchor = again;
+      anchor.setAttribute("aria-expanded", "true");
+    }
     const r = anchor.getBoundingClientRect();
     pop.style.top = `${r.bottom + 8}px`;
     pop.style.left = `${Math.max(12, Math.min(r.left - 12, window.innerWidth - pop.offsetWidth - 12))}px`;
@@ -443,71 +534,10 @@ async function openPopover(anchor: HTMLElement, uid: string, tab: Tab) {
     window.removeEventListener("resize", place);
   };
 
-  let view: StatusView | null = null;
-  try {
-    view = await statusView(uid, { sync: true });
-  } catch (e) {
-    pop.textContent = e instanceof Error ? e.message : "Couldn't check the status.";
-  }
-  if (!pop.isConnected || !view) return;
-  const v = view;
-  const body = h("div", { class: "rp-tab-body" });
-  const tabs: [Tab, string, () => void][] = [["page", "This page", () => drawPage(body, uid, v, place)]];
-  if (yours(v)) tabs.push(["settings", "Settings", () => void renderPageSettings(body, uid, () => recheckSoon(0)).then(place)]);
-  const bar = h("div", { class: "rp-tabs", role: "tablist" });
-  const select = (t: Tab) => {
-    const i = Math.max(0, tabs.findIndex(([k]) => k === t));
-    bar.querySelectorAll("[role=tab]").forEach((b, j) => b.setAttribute("aria-selected", String(i === j)));
-    tabs[i][2]();
-    place();
-  };
-  for (const [k, label] of tabs) bar.append(h("button", { type: "button", class: "rp-tab", role: "tab", onclick: () => select(k) }, label));
-  pop.replaceChildren(bar, body);
-  select(tab);
+  pop.classList.add("rp-panel");
+  const view = await renderPanel(pop, uid, tab, { relayout: place, close: closePopover, isOpen: () => pop.isConnected, onChange: () => recheckSoon(0) });
+  if (!view) return;
   // What the pop-up found is the freshest status: draw it.
   checked.set(uid, { view, edited: checked.get(uid)?.edited ?? new Set() });
   schedule();
-}
-
-/** "This page": the status, the page's stats, its actions and the way to the dashboard. */
-function drawPage(root: HTMLElement, uid: string, view: StatusView, place: () => void) {
-  const stats = h("div", {});
-  const { message, actions } = drawStatus(view);
-  // Stats sit between the status and its actions.
-  root.replaceChildren(
-    message,
-    stats,
-    actions,
-    h(
-      "div",
-      { class: "rp-pop-foot" },
-      h("a", { class: "rp-link", href: "#", onclick: (e: Event) => (e.preventDefault(), closePopover(), openDashboard()) }, "Open dashboard"),
-    ),
-  );
-  if (yours(view)) void renderPageStats(stats, uid).then(place);
-}
-
-/** The status, as the status toast says it, with its actions. */
-function drawStatus(view: StatusView) {
-  const row = h("div", { class: "rp-row" });
-  const button = (label: string, onClick: () => void, primary: boolean) =>
-    row.append(
-      bpButton(
-        label,
-        () => {
-          closePopover();
-          onClick();
-        },
-        label === "Unpublish" ? { minimal: true, intent: "danger" } : { intent: primary ? "primary" : undefined },
-      ),
-    );
-  const last = view.actions.filter((a) => a.label === "Unpublish");
-  view.actions
-    .filter((a) => !last.includes(a))
-    .forEach((a, i) => button(a.label, a.onClick, i === 0 && /^(Republish|Publish|Sync)/.test(a.label)));
-  // Links come from the server's responses; only ever open web pages from them.
-  const link = view.link;
-  if (link && /^https?:\/\//i.test(link)) button("Open ↗", () => void window.open(link, "_blank", "noopener"), false);
-  last.forEach((a) => button(a.label, a.onClick, false));
-  return { message: h("div", {}, view.message), actions: row.childElementCount ? row : "" };
 }

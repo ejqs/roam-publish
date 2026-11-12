@@ -2,7 +2,6 @@ import { api, ApiError } from "./api";
 import { foldedUids, hashPayload, isShortlinkText, type Node, type Payload, refold, serialize, type Shortlinks } from "./serialize";
 import {
   getApiKey,
-  getAskWhere,
   getAuthor,
   getServer,
   getCache,
@@ -12,12 +11,14 @@ import {
   getShortlinkPosition,
   getShortlinkTag,
   setCache,
+  setPublishing,
   SHORTLINK_TEXT,
   type CachedPublication,
   type Listing,
   listingOf,
   type PublicationCache,
   type Visibility,
+  type Access,
 } from "./state";
 import { toast } from "./toast";
 import { canSeal, hashLike, keyedHash, type SealPlan, sealTree } from "./seal";
@@ -39,6 +40,8 @@ type Remote = {
   inGraph?: boolean;
   /** Sealed with a password (from servers that say). */
   encrypted?: boolean;
+  /** Its access in its graph, null when only in collections (from servers that say). */
+  access?: Access | null;
   updatedAt: string;
   /** Taken down by a moderator (from servers that say). */
   removed?: boolean;
@@ -162,13 +165,8 @@ async function confirmOnce() {
 
 /** Re-download the list of published items from the server into the cache. */
 export async function syncPublications(opts: { quiet?: boolean } = {}) {
-  const { publications, changeLog, collections } = await api<{
-    publications: Remote[];
-    changeLog?: ChangeLog;
-    collections?: number;
-  }>("/api/ext/publications");
+  const { publications, changeLog } = await api<{ publications: Remote[]; changeLog?: ChangeLog }>("/api/ext/publications");
   warnIfBroken(changeLog);
-  collectionCount = collections;
   const previous = getCache();
   const cache: PublicationCache = {};
   for (const p of publications) {
@@ -178,7 +176,7 @@ export async function syncPublications(opts: { quiet?: boolean } = {}) {
       // last published from here.
       title: (p.encrypted && previous[p.rootUid]?.title) || p.title, visibility: p.visibility, updatedAt: p.updatedAt,
       listing: p.listing, discoverBlocked: p.discoverBlocked, listedNote: p.listedNote,
-      inGraph: p.inGraph, encrypted: p.encrypted,
+      inGraph: p.inGraph, encrypted: p.encrypted, access: p.access,
       shortUrl: p.shortUrl, anchorUid: p.anchorUid, places: p.places, removed: p.removed, mine: p.mine,
       // The server doesn't send bylines; keep the one sent with the last publish from here.
       author: previous[p.rootUid]?.author,
@@ -340,7 +338,6 @@ type PublishResponse = {
   inGraph?: boolean;
   encrypted?: boolean;
   changeLog?: ChangeLog;
-  collections?: number;
 };
 
 /**
@@ -385,7 +382,13 @@ type PublishOpts = {
   to?: string[];
   /** Publish where roam.pub's New pages go to says, without asking (it was asked, or there's nothing to pick). */
   noAsk?: boolean;
+  /** How a new page is listed in its graph, as picked in the Publish pop-up; set right after it's published. */
+  listing?: Listing;
 };
+
+/** Opens the Publish pop-up for something new; set by the extension on load (none in tests: it publishes straight away). */
+let askHandler: ((uid: string) => void) | null = null;
+export const setAskHandler = (fn: ((uid: string) => void) | null) => void (askHandler = fn);
 
 /**
  * Publishes or republishes. `folds` says which blocks start collapsed on the website (see Folds).
@@ -398,6 +401,7 @@ type PublishOpts = {
 export async function publish(uid: string, opts: PublishOpts = {}): Promise<void> {
   if (publishing.has(uid)) return toast("Already publishing that. One moment…");
   publishing.add(uid);
+  setPublishing(uid, true);
   let link: Awaited<ReturnType<typeof ensureShortlinkBlock>> = null;
   try {
     const cache = await ensureCache();
@@ -410,10 +414,10 @@ export async function publish(uid: string, opts: PublishOpts = {}): Promise<void
           : `This ${already.kind} is already published, so this doesn't change it. To encrypt it, give it a password on roam.pub.`,
         { link: openLink(already) },
       );
-    if (!cache[uid] && !opts.encrypt && !opts.to && !opts.noAsk && getAskWhere()) {
+    if (!cache[uid] && !opts.encrypt && !opts.to && !opts.noAsk && askHandler) {
       // Asked before anything else, and before writing anything to the graph.
       publishing.delete(uid);
-      return await askWhere(uid, opts);
+      return askHandler(uid);
     }
     const published = cache[uid]?.folded;
     let folds = opts.folds;
@@ -484,6 +488,8 @@ export async function publish(uid: string, opts: PublishOpts = {}): Promise<void
         hash: res.contentHash, url: res.url, title: payload.title, kind: payload.kind,
         visibility: res.visibility, listing: res.listing, discoverBlocked: res.discoverBlocked,
         inGraph: res.inGraph, encrypted: res.encrypted ?? cache[uid]?.encrypted,
+        // Not in publish responses: kept from the last sync, and filled in by the next one.
+        access: cache[uid]?.access,
         updatedAt: new Date().toISOString(), author,
         // Which blocks are collapsed on the website now, for "keep" and for telling when Roam differs.
         folded: foldedUids(payload.tree),
@@ -491,11 +497,28 @@ export async function publish(uid: string, opts: PublishOpts = {}): Promise<void
         places: cache[uid]?.places,
       },
     });
-    collectionCount = res.collections;
+    // The visibility picked in the Publish pop-up: new pages start the way the graph says, then change.
+    let listing = listingOf(res);
+    let listingNote = "";
+    let listingFailed = false;
+    if (res.status === "created" && opts.listing && res.inGraph !== false && opts.listing !== listing) {
+      try {
+        const now = await api<ListingResponse>(`/api/ext/publications/${encodeURIComponent(uid)}`, {
+          method: "PATCH",
+          body: JSON.stringify({ listing: opts.listing }),
+        });
+        await cacheListing(uid, now);
+        listing = listingOf(now);
+        if (listing !== "unlisted" && now.listedNote) listingNote = ` ${now.listedNote}`;
+      } catch (e) {
+        listingFailed = true;
+        listingNote = ` It's ${LISTED[listing]} for now: ${e instanceof Error ? e.message : "its visibility couldn't be changed"}`;
+      }
+    }
     const copied = await navigator.clipboard?.writeText(res.url).then(() => true, () => false);
     const copiedNote = copied ? " Link copied." : "";
 
-    const unlisted = listingOf(res) === "unlisted";
+    const unlisted = listing === "unlisted";
     const msg = opts.addedTo
       ? `Added to ${opts.addedTo.name} and republished, so it opens there with ${opts.addedTo.name}'s password.`
       : res.status === "unchanged"
@@ -507,17 +530,13 @@ export async function publish(uid: string, opts: PublishOpts = {}): Promise<void
           : res.inGraph === false
             ? `${label} published to collections only.${copiedNote}`
             : unlisted
-              ? `${label} published as unlisted: only people with the link can see it.${copiedNote}`
-              : `${label} published!${copiedNote}`;
+              ? `${label} published as unlisted: only people with the link can see it.${copiedNote}${listingNote}`
+              : `${label} published, ${LISTED[listing]}.${copiedNote}${listingNote}`;
     toast(roamCantEncrypt ? msg + encryptedByRoamPub(res.status === "unchanged") : msg, {
-      intent: res.status === "unchanged" && !opts.addedTo ? "none" : "success",
-      link: opts.addedTo?.entryUrl ?? res.url,
-      durationMs: roamCantEncrypt ? 20000 : undefined,
-      // New items start unlisted; offer the one-click upgrades, and collections, right where they'll see it.
-      actions:
-        res.status === "created"
-          ? [...(unlisted ? listingActions(uid, res) : []), ...collectionAction(uid)]
-          : undefined,
+      // Published, but not with the visibility picked: not a plain success.
+      intent: (res.status === "unchanged" && !opts.addedTo) || listingFailed ? "none" : "success",
+      link: opts.addedTo?.entryUrl ?? getCache()[uid]?.url ?? res.url,
+      durationMs: roamCantEncrypt || listingNote ? 20000 : undefined,
     });
     warnIfBroken(res.changeLog);
   } catch (e) {
@@ -528,13 +547,17 @@ export async function publish(uid: string, opts: PublishOpts = {}): Promise<void
     report(e);
   } finally {
     publishing.delete(uid);
+    setPublishing(uid, false);
   }
 }
 
-/** The website's words for a page's visibility: the buttons, and what the status calls a page or block. */
-const MAKE: Record<Listing, string> = { unlisted: "Make unlisted", listed: "Make public", discover: "Put on Discover" };
+/** What the status calls a page or block, and how a publish result says where it's listed. */
 const statusLabel = (listing: Listing, kind: "page" | "block") =>
   listing === "discover" ? `${kind} on Discover` : `${listing === "listed" ? "public" : "unlisted"} ${kind}`;
+/** How a status starts for a page behind a password or members only: "encrypted ", "password-locked ". */
+export const lockWord = (c: { encrypted?: boolean; access?: Access | null }) =>
+  c.encrypted ? "encrypted " : c.access === "password" ? "password-locked " : c.access === "members" ? "members-only " : "";
+const LISTED: Record<Listing, string> = { unlisted: "unlisted", listed: "public", discover: "public and on Discover" };
 
 type Places = {
   /** `encryptBlocked`: why it can't be published with encryption, or null when it can (from servers that say). */
@@ -543,7 +566,6 @@ type Places = {
   /** Where roam.pub's New pages go to puts a new page: "graph" and collection ids. */
   newPagesGoTo: string[];
 };
-type Access = "open" | "password" | "members";
 
 /** How a new page starts out in a place, as the dropdown says it. */
 const ACCESS_WORDS: Record<Access, string> = { open: "Open", password: "Password", members: "Members only" };
@@ -554,113 +576,67 @@ const NEW_PAGES = "new-pages";
 /** Publish with encryption, as one of the choices. */
 const ENCRYPTED = "graph-encrypted";
 
+export type PublishChoices = {
+  options: { value: string; label: string; disabled?: string | null }[];
+  /** The choice it starts on: where roam.pub's New pages go to says. */
+  value: string;
+  goTo: string[];
+  /** Choices whose page starts behind a password or members only in its graph, so it can't go on Discover. */
+  locked: string[];
+  /** Why Publish with encryption is unavailable, in roam.pub's words, when it's offered but can't be picked. */
+  encryptBlocked: string | null;
+};
+
 /**
- * "Publish where?": asks whether something new goes to the graph or one of the publisher's
- * collections, starting on where roam.pub's New pages go to says, so Publish is still one click.
- * A collection is the only place it goes; Add to collection… after publishing adds more. Not asked
- * when there's no collection to pick, nor by a roam.pub that can't publish to one directly.
+ * Where something new can go, for the Publish pop-up: the graph, the graph encrypted, or one of the
+ * publisher's collections, starting on where roam.pub's New pages go to says, so Publish is still one
+ * click. A collection is the only place it goes; Add to collection after publishing adds more. Null
+ * from a roam.pub that can't publish to a place directly (it goes where New pages go to says).
  */
-async function askWhere(uid: string, opts: PublishOpts): Promise<void> {
+export async function publishChoices(): Promise<PublishChoices | null> {
   let places: Places;
   try {
     places = await api<Places>("/api/ext/places");
   } catch (e) {
-    // A roam.pub from before "Publish where?": publish as before.
-    if (e instanceof ApiError && e.status === 404) return publish(uid, { ...opts, noAsk: true });
-    return report(e);
+    if (e instanceof ApiError && e.status === 404) return null;
+    throw e;
   }
   // Not offered when new pages there are encrypted anyway.
   const offerEncrypted = places.graph.encryptBlocked !== undefined && !places.graph.encrypted;
-  if (places.collections.length === 0 && !(offerEncrypted && !places.graph.encryptBlocked))
-    return publish(uid, { ...opts, noAsk: true });
   const names = new Map([["graph", places.graph.name], ...places.collections.map((c) => [c.id, c.name] as [string, string])]);
   const goTo = places.newPagesGoTo.filter((t) => names.has(t));
   const several = goTo.length > 1;
   const options = [
-    ...(several
-      ? [{ value: NEW_PAGES, label: `New pages setting: ${goTo.map((t) => names.get(t)).join(" + ")}` }]
-      : []),
+    ...(several ? [{ value: NEW_PAGES, label: `New pages setting: ${goTo.map((t) => names.get(t)).join(" + ")}` }] : []),
     { value: "graph", label: `Graph: ${places.graph.name} (${startsWords(places.graph)})` },
     ...(offerEncrypted
       ? [{
           value: ENCRYPTED,
-          label: `Graph: ${places.graph.name} (Password, encrypted)${places.graph.encryptBlocked ? ", needs a graph password that can encrypt" : ""}`,
-          disabled: !!places.graph.encryptBlocked,
+          label: `Graph: ${places.graph.name} (Password, encrypted)`,
+          // Why is said under the dropdown: a long reason in the option itself gets cut off.
+          disabled: places.graph.encryptBlocked ? "unavailable" : null,
         }]
       : []),
     ...places.collections.map((c) => ({ value: c.id, label: `Collection: ${c.name} (${startsWords(c)})` })),
   ];
-  const root = await window.roamAlphaAPI.data.async.pull("[:node/title]", `[:block/uid "${uid}"]`);
-  const title = root?.[":node/title"];
-  const kind = typeof title === "string" ? "page" : "block";
-  toast(`Publish ${title ? `“${title}”` : `this ${kind}`} to:`, {
-    select: { placeholder: "Publish to…", options, value: several ? NEW_PAGES : (goTo[0] ?? "graph") },
-    actions: [
-      {
-        label: "Publish",
-        onClick: (picked) =>
-          void publish(
-            uid,
-            picked === ENCRYPTED
-              ? { ...opts, noAsk: true, encrypt: true }
-              : { ...opts, noAsk: true, to: picked === NEW_PAGES ? goTo : [picked] },
-          ),
-      },
-    ],
-    durationMs: 20000,
-  });
+  const graphLocked = places.graph.access !== "open" || places.graph.encrypted;
+  const locked = [ENCRYPTED, ...(graphLocked ? ["graph", NEW_PAGES] : [])];
+  const encryptBlocked = offerEncrypted ? (places.graph.encryptBlocked ?? null) : null;
+  return { options, value: several ? NEW_PAGES : (goTo[0] ?? "graph"), goTo, locked, encryptBlocked };
 }
 
-const NOW: Record<Listing, string> = {
-  unlisted: "Now unlisted: only people with the link can see it.",
-  listed: "Now public: on your graph's front page.",
-  discover: "Now on Discover and your graph's front page.",
-};
+/** The publish options for a choice from publishChoices. */
+export const choiceOpts = (picked: string, goTo: string[]): PublishOpts =>
+  picked === ENCRYPTED ? { noAsk: true, encrypt: true } : { noAsk: true, to: picked === NEW_PAGES ? goTo : [picked] };
 
-/**
- * Buttons for every visibility but the current one. Put on Discover only shows when the
- * server says it can be (older servers don't say, so it never shows there). Taking a page off
- * Discover asks first, as the website does. None for a page only in collections: it has no graph
- * place to list, and each collection lists it its own way.
- */
-function listingActions(
-  uid: string,
-  c: { visibility: Visibility; listing?: Listing; discoverBlocked?: string | null; inGraph?: boolean },
-) {
-  if (c.inGraph === false) return [];
-  const current = listingOf(c);
-  const discoverOk = c.listing !== undefined && !c.discoverBlocked;
-  return (["listed", "discover", "unlisted"] as const)
-    .filter((l) => l !== current && (l !== "discover" || discoverOk))
-    .map((l) => ({
-      label: MAKE[l],
-      onClick: () => (current === "discover" && l !== "discover" ? confirmLeaveDiscover(uid, l) : void setListing(uid, l)),
-    }));
-}
+/** Whether a choice puts the page in its graph, where Visibility applies (a collection lists it its own way). */
+export const choiceInGraph = (picked: string, goTo: string[]) =>
+  picked === "graph" || picked === ENCRYPTED || (picked === NEW_PAGES && goTo.includes("graph"));
 
-const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
 const upperFirst = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-
-const OFF_DISCOVER: Record<Exclude<Listing, "discover">, string> = {
-  listed: "It stays on your graph's front page.",
-  unlisted: "It also comes off your graph's front page: only people with the link can see it.",
-};
 
 /** Closes a confirm toast without doing anything (any button closes it). */
 const CANCEL = { label: "Cancel", onClick: () => {} };
-
-/** Asks before taking a page off Discover, as the website does. */
-export function confirmLeaveDiscover(uid: string, listing: Exclude<Listing, "discover">) {
-  const title = getCache()[uid]?.title;
-  toast(
-    `Take ${title ? `“${title}”` : "this"} off roam.pub/discover? ${OFF_DISCOVER[listing]}`,
-    {
-      intent: "danger",
-      actions: [{ label: MAKE[listing], onClick: () => void setListing(uid, listing) }, CANCEL],
-      durationMs: 15000,
-    },
-  );
-}
 
 type ListingResponse = {
   visibility: Visibility;
@@ -680,35 +656,6 @@ export async function cacheListing(uid: string, res: ListingResponse) {
   if (next) await setCache({ ...cache, [uid]: next });
   return next;
 }
-
-export async function setListing(uid: string, listing: Listing) {
-  try {
-    const res = await api<ListingResponse>(`/api/ext/publications/${encodeURIComponent(uid)}`, {
-      method: "PATCH",
-      body: JSON.stringify({ listing }),
-    });
-    const next = await cacheListing(uid, res);
-    // Public with the graph's front page off: nothing lists it, so don't say the front page does.
-    const now = listingOf(res);
-    const note = now !== "unlisted" && res.listedNote;
-    toast(note ? `Now public, but ${lowerFirst(note)}` : NOW[now], {
-      intent: note ? "none" : "success",
-      link: next ? openLink(next) : res.url,
-      durationMs: note ? 15000 : undefined,
-    });
-  } catch (e) {
-    report(e);
-  }
-}
-
-/** Collections the key's holder can add pages to, as the server last said; undefined on servers that don't. */
-let collectionCount: number | undefined;
-
-/**
- * "Add to collection…", when there's a collection to add to.
- */
-const collectionAction = (uid: string) =>
-  collectionCount ? [{ label: "Add to collection…", onClick: () => void chooseCollection(uid) }] : [];
 
 type CollectionChoice = {
   id: string;
@@ -732,10 +679,6 @@ function startsAs(c: Pick<CollectionChoice, "listing" | "access">) {
         : "public";
 }
 
-/**
- * Asks which collection to add a published page to. Each one says how the page will start out
- * there, from the collection's own defaults, and whether it leaves the graph.
- */
 /** The collections a page can be added to, as dropdown options; a disabled one says why. */
 export async function collectionOptions(uid: string) {
   const { collections } = await api<{ collections: CollectionChoice[] }>(`/api/ext/publications/${encodeURIComponent(uid)}/collections`);
@@ -748,27 +691,6 @@ export async function collectionOptions(uid: string) {
         : `${c.name}: ${startsAs(c)}${c.movesOutOfGraph ? ", leaves your graph" : ""}`,
     disabled: !!c.entryUrl || !!c.blocked,
   }));
-}
-
-export async function chooseCollection(uid: string) {
-  try {
-    const collections = await collectionOptions(uid);
-    if (collections.length === 0)
-      return toast("You're not in any collections yet. Create or join one on roam.pub.", {
-        link: `${getServer()}/dashboard/collections`,
-      });
-    const title = getCache()[uid]?.title;
-    toast(`Add ${title ? `“${title}”` : "this"} to a collection. It starts out the way the collection says.`, {
-      select: {
-        placeholder: "Choose a collection…",
-        options: collections,
-        onChoose: (id) => void addToCollection(uid, id),
-      },
-      durationMs: 20000,
-    });
-  } catch (e) {
-    report(e);
-  }
 }
 
 /** Whether the page in Roam differs from what's published, apart from which blocks are collapsed. */
@@ -893,7 +815,7 @@ export async function unpublish(uid: string) {
   }
 }
 
-/** What the status toast and the title icon's pop-up say about a page or block. */
+/** What the Roam Publish pop-up says about a page or block. */
 export type StatusState = "unpublished" | "current" | "changed" | "unknown" | "removed" | "other";
 export type StatusView = {
   state: StatusState;
@@ -938,8 +860,6 @@ export async function statusView(uid: string, { sync }: { sync: boolean }): Prom
       state: "unpublished", kind, intent: "none", message: `${label} isn't published.${offline}`,
       actions: [
         { label: `Publish ${kind}`, onClick: () => void publish(uid) },
-        // Otherwise Publish asks, with encryption as one of the choices.
-        ...(getAskWhere() ? [] : [{ label: "Publish with encryption", onClick: () => void publish(uid, { encrypt: true }) }]),
       ],
     };
   const uids = treeUids(payload.tree);
@@ -947,9 +867,9 @@ export async function statusView(uid: string, { sync }: { sync: boolean }): Prom
     return { state: "removed", kind, c, uids, intent: "danger", message: `${label} was removed by a moderator.${offline}`, link: openLink(c), actions: [] };
   // A page only in collections has no listing of its own: each collection lists it.
   const onlyInCollections = c.inGraph === false;
-  // "Unlisted page", "Encrypted public block", "Page on Discover", "Page in collections only".
+  // "Unlisted page", "Encrypted public block", "Password-locked unlisted block", "Page in collections only".
   const listed = onlyInCollections ? `${kind} in collections only` : statusLabel(listingOf(c), kind);
-  const what = upperFirst(c.encrypted ? `encrypted ${listed}` : listed);
+  const what = upperFirst(`${lockWord(c)}${listed}`);
   if (c.mine === false)
     return {
       state: "other", kind, c, uids, intent: "none", link: openLink(c), actions: [],
@@ -969,7 +889,6 @@ export async function statusView(uid: string, { sync }: { sync: boolean }): Prom
       message: `${what}, last published ${since}. Can't tell here whether it changed. Republish to be sure.${offline}`,
       actions: [
         { label: "Republish", onClick: () => void publish(uid, { folds: "asIs" }) },
-        ...collectionAction(uid),
         { label: "Unpublish", onClick: () => void confirmUnpublish(uid, { checked: true }) },
       ],
     };
@@ -997,25 +916,9 @@ export async function statusView(uid: string, { sync }: { sync: boolean }): Prom
       : `${what}, ${changed ? "changed" : "new author name"} since last published ${since}.${foldsNote}${offline}${listedNote}`,
     actions: [
       ...next,
-      ...collectionAction(uid),
       { label: "Unpublish", onClick: () => void confirmUnpublish(uid, { checked: true }) },
     ],
   };
 }
 
 const treeUids = (n: Node): string[] => [n.uid, ...n.children.flatMap(treeUids)];
-
-/**
- * The status as a toast, from the page and block menus and the command palette. Syncs first. Writes
- * nothing to the graph by itself.
- */
-export async function publishStatus(uid: string) {
-  try {
-    const view = await statusView(uid, { sync: true });
-    if (!view) return toast("Couldn't read that page or block.", { intent: "danger" });
-    const { message, intent, link, actions, durationMs } = view;
-    toast(message, { intent, link, actions, durationMs });
-  } catch (e) {
-    report(e);
-  }
-}

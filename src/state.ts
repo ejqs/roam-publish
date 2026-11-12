@@ -14,6 +14,8 @@ export type CachedPublication = {
   inGraph?: boolean;
   /** Sealed with a password, so collections are added on roam.pub (from servers that say). */
   encrypted?: boolean;
+  /** Its access in its graph; null when it's only in collections (from servers that say). */
+  access?: Access | null;
   updatedAt: string;
   /** Author name sent with the last publish; republishing with a new one updates the byline. */
   author?: string;
@@ -31,6 +33,11 @@ export type CachedPublication = {
   mine?: boolean;
 };
 export type Visibility = "public" | "unlisted";
+export type Access = "open" | "password" | "members";
+
+/** Behind a password or members only: encrypted, or locked on roam.pub. */
+export const lockedOf = (c: { encrypted?: boolean; access?: Access | null }) =>
+  !!c.encrypted || c.access === "password" || c.access === "members";
 export type Listing = "unlisted" | "listed" | "discover";
 
 /** Where it's listed; older servers only say public or unlisted. */
@@ -60,11 +67,11 @@ export function initState(extensionAPI: ExtensionAPI) {
   if (api.settings.get("shortlink-tag") == null)
     void save("shortlink-tag", existing ? "#published" : DEFAULT_SHORTLINK_TAG);
   // Saved so the settings panel's selects show them. Both carry over what versions before 0.2.0 saved.
-  if (api.settings.get(BLOCK_SETTING) == null) void save(BLOCK_SETTING, legacyBlockChoice());
+  // New installs write nothing to the graph until the block is switched on; the title icons show status.
+  if (api.settings.get(BLOCK_SETTING) == null) void save(BLOCK_SETTING, existing ? legacyBlockChoice() : "Off");
   const position = api.settings.get("shortlink-position");
   if (position !== "First" && position !== "Last") void save("shortlink-position", position === "bottom" ? "Last" : "First");
   if (api.settings.get("collapsed-blocks") == null) void save("collapsed-blocks", COLLAPSED_AS_IN_ROAM);
-  if (api.settings.get("ask-where") == null) void save("ask-where", true);
   if (api.settings.get(TOP_BAR_SETTING) == null) void save(TOP_BAR_SETTING, true);
   if (!STATUS_CHOICES.includes(api.settings.get(STATUS_SETTING) as StatusChoice)) void save(STATUS_SETTING, STATUS_CHOICES[0]);
 }
@@ -108,11 +115,11 @@ export const getAuthor = () => ((api.settings.get("author-name") as string) || "
 export const getShortlinkEnabled = () => blockChoice() === "Pages" || blockChoice() === "Pages and blocks";
 /** Published blocks get a Roam Publish block. */
 export const getShortlinkOnBlocks = () => blockChoice() === "Pages and blocks" || blockChoice() === "Blocks only";
-/** The Roam Publish block's text; blank for none. */
-/** Whether Publish asks where a new page goes; on unless switched off. */
-export const getAskWhere = () => api.settings.get("ask-where") !== false;
+/** Saved from the setup dialog, as the settings panel's field saves it. */
+export const saveApiKey = (key: string) => save("api-key", key.trim());
 export const TOP_BAR_SETTING = "top-bar-button";
 export const getTopBar = () => api.settings.get(TOP_BAR_SETTING) !== false;
+/** The Roam Publish block's text; blank for none. */
 export const getShortlinkTag = () => ((api.settings.get("shortlink-tag") as string) ?? DEFAULT_SHORTLINK_TAG).trim();
 /** How collapsed blocks start on a first publish: as in Roam unless set to Expanded. */
 export const getFirstFolds = () => (api.settings.get("collapsed-blocks") === COLLAPSED_EXPANDED ? "expanded" : "asIs");
@@ -127,6 +134,16 @@ export const getCache = (): PublicationCache =>
 
 /** Called after the published list changes (a publish, an unpublish, a sync), so status marks redraw. */
 const cacheListeners = new Set<() => void>();
+
+/** Pages and blocks being published right now, so their titles show it before roam.pub answers. */
+const publishingNow = new Set<string>();
+export const isPublishing = (uid: string) => publishingNow.has(uid);
+export function setPublishing(uid: string, on: boolean) {
+  if (on === publishingNow.has(uid)) return;
+  if (on) publishingNow.add(uid);
+  else publishingNow.delete(uid);
+  cacheListeners.forEach((fn) => fn());
+}
 export function onCacheChange(fn: () => void) {
   cacheListeners.add(fn);
   return () => void cacheListeners.delete(fn);

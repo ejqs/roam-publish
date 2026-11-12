@@ -18,10 +18,10 @@ export type Payload = { rootUid: string; kind: "page" | "block"; title: string; 
 
 const PATTERN =
   "[:block/uid :block/string :block/heading :block/text-align :block/open :children/view-type :node/title :block/order {:block/children ...}]";
-const REF = /\(\(([\w-]{9,})\)\)/g;
+export const REF = /\(\(([\w-]{9,})\)\)/g;
 // Spans whose block refs stay as written: code, embeds, and block-ref aliases `[label](((uid)))`.
-const KEEP = /```[\s\S]*?```|`[^`\n]+`|\{\{(?:\[\[)?embed(?:-path|-children)?(?:\]\])?:[^}]*\}\}|\]\(\(\([\w-]{9,}\)\)\)/g;
-const EMBED =
+export const KEEP = /```[\s\S]*?```|`[^`\n]+`|\{\{(?:\[\[)?embed(?:-path|-children)?(?:\]\])?:[^}]*\}\}|\]\(\(\([\w-]{9,}\)\)\)/g;
+export const EMBED =
   /\{\{(?:\[\[)?(embed(?:-path|-children)?)(?:\]\])?:\s*(?:\(\(([\w-]{9,})\)\)|\[\[(.+?)\]\])\s*\}\}/g;
 /** More than anyone puts in one block; keeps a pathological block from pulling half the graph. */
 const MAX_EMBEDS_PER_BLOCK = 20;

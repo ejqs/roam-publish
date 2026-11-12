@@ -1,19 +1,8 @@
-// Tiny self-contained toast so we don't depend on Roam internals.
+// Toasts for results ("Published. Link copied."), drawn with the Blueprint classes Roam already loads,
+// so they follow Roam's light and dark themes. Choices about a page happen in its pop-up (panel.ts).
 let container: HTMLDivElement | null = null;
 
-/** `selected`: the dropdown's choice, for a toast whose dropdown starts on a `value`. */
-type ToastAction = { label: string; onClick: (selected: string) => void };
-
-/**
- * A dropdown above the buttons. Without a `value`, picking an option closes the toast and runs
- * `onChoose`. With one, it starts on that option and stays open, and the buttons act on the choice.
- */
-type ToastSelect = {
-  placeholder: string;
-  options: { value: string; label: string; disabled?: boolean }[];
-  value?: string;
-  onChoose?: (value: string) => void;
-};
+type ToastAction = { label: string; onClick: () => void };
 
 type ToastOptions = {
   intent?: "success" | "danger" | "none";
@@ -21,29 +10,40 @@ type ToastOptions = {
   action?: ToastAction;
   /** Several buttons in a row; `action` is the one-button shorthand. */
   actions?: ToastAction[];
-  select?: ToastSelect;
   durationMs?: number;
 };
+
+/** Whether Roam shows a dark theme, from the app's background; light when it can't tell (tests). */
+function darkTheme() {
+  if (typeof getComputedStyle !== "function") return false;
+  const near = document.querySelector?.(".roam-body-main, .roam-app") ?? document.body;
+  for (let e: Element | null = near; e; e = e.parentElement) {
+    const m = /rgba?\((\d+), (\d+), (\d+)(?:, ([\d.]+))?\)/.exec(getComputedStyle(e).backgroundColor);
+    if (m && m[4] !== "0") return 0.299 * +m[1] + 0.587 * +m[2] + 0.114 * +m[3] < 128;
+  }
+  return false;
+}
 
 export function toast(message: string, opts: ToastOptions = {}) {
   if (!container) {
     container = document.createElement("div");
     container.id = "roam-publish-toasts";
+    container.className = "bp3-toast-container bp3-toast-container-top";
     // Screen readers announce each toast as it appears.
     container.setAttribute("role", "status");
     container.setAttribute("aria-live", "polite");
     Object.assign(container.style, {
-      position: "fixed", top: "12px", left: "50%", transform: "translateX(-50%)",
-      zIndex: "1000", display: "flex", flexDirection: "column", gap: "8px", alignItems: "center",
+      position: "fixed", top: "0", left: "0", right: "0", zIndex: "1000", display: "flex", flexDirection: "column",
+      alignItems: "center", pointerEvents: "none",
     });
     document.body.appendChild(container);
   }
-  const bg = opts.intent === "success" ? "#238551" : opts.intent === "danger" ? "#cd4246" : "#404854";
+  const intent = opts.intent === "success" ? " bp3-intent-success" : opts.intent === "danger" ? " bp3-intent-danger" : "";
   const el = document.createElement("div");
+  el.className = `bp3-toast${intent}${darkTheme() ? " bp3-dark" : ""}`;
   Object.assign(el.style, {
-    background: bg, color: "#fff", padding: "10px 14px", borderRadius: "2px", fontSize: "14px",
-    boxShadow: "0 0 0 1px rgba(17,20,24,.1), 0 2px 4px rgba(17,20,24,.2), 0 8px 24px rgba(17,20,24,.2)",
-    maxWidth: "480px",
+    display: "block", margin: "12px 0 0", padding: "10px 14px", fontSize: "14px", lineHeight: "1.45",
+    width: "min(480px, calc(100vw - 24px))", boxSizing: "border-box", pointerEvents: "all",
   });
   el.textContent = message;
   // Links come from the server's responses; only ever open web pages from them.
@@ -53,72 +53,34 @@ export function toast(message: string, opts: ToastOptions = {}) {
     a.target = "_blank";
     a.rel = "noopener";
     a.textContent = " Open ↗";
-    Object.assign(a.style, { color: "#fff", fontWeight: "600", marginLeft: "6px" });
+    Object.assign(a.style, { color: "inherit", fontWeight: "600", marginLeft: "6px", textDecoration: "underline" });
     el.appendChild(a);
-  }
-  let sel: HTMLSelectElement | null = null;
-  if (opts.select) {
-    // Wide enough to read its options, also on a phone.
-    el.style.width = "min(480px, calc(100vw - 24px))";
-    el.style.boxSizing = "border-box";
-    const { placeholder, options, value, onChoose } = opts.select;
-    sel = document.createElement("select");
-    sel.setAttribute("aria-label", placeholder);
-    Object.assign(sel.style, {
-      display: "block", width: "100%", marginTop: "8px", padding: "4px 6px", fontSize: "13px",
-      color: "#1c2127", background: "#fff", border: "1px solid rgba(255,255,255,.4)", borderRadius: "2px",
-    });
-    if (value === undefined) {
-      const first = document.createElement("option");
-      first.textContent = placeholder;
-      first.value = "";
-      first.disabled = true;
-      first.selected = true;
-      sel.appendChild(first);
-    }
-    for (const o of options) {
-      const opt = document.createElement("option");
-      opt.value = o.value;
-      opt.textContent = o.label;
-      opt.disabled = !!o.disabled;
-      opt.selected = o.value === value;
-      sel.appendChild(opt);
-    }
-    const picked = sel;
-    if (value !== undefined) picked.value = value;
-    if (onChoose)
-      picked.addEventListener("change", () => {
-        if (!picked.value) return;
-        el.remove();
-        onChoose(picked.value);
-      });
-    el.appendChild(picked);
   }
   const actions = [...(opts.action ? [opts.action] : []), ...(opts.actions ?? [])];
   // Every toast can be closed; Close sits at the right end of the button row.
   const row = document.createElement("div");
-  Object.assign(row.style, { display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "8px" });
+  // With no actions, Close sits on the message's line.
+  if (actions.length) Object.assign(row.style, { display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "8px" });
+  else {
+    Object.assign(el.style, { display: "flex", alignItems: "center", gap: "8px" });
+    Object.assign(row.style, { marginLeft: "auto", flex: "none" });
+  }
   for (const { label, onClick } of [...actions, { label: "Close", onClick: () => {} }]) {
     const b = document.createElement("button");
     b.type = "button";
+    b.className = `bp3-button bp3-small${label === "Close" ? " bp3-minimal" : ""}`;
     b.textContent = label;
-    Object.assign(b.style, {
-      padding: "4px 10px", cursor: "pointer",
-      background: "rgba(255,255,255,.15)", color: "#fff", fontSize: "13px", fontWeight: "600",
-      border: "1px solid rgba(255,255,255,.4)", borderRadius: "2px",
-      ...(label === "Close" && { marginLeft: "auto" }),
-    });
+    if (label === "Close" && actions.length) Object.assign(b.style, { marginLeft: "auto" });
     b.addEventListener("click", () => {
       el.remove();
-      onClick(sel?.value ?? "");
+      onClick();
     });
     row.appendChild(b);
   }
   el.appendChild(row);
   container.appendChild(el);
-  // A toast stays while the pointer or focus is in it (picking from its dropdown, say), and closes
-  // its usual time after that.
-  const ms = opts.durationMs ?? (actions.length || opts.select ? 12000 : opts.link ? 8000 : 4000);
+  // A toast stays while the pointer or focus is in it, and closes its usual time after that.
+  const ms = opts.durationMs ?? (actions.length ? 12000 : opts.link ? 8000 : 4000);
   let timer = setTimeout(() => el.remove(), ms);
   const hold = () => clearTimeout(timer);
   const release = () => {
