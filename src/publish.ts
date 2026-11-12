@@ -11,6 +11,7 @@ import {
   getShortlinkPosition,
   getShortlinkTag,
   setCache,
+  setPublishing,
   SHORTLINK_TEXT,
   type CachedPublication,
   type Listing,
@@ -400,6 +401,7 @@ export const setAskHandler = (fn: ((uid: string) => void) | null) => void (askHa
 export async function publish(uid: string, opts: PublishOpts = {}): Promise<void> {
   if (publishing.has(uid)) return toast("Already publishing that. One moment…");
   publishing.add(uid);
+  setPublishing(uid, true);
   let link: Awaited<ReturnType<typeof ensureShortlinkBlock>> = null;
   try {
     const cache = await ensureCache();
@@ -545,6 +547,7 @@ export async function publish(uid: string, opts: PublishOpts = {}): Promise<void
     report(e);
   } finally {
     publishing.delete(uid);
+    setPublishing(uid, false);
   }
 }
 

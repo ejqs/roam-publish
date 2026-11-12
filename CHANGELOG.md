@@ -35,6 +35,12 @@ What's new shows it once Roam Depot serves it. Every bullet starts with **Breaki
   Roam's comment button. Click it to publish the block, or see its status if it's published.
 - New: A published block's ring has a small lock when it's behind a password, or a link icon when it's
   unlisted, as page titles do.
+- Improved: Each icon after a published page's title opens its own tab: status opens **This page** (its status
+  and actions), stats opens the new **Stats** tab, and settings opens **Settings**. Before, status and stats
+  opened the same thing.
+- Improved: A page's title shows a fading icon as soon as you click **Publish**, and its status, stats and
+  settings icons as soon as roam.pub has it.
+- Fixed: Switching tabs in a title icon's pop-up could move the pop-up to the top left corner of the window.
 
 ### Commands
 - Improved: **Fewer commands.** **Roam Publish: Publish or update current page…** and **Publish or update focused

@@ -4,7 +4,7 @@ import { openDashboard } from "./panels";
 import { refreshLinks, removeLinks } from "./links";
 import { renderPanel, type Tab, yours } from "./panel";
 import { openSetup } from "./setup";
-import { getApiKey, getCache, getStatusMarks, getTopBar, listingOf, lockedOf, onCacheChange } from "./state";
+import { type CachedPublication, getApiKey, getCache, getStatusMarks, getTopBar, isPublishing, listingOf, lockedOf, onCacheChange } from "./state";
 import { closeDialogs, h, isDark } from "./ui";
 
 /**
@@ -49,6 +49,8 @@ h1.rm-title-display:has(textarea, input) .${GROUP_CLASS} { display: none; }
   border-radius: 50%; background: #d9822b; }
 .${ICON_CLASS}[data-tone="danger"] { color: #db3737; }
 .${ICON_CLASS}[data-tone="muted"], .${ICON_CLASS}[data-part="stats"], .${ICON_CLASS}[data-part="settings"] { color: #8a9ba8; }
+.${ICON_CLASS}[data-tone="pending"] { color: #8a9ba8; animation: roam-publish-pending 1s ease-in-out infinite alternate; }
+@keyframes roam-publish-pending { from { opacity: 1; } to { opacity: 0.35; } }
 .${ICON_CLASS}[aria-expanded="true"] { background: rgba(138, 155, 168, 0.2); }
 .${GROUP_CLASS}[data-parts="publish"] { opacity: 0; transition: opacity 0.12s; }
 h1.rm-title-display:hover .${GROUP_CLASS}[data-parts="publish"], .${GROUP_CLASS}[data-parts="publish"]:focus-within,
@@ -345,12 +347,15 @@ async function apply() {
     const uid = await pageUid(titleText(h));
     const c = uid ? cache[uid] : undefined;
     const state = c && uid ? check(uid) : undefined;
-    if (uid && !c) {
+    // Being published: say so at once, and show it published as soon as roam.pub answers, before the check.
+    const pending = !!uid && isPublishing(uid) && !state?.view;
+    if (uid && !c && !pending) {
       drawPublishIcon(h, icon, uid);
       continue;
     }
-    if (!uid || !c || !state?.view) continue;
-    drawIcons(h, icon, uid, state.view);
+    if (!uid || !(state?.view || pending)) continue;
+    drawIcons(h, icon, uid, state?.view ?? publishingView(c));
+    if (!c || !state?.view) continue;
     // A published page of yours: links in it to pages that aren't published get a dotted underline (links.ts).
     if (yours(state.view) && getStatusMarks() === "Titles and blocks") mark(h.closest(".roam-log-page, .rm-sidebar-outline, .roam-article"), "page");
     state.edited.forEach((u) => edited.add(u));
@@ -392,6 +397,7 @@ function iconButton(uid: string, part: string, tab: Tab, label: string) {
   const el = document.createElement("span");
   el.className = ICON_CLASS;
   el.dataset.part = part;
+  el.dataset.uid = uid;
   el.contentEditable = "false";
   el.setAttribute("role", "button");
   el.setAttribute("aria-haspopup", "dialog");
@@ -414,11 +420,19 @@ function iconButton(uid: string, part: string, tab: Tab, label: string) {
   return el;
 }
 
+/** What the title shows while it's being published: "Publishing…", then published once roam.pub has it. */
+const publishingView = (c: CachedPublication | undefined): StatusView =>
+  c
+    ? { state: "current", kind: c.kind, c, intent: "none", actions: [], message: "Published." }
+    : { state: "unknown", kind: "page", intent: "none", actions: [], message: "Publishing…" };
+
 /** The title's icons: status always, then stats and settings where they apply. */
 function drawIcons(h: Element, existing: HTMLElement | null, uid: string, view: StatusView) {
   const c = view.c;
-  const { icon, tone } = iconFor(view.state, !!c && lockedOf(c), !!c && c.inGraph !== false && listingOf(c) === "unlisted");
-  const parts = yours(view) ? "status stats settings" : "status";
+  const { icon, tone: shown } = iconFor(view.state, !!c && lockedOf(c), !!c && c.inGraph !== false && listingOf(c) === "unlisted");
+  const tone = !c && view.state === "unknown" ? "pending" : shown;
+  // Nothing to show stats or settings for until roam.pub has it.
+  const parts = yours(view) && c ? "status stats settings" : "status";
   let group = existing;
   if (!group || group.dataset.parts !== parts) {
     group?.remove();
@@ -428,7 +442,7 @@ function drawIcons(h: Element, existing: HTMLElement | null, uid: string, view: 
     group.dataset.parts = parts;
     group.append(iconButton(uid, "status", "page", ""));
     if (parts !== "status")
-      group.append(iconButton(uid, "stats", "page", "Roam Publish: views and upvotes"), iconButton(uid, "settings", "settings", "Roam Publish: page settings"));
+      group.append(iconButton(uid, "stats", "stats", "Roam Publish: views and upvotes"), iconButton(uid, "settings", "settings", "Roam Publish: page settings"));
     group.querySelector('[data-part="stats"] > span')?.setAttribute("class", "bp3-icon bp3-icon-standard bp3-icon-timeline-bar-chart");
     group.querySelector('[data-part="settings"] > span')?.setAttribute("class", "bp3-icon bp3-icon-standard bp3-icon-cog");
     h.appendChild(group);
@@ -476,10 +490,11 @@ function closePopover() {
 }
 
 /**
- * The pop-up under the title icons, about this page only: "This page" (status, stats and actions)
- * and "Settings". Synced with roam.pub first, as the menus are.
+ * The pop-up under the title icons, about this page only: "This page" (status and actions), "Stats"
+ * and "Settings", each icon opening its own tab. Synced with roam.pub first, as the menus are.
  */
-async function openPopover(anchor: HTMLElement, uid: string, tab: Tab) {
+async function openPopover(clicked: HTMLElement, uid: string, tab: Tab) {
+  let anchor = clicked;
   const open = document.getElementById(POPOVER_ID);
   if (open?.dataset.uid === uid && open.dataset.anchor === anchor.dataset.part) return closePopover();
   closePopover();
@@ -491,6 +506,14 @@ async function openPopover(anchor: HTMLElement, uid: string, tab: Tab) {
   pop.className = isDark(anchor) ? "rp-dark bp3-dark" : "";
     anchor.setAttribute("aria-expanded", "true");
   const place = () => {
+    // Roam redraws a title now and then (after a save, say), and the icons with it: follow the new icon.
+    if (!anchor.isConnected) {
+      const again = document.querySelector<HTMLElement>(`.${ICON_CLASS}[data-uid="${CSS.escape(uid)}"][data-part="${anchor.dataset.part}"]`);
+      // None on screen yet: stay where it is rather than jump to the corner.
+      if (!again) return;
+      anchor = again;
+      anchor.setAttribute("aria-expanded", "true");
+    }
     const r = anchor.getBoundingClientRect();
     pop.style.top = `${r.bottom + 8}px`;
     pop.style.left = `${Math.max(12, Math.min(r.left - 12, window.innerWidth - pop.offsetWidth - 12))}px`;
