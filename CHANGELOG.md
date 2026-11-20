@@ -6,6 +6,10 @@ What's new shows it once Roam Depot serves it. Every bullet starts with **Breaki
 
 ## Unreleased
 
+### Publishing
+- Improved: The share icon you get by holding **Cmd (Ctrl on Windows)** now sits beside Roam's comment **+** on
+  the block, instead of far left of the bullet.
+
 ### Status in Roam
 - Fixed: Clicking a page title to edit it no longer moves the title down. The title icons jumped above it
   (or, on unpublished pages, left an empty gap there); they now stay hidden until you finish editing.
