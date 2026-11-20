@@ -65,11 +65,21 @@ export function toast(message: string, opts: ToastOptions = {}) {
     Object.assign(el.style, { display: "flex", alignItems: "center", gap: "8px" });
     Object.assign(row.style, { marginLeft: "auto", flex: "none" });
   }
-  for (const { label, onClick } of [...actions, { label: "Close", onClick: () => {} }]) {
+  for (const [i, { label, onClick }] of [...actions, { label: "Close", onClick: () => {} }].entries()) {
     const b = document.createElement("button");
     b.type = "button";
-    b.className = `bp3-button bp3-small${label === "Close" ? " bp3-minimal" : ""}`;
+    // On a colored toast Blueprint makes button text white, so its buttons have to be minimal (as in
+    // Blueprint's own toasts), or the labels vanish on the light default button. Their text is full
+    // white rather than Blueprint's 70% for contrast, and the first action, the one the toast asks
+    // about, is outlined.
+    const minimal = intent !== "" || label === "Close";
+    b.className = `bp3-button bp3-small${minimal ? " bp3-minimal" : ""}`;
     b.textContent = label;
+    if (intent) {
+      b.style.setProperty?.("color", "#fff", "important");
+      if (i === 0 && label !== "Close")
+        Object.assign(b.style, { boxShadow: "inset 0 0 0 1px rgba(255, 255, 255, 0.8)", fontWeight: "600" });
+    }
     if (label === "Close" && actions.length) Object.assign(b.style, { marginLeft: "auto" });
     b.addEventListener("click", () => {
       el.remove();

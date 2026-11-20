@@ -792,7 +792,7 @@ export async function confirmUnpublish(uid: string, { checked = false } = {}) {
   }
   const title = getCache()[uid]?.title;
   toast(
-    `Unpublish ${title ? `“${title}”` : "this"}? Its link stops working, and its access settings, passwords, views, upvotes and places in collections on roam.pub are deleted. Publishing it again starts over.`,
+    `Unpublish ${title ? `“${title}”` : "this"}? Its link stops working, and roam.pub deletes its settings, passwords, views, upvotes and places in collections. This can't be undone.`,
     { intent: "danger", actions: [{ label: "Unpublish", onClick: () => void unpublish(uid) }, CANCEL], durationMs: 15000 },
   );
 }
