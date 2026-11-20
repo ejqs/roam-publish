@@ -679,17 +679,22 @@ function startsAs(c: Pick<CollectionChoice, "listing" | "access">) {
         : "public";
 }
 
-/** The collections a page can be added to, as dropdown options; a disabled one says why. */
+/**
+ * The collections a page can be added to, as dropdown options; a disabled one says why.
+ * `leavesGraph`: adding it there takes it out of its graph, which the picker warns about once chosen.
+ */
 export async function collectionOptions(uid: string) {
   const { collections } = await api<{ collections: CollectionChoice[] }>(`/api/ext/publications/${encodeURIComponent(uid)}/collections`);
   return collections.map((c) => ({
     value: c.id,
+    name: c.name,
     label: c.entryUrl
       ? `${c.name} (already there)`
       : c.blocked
         ? `${c.name} (needs a password that can encrypt)`
-        : `${c.name}: ${startsAs(c)}${c.movesOutOfGraph ? ", leaves your graph" : ""}`,
+        : `${c.name}: ${startsAs(c)}`,
     disabled: !!c.entryUrl || !!c.blocked,
+    leavesGraph: !c.entryUrl && !c.blocked && c.movesOutOfGraph,
   }));
 }
 

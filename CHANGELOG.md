@@ -16,6 +16,8 @@ What's new shows it once Roam Depot serves it. Every bullet starts with **Breaki
 - New: **Search in the dashboard.** Type in the box at the top of the Roam Publish dashboard to find your published
   pages and blocks by title. Each result shows its visibility and when it was last published; click it to go there
   in Roam, or **Open** for the published page.
+- Improved: **Add to collection** lists each collection as its name and how the page starts out there. Choosing one
+  whose settings take the page or block out of your graph shows a warning before you add it.
 
 ### Status in Roam
 - Fixed: Clicking a page title to edit it no longer moves the title down. The title icons jumped above it

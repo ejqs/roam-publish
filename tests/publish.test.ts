@@ -682,8 +682,9 @@ describe("add to collection", () => {
     assert.deepEqual(options, [
       ["Writing (already there)", true],
       ["Best of: public and on Discover", false],
-      ["Private: password-protected, leaves your graph", false],
+      ["Private: password-protected", false],
     ]);
+    assert.deepEqual((await collectionOptions("page1")).map((o) => o.leavesGraph), [false, false, true]);
     await addToCollection("page1", "c3");
     assert.deepEqual(calls.at(-1), { method: "POST", path: "/api/ext/publications/page1/collections", body: { collectionId: "c3" } });
     assert.match(toasts.at(-1)!, /^Added to Private, password-protected there\. It left your graph, so its graph link can't get around the password\./);

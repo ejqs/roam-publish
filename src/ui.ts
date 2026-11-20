@@ -118,7 +118,7 @@ export function textField(label: string, value: string, opts: { multiline?: bool
   return { row: h("label", { class: "rp-field" }, h("span", { class: "rp-field-label" }, label), input), get: () => input.value };
 }
 
-export const callout = (text: string, intent: "danger" | "primary" | "none" = "none") =>
+export const callout = (text: string, intent: "danger" | "warning" | "primary" | "none" = "none") =>
   h("div", { class: `bp3-callout rp-callout${intent === "none" ? "" : ` bp3-intent-${intent}`}` }, text);
 
 const DIALOG_CLASS = "roam-publish-dialog";
