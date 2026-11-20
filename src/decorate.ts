@@ -36,6 +36,10 @@ const MAX_MARKED = 500;
 
 const STYLES = `
 .${GROUP_CLASS} { display: inline-flex; align-items: center; gap: 2px; margin-left: 8px; vertical-align: middle; }
+/* While a title is edited, Roam swaps it for a text box, and the heading can lose its rm-title-display
+   class: the icons show only in a title heading that isn't being edited, so they never sit above the text box
+   or push it down. */
+:not(h1.rm-title-display) > .${GROUP_CLASS}, :has(> textarea, > input) > .${GROUP_CLASS},
 h1.rm-title-display:has(textarea, input) .${GROUP_CLASS} { display: none; }
 .${ICON_CLASS} { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px;
   vertical-align: middle; border-radius: 3px; cursor: pointer; position: relative; user-select: none; }
@@ -126,6 +130,12 @@ h1.rm-title-display:hover .${GROUP_CLASS}[data-parts="publish"], .${GROUP_CLASS}
 .roam-publish-dialog { width: 460px; max-width: calc(100vw - 32px); }
 .roam-publish-dialog.rp-wide { width: 760px; }
 .roam-publish-dialog .bp3-dialog-body { max-height: calc(100vh - 220px); overflow-y: auto; }
+.rp-search { margin-bottom: 12px; }
+.rp-results-head { margin-top: 0 !important; }
+.rp-result-title { display: flex; align-items: center; gap: 6px; }
+.rp-result-title > .bp3-icon { flex: none; color: #8a9ba8; }
+.rp-result-title > .rp-link { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.roam-publish-dialog .bp3-dialog-body > [hidden] { display: none; }
 .rp-periods { margin-bottom: 12px; }
 .rp-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
 .rp-tile { padding: 10px 12px; border-radius: 3px; background: rgba(138, 155, 168, 0.12); }

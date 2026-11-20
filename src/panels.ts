@@ -1,8 +1,9 @@
 import { api, ApiError } from "./api";
 import { addToCollection, cacheListing, collectionOptions, statusView, syncPublications } from "./publish";
-import { getCache, getServer, type Listing, type Visibility } from "./state";
+import { searchPublications, type Found } from "./search";
+import { getCache, getServer, listingOf, lockedOf, type Listing, type Visibility } from "./state";
 import { toast } from "./toast";
-import { button, callout, dialog, h, openUrl, segmented, selectField, switchField, textField } from "./ui";
+import { button, callout, dialog, h, icon, openUrl, segmented, selectField, switchField, textField } from "./ui";
 
 /**
  * Page settings, Collection settings and the dashboard, all drawn by the extension and filled from
@@ -164,7 +165,7 @@ export async function renderPageSettings(root: HTMLElement, uid: string, onChang
     ),
   );
   const add = h("div", {});
-  void addToCollectionField(add, uid, () => (onChange(), void renderPageSettings(root, uid, onChange)));
+  void addToCollectionField(add, uid, s.graph.name, () => (onChange(), void renderPageSettings(root, uid, onChange)));
 
   const save = button(
     "Save",
@@ -203,8 +204,11 @@ export async function renderPageSettings(root: HTMLElement, uid: string, onChang
   );
 }
 
-/** A collection picker inside the Settings tab: choose one, then Add. Nothing shows without collections to add to. */
-async function addToCollectionField(root: HTMLElement, uid: string, onAdded: () => void) {
+/**
+ * A collection picker inside the Settings tab: choose one, then Add. Nothing shows without collections
+ * to add to. Choosing one that takes the page out of its graph says so before Add.
+ */
+async function addToCollectionField(root: HTMLElement, uid: string, graphName: string, onAdded: () => void) {
   let options: Awaited<ReturnType<typeof collectionOptions>>;
   try {
     options = await collectionOptions(uid);
@@ -228,8 +232,18 @@ async function addToCollectionField(root: HTMLElement, uid: string, onAdded: () 
     },
     { disabled: true },
   );
-  select.addEventListener("change", () => (add.disabled = !field.get()));
-  root.replaceChildren(h("div", { class: "rp-inline" }, field.row, add));
+  const warning = h("div", {});
+  const what = getCache()[uid]?.kind === "block" ? "block" : "page";
+  select.addEventListener("change", () => {
+    add.disabled = !field.get();
+    const picked = options.find((o) => o.value === field.get());
+    warning.replaceChildren(
+      ...(picked?.leavesGraph
+        ? [callout(`${picked.name}'s settings take this ${what} out of ${graphName}. Its graph link stops working, and it stays only in its collections.`, "warning")]
+        : []),
+    );
+  });
+  root.replaceChildren(h("div", { class: "rp-inline" }, field.row, add), warning);
 }
 
 /** The page's settings in one of its collections, and taking it out of that collection. */
@@ -443,12 +457,90 @@ export function openDashboard() {
     );
     void fill(content, d.isOpen);
   };
-  d.body.append(periods, content);
+  const results = h("div", { hidden: true });
+  const search = searchField((q) => {
+    const on = q.trim() !== "";
+    periods.hidden = content.hidden = on;
+    results.hidden = !on;
+    if (on) void drawResults(results, q, d.isOpen);
+  });
+  d.body.append(search, periods, content, results);
+  search.querySelector("input")?.focus();
   d.footer.append(
     button("Open dashboard on roam.pub ↗", () => openUrl(`${getServer()}/dashboard`), { minimal: true, small: false }),
     button("Close", d.close, { small: false }),
   );
   draw();
+}
+
+/** A Blueprint search box; `onInput` gets what's typed as it's typed. */
+function searchField(onInput: (q: string) => void) {
+  const input = h("input", {
+    type: "search",
+    class: "bp3-input",
+    placeholder: "Search published pages and blocks",
+    "aria-label": "Search published pages and blocks",
+    spellcheck: "false",
+    autocomplete: "off",
+  });
+  input.addEventListener("input", () => onInput(input.value));
+  // Escape clears the search first; a second Escape closes the dashboard.
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && input.value) {
+      e.stopPropagation();
+      input.value = "";
+      onInput("");
+    }
+  });
+  return h("div", { class: "bp3-input-group bp3-small rp-search" }, icon("search"), input);
+}
+
+/** Results shown at once; typing more narrows them. */
+const MAX_RESULTS = 50;
+const KIND_LABEL = { page: "Page", block: "Block" } as const;
+const LOCK_LABEL = (c: Found["c"]) =>
+  c.encrypted ? "Encrypted" : c.access === "password" ? "Password" : c.access === "members" ? "Members only" : null;
+
+/** Your published pages and blocks whose titles match, from what the extension last synced with roam.pub. */
+async function drawResults(root: HTMLElement, q: string, isOpen: () => boolean) {
+  let cache = getCache();
+  if (!Object.keys(cache).length) {
+    root.replaceChildren(h("div", { class: "rp-muted" }, "Loading…"));
+    try {
+      cache = await syncPublications({ quiet: true });
+    } catch (e) {
+      root.replaceChildren(callout(errorText(e), "danger"));
+      return;
+    }
+    if (!isOpen() || root.hidden) return;
+  }
+  const found = searchPublications(cache, q);
+  const shown = found.slice(0, MAX_RESULTS);
+  root.replaceChildren(
+    h("h6", { class: "bp3-heading rp-heading rp-results-head" }, found.length ? plural(found.length, "result") : "Results"),
+    shown.length
+      ? h(
+          "div",
+          { class: "rp-list" },
+          ...shown.map(({ uid, c }) => {
+            const where = [KIND_LABEL[c.kind], LOCK_LABEL(c) ?? (c.inGraph === false ? "In collections only" : LISTING_LABEL[listingOf(c)])];
+            return h(
+              "div",
+              { class: "rp-list-row rp-result" },
+              h(
+                "span",
+                { class: "rp-result-title" },
+                icon(lockedOf(c) ? "lock" : listingOf(c) === "unlisted" ? "link" : "globe"),
+                h("a", { class: "rp-link", href: "#", onclick: (e: Event) => (e.preventDefault(), openInRoam(uid, c.kind)) }, c.title || uid),
+              ),
+              h("span", { class: "rp-muted" }, `${where.join(" · ")} · Last published ${date(c.updatedAt)}`),
+              button("Open ↗", () => openUrl(c.url), { minimal: true }),
+            );
+          }),
+        )
+      : h("div", { class: "rp-muted" }, "No published pages or blocks match."),
+    found.length > MAX_RESULTS ? h("div", { class: "rp-note" }, `Showing the first ${count(MAX_RESULTS)}. Type more to narrow them down.`) : "",
+  );
 }
 
 async function fill(root: HTMLElement, isOpen: () => boolean) {

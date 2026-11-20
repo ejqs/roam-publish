@@ -4,6 +4,25 @@ All notable changes to the Roam Publish extension. Each version is dated when it
 What's new shows it once Roam Depot serves it. Every bullet starts with **Breaking:**, **New:**, **Improved:** or
 **Fixed:**; a breaking change comes with a new major version.
 
+## Unreleased
+
+### Publishing
+- Improved: The share icon you get by holding **Cmd (Ctrl on Windows)** now sits beside Roam's comment **+** on
+  the block, instead of far left of the bullet.
+- Fixed: The buttons in the **Unpublish** confirmation were blank: their labels were white on white. They now read
+  clearly in light and dark themes, with **Unpublish** outlined. The confirmation is also shorter.
+
+### Settings and dashboard
+- New: **Search in the dashboard.** Type in the box at the top of the Roam Publish dashboard to find your published
+  pages and blocks by title. Each result shows its visibility and when it was last published; click it to go there
+  in Roam, or **Open** for the published page.
+- Improved: **Add to collection** lists each collection as its name and how the page starts out there. Choosing one
+  whose settings take the page or block out of your graph shows a warning before you add it.
+
+### Status in Roam
+- Fixed: Clicking a page title to edit it no longer moves the title down. The title icons jumped above it
+  (or, on unpublished pages, left an empty gap there); they now stay hidden until you finish editing.
+
 ## 0.4.0 (2026-11-11)
 
 ### Publishing

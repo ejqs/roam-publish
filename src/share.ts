@@ -4,8 +4,8 @@ import { getCache } from "./state";
 import { isDark } from "./ui";
 
 /**
- * Hold Cmd (Ctrl elsewhere) and a share icon shows beside the bullet of the block under the pointer, the way Roam
- * shows its comment button on a held Cmd. Clicking it opens the block's Roam Publish pop-up. Pressing
+ * Hold Cmd (Ctrl elsewhere) and a share icon shows beside Roam's comment "+" on the block under the pointer, the
+ * way Roam shows that button on a held Cmd. Clicking it opens the block's Roam Publish pop-up. Pressing
  * another key with it (a shortcut) or leaving the window hides it.
  *
  * The icon is one fixed element on document.body, placed over the block: nothing is added to Roam's
@@ -64,18 +64,47 @@ function show() {
   document.body.appendChild(b);
   button = b;
   place(main);
+  // Roam draws its "+" on the same key press, maybe after us: line up with it once it's there.
+  requestAnimationFrame(() => button === b && place(main));
 }
 
-/** Just left of the block's bullet, centred on it, in the gutter Roam leaves there. */
+/**
+ * Roam's own comment "+" for this block, when it's showing. Roam draws it to the right of the block while Cmd is
+ * held; any element in the block's row whose class names a comment, or Blueprint's plus icon, counts. Only the
+ * block's own row: a child block's "+" sits lower down.
+ */
+export function commentButtonOf(main: Element): Element | null {
+  const row = main.getBoundingClientRect();
+  const scope = main.closest(".roam-block-container") ?? main;
+  const found = scope.querySelectorAll(
+    '[class*="comment" i]:is(button, [role="button"], .bp3-button), button:has(.bp3-icon-plus), .bp3-icon-plus',
+  );
+  for (const el of Array.from(found)) {
+    if (el.closest(`#${BUTTON_ID}`)) continue;
+    const r = el.getBoundingClientRect();
+    if (!r.width || !r.height) continue;
+    // In the row, not in a child block's.
+    if (r.top + r.height / 2 < row.top || r.top + r.height / 2 > row.bottom) continue;
+    return el;
+  }
+  return null;
+}
+
+/** Beside Roam's comment "+", to its left, centred on it. Without one, where Roam puts it: the row's right end. */
 function place(main: Element) {
   if (!button) return;
-  const bullet = main.querySelector(".rm-bullet") ?? main;
-  const r = bullet.getBoundingClientRect();
-  // Left of the collapse arrow too, when the block has one, so neither covers the other.
-  const caret = main.querySelector(".rm-caret");
-  const left = caret ? Math.min(r.left, caret.getBoundingClientRect().left) : r.left;
-  button.style.top = `${r.top + r.height / 2 - 10}px`;
-  button.style.left = `${left - 22}px`;
+  const plus = commentButtonOf(main);
+  if (plus) {
+    const r = plus.getBoundingClientRect();
+    button.style.top = `${r.top + r.height / 2 - 10}px`;
+    button.style.left = `${r.left - 22}px`;
+    return;
+  }
+  const r = main.getBoundingClientRect();
+  const text = main.querySelector(".rm-block__input, .roam-block") ?? main;
+  const t = text.getBoundingClientRect();
+  button.style.top = `${t.top + Math.min(t.height, 26) / 2 - 10}px`;
+  button.style.left = `${r.right - 48}px`;
 }
 
 function onKeyDown(e: KeyboardEvent) {
