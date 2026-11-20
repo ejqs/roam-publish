@@ -24,10 +24,22 @@ type PlaceSettings = {
   defaults: { showAuthor: "show" | "hide"; views: "show" | "hide" | "off"; pdfDownload: "on" | "off" };
 };
 
+/** A pinned link: where its owner shared it (roam.pub refuses anything that would break it). */
+type Pin = { sharedAt: string[] };
+
 type PageSettings = {
   encrypted: boolean;
   manageUrl: string;
-  graph: PlaceSettings & { name: string; inGraph: boolean; url: string; listingBlocked: string | null };
+  graph: PlaceSettings & {
+    name: string;
+    inGraph: boolean;
+    url: string;
+    listingBlocked: string | null;
+    /** roam.pub 0.30.0+: the pin on the page's link in its graph (absent from older roam.pub). */
+    pin?: Pin | null;
+    /** What the pin refuses, in a sentence. */
+    pinBlocks?: string;
+  };
   collections: (PlaceSettings & { id: string; name: string; url: string; canManage: boolean })[];
 };
 
@@ -91,6 +103,9 @@ const errorText = (e: unknown) =>
 const date = (iso: string) => new Date(iso.length === 10 ? `${iso}T00:00:00Z` : iso).toLocaleDateString(undefined, { dateStyle: "medium", timeZone: iso.length === 10 ? "UTC" : undefined });
 const count = (n: number) => n.toLocaleString();
 const plural = (n: number, one: string, many = `${one}s`) => `${count(n)} ${n === 1 ? one : many}`;
+
+/** A shared-at URL as people say it: no scheme, no "www.", no trailing slash (as on roam.pub). */
+const shortPlace = (url: string) => url.replace(/^https?:\/\//i, "").replace(/^www\./i, "").replace(/\/$/, "");
 
 const listingNote = (l: Listing, where: "graph" | "collection") =>
   l === "unlisted" ? "Only people with the link find it." : `Shown on the ${where === "graph" ? "graph's front page" : "collection's page"}${l === "discover" ? " and on Discover" : ""}.`;
@@ -193,6 +208,7 @@ export async function renderPageSettings(root: HTMLElement, uid: string, onChang
   root.replaceChildren(
     ...(f ? f.rows : [formRow("Visibility", h("span", { class: "rp-muted" }, `Not in ${s.graph.name}, only in collections.`))]),
     formRow("Collections", ...(collections.length ? collections : [h("div", { class: "rp-muted" }, "None")]), add),
+    ...(s.graph.inGraph && s.graph.pin !== undefined ? [pinRow(uid, s, () => (onChange(), void renderPageSettings(root, uid, onChange)))] : []),
     formRow(
       "Access",
       h("div", {}, ACCESS_LABEL[s.graph.access], s.encrypted ? ", encrypted" : ""),
@@ -201,6 +217,88 @@ export async function renderPageSettings(root: HTMLElement, uid: string, onChang
     status,
     h("div", { class: "rp-row rp-row-end" }, save),
   );
+}
+
+/**
+ * The page's link in its graph, pinned (roam.pub's Pin link): where it's shared, with Edit places and
+ * Unpin, or Pin link… when it isn't. Saved at once, apart from the form's Save.
+ */
+function pinRow(uid: string, s: PageSettings, onChange: () => void) {
+  const pin = s.graph.pin;
+  if (!pin)
+    return formRow(
+      "Pin",
+      h("div", {}, button("Pin link…", () => openPinDialog(uid, s, onChange))),
+      h("div", { class: "rp-note" }, "Shared it somewhere? Pin it so it can't break by accident."),
+    );
+  let confirming = false;
+  const unpin = button(
+    "Unpin",
+    async () => {
+      if (!confirming) {
+        confirming = true;
+        unpin.textContent = "Unpin? It could break where it's shared";
+        return;
+      }
+      unpin.disabled = true;
+      try {
+        const res = await api<{ message: string }>(`/api/ext/publications/${enc(uid)}/pin`, { method: "DELETE" });
+        toast(res.message, { intent: "success" });
+        onChange();
+      } catch (e) {
+        toast(errorText(e), { intent: "danger" });
+        unpin.disabled = false;
+      }
+    },
+    { intent: "danger", minimal: true },
+  );
+  return formRow(
+    "Pin",
+    h("div", {}, `Pinned: you've shared this link in ${pin.sharedAt.length === 1 ? "1 place" : `${pin.sharedAt.length} places`}`),
+    ...pin.sharedAt.map((u) =>
+      h("div", { class: "rp-list-row" }, h("a", { class: "rp-link", href: "#", title: u, onclick: (e: Event) => (e.preventDefault(), openUrl(u)) }, `${shortPlace(u)} ↗`)),
+    ),
+    h("div", { class: "rp-note" }, s.graph.pinBlocks ?? ""),
+    h("div", { class: "rp-inline" }, button("Edit places…", () => openPinDialog(uid, s, onChange), { minimal: true }), unpin),
+  );
+}
+
+/** Pin link…, or Edit places…: paste where the link is shared, one per line. */
+function openPinDialog(uid: string, s: PageSettings, onChange: () => void) {
+  const d = dialog(s.graph.pin ? "Where you shared it" : "Pin link");
+  const places = textField("Where you shared it, one link per line", (s.graph.pin?.sharedAt ?? []).join("\n"), { multiline: true, maxLength: 30_000 });
+  const status = h("div", { class: "rp-status", role: "status" });
+  d.body.append(
+    h("div", { class: "rp-note" }, s.graph.url),
+    places.row,
+    h("div", { class: "rp-note" }, s.graph.pinBlocks ?? ""),
+    status,
+  );
+  const save = button(
+    s.graph.pin ? "Save" : "Pin link",
+    async () => {
+      const sharedAt = places
+        .get()
+        .split("\n")
+        .map((l) => l.trim())
+        .filter(Boolean);
+      if (!sharedAt.length) return void status.replaceChildren(callout("Paste at least one place you've shared it.", "danger"));
+      save.disabled = true;
+      status.replaceChildren();
+      try {
+        const res = await api<{ message: string }>(`/api/ext/publications/${enc(uid)}/pin`, { method: "POST", body: JSON.stringify({ sharedAt }) });
+        toast(res.message, { intent: "success" });
+        d.close();
+        onChange();
+      } catch (e) {
+        status.replaceChildren(callout(errorText(e), "danger"));
+        save.disabled = false;
+      }
+    },
+    { intent: "primary", small: false },
+  );
+  d.footer.append(button("Cancel", d.close, { small: false }), save);
+  places.row.querySelector("textarea")?.focus();
 }
 
 /** A collection picker inside the Settings tab: choose one, then Add. Nothing shows without collections to add to. */

@@ -4,6 +4,13 @@ All notable changes to the Roam Publish extension. Each version is dated when it
 What's new shows it once Roam Depot serves it. Every bullet starts with **Breaking:**, **New:**, **Improved:** or
 **Fixed:**; a breaking change comes with a new major version.
 
+## Unreleased
+
+### Publishing
+- New: **Pin link** in the page pop-up's **Settings** tab. Paste where you shared the page's link; until you unpin
+  it, roam.pub refuses anything that would break it there, such as unpublishing the page or moving it to Password.
+  **Edit places…** and **Unpin** change it later. Needs roam.pub 0.30.0.
+
 ## 0.4.0 (2026-11-11)
 
 ### Publishing
