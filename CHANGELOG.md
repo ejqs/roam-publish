@@ -7,6 +7,8 @@ What's new shows it once Roam Depot serves it. Every bullet starts with **Breaki
 ## Unreleased
 
 ### Publishing
+- Improved: The share icon you get by holding **Cmd (Ctrl on Windows)** now sits beside Roam's comment **+** on
+  the block, instead of far left of the bullet.
 - Fixed: The buttons in the **Unpublish** confirmation were blank: their labels were white on white. They now read
   clearly in light and dark themes, with **Unpublish** outlined. The confirmation is also shorter.
 
