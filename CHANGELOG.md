@@ -15,6 +15,10 @@ What's new shows it once Roam Depot serves it. Every bullet starts with **Breaki
   pages and blocks by title. Each result shows its visibility and when it was last published; click it to go there
   in Roam, or **Open** for the published page.
 
+### Status in Roam
+- Fixed: Clicking a page title to edit it no longer moves the title down. The title icons jumped above it
+  (or, on unpublished pages, left an empty gap there); they now stay hidden until you finish editing.
+
 ## 0.4.0 (2026-11-11)
 
 ### Publishing

@@ -36,6 +36,10 @@ const MAX_MARKED = 500;
 
 const STYLES = `
 .${GROUP_CLASS} { display: inline-flex; align-items: center; gap: 2px; margin-left: 8px; vertical-align: middle; }
+/* While a title is edited, Roam swaps it for a text box, and the heading can lose its rm-title-display
+   class: the icons show only in a title heading that isn't being edited, so they never sit above the text box
+   or push it down. */
+:not(h1.rm-title-display) > .${GROUP_CLASS}, :has(> textarea, > input) > .${GROUP_CLASS},
 h1.rm-title-display:has(textarea, input) .${GROUP_CLASS} { display: none; }
 .${ICON_CLASS} { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px;
   vertical-align: middle; border-radius: 3px; cursor: pointer; position: relative; user-select: none; }
