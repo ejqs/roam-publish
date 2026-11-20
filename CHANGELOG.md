@@ -4,6 +4,12 @@ All notable changes to the Roam Publish extension. Each version is dated when it
 What's new shows it once Roam Depot serves it. Every bullet starts with **Breaking:**, **New:**, **Improved:** or
 **Fixed:**; a breaking change comes with a new major version.
 
+## Unreleased
+
+### Publishing
+- Improved: The share icon you get by holding **Cmd (Ctrl on Windows)** now sits beside Roam's comment **+** on
+  the block, instead of far left of the bullet.
+
 ## 0.4.0 (2026-11-11)
 
 ### Publishing
