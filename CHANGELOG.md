@@ -6,6 +6,10 @@ What's new shows it once Roam Depot serves it. Every bullet starts with **Breaki
 
 ## Unreleased
 
+### Publishing
+- Improved: The share icon you get by holding **Cmd (Ctrl on Windows)** now sits beside Roam's comment **+** on
+  the block, instead of far left of the bullet.
+
 ### Settings and dashboard
 - New: **Search in the dashboard.** Type in the box at the top of the Roam Publish dashboard to find your published
   pages and blocks by title. Each result shows its visibility and when it was last published; click it to go there
