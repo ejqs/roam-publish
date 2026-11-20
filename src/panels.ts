@@ -164,7 +164,7 @@ export async function renderPageSettings(root: HTMLElement, uid: string, onChang
     ),
   );
   const add = h("div", {});
-  void addToCollectionField(add, uid, () => (onChange(), void renderPageSettings(root, uid, onChange)));
+  void addToCollectionField(add, uid, s.graph.name, () => (onChange(), void renderPageSettings(root, uid, onChange)));
 
   const save = button(
     "Save",
@@ -203,8 +203,11 @@ export async function renderPageSettings(root: HTMLElement, uid: string, onChang
   );
 }
 
-/** A collection picker inside the Settings tab: choose one, then Add. Nothing shows without collections to add to. */
-async function addToCollectionField(root: HTMLElement, uid: string, onAdded: () => void) {
+/**
+ * A collection picker inside the Settings tab: choose one, then Add. Nothing shows without collections
+ * to add to. Choosing one that takes the page out of its graph says so before Add.
+ */
+async function addToCollectionField(root: HTMLElement, uid: string, graphName: string, onAdded: () => void) {
   let options: Awaited<ReturnType<typeof collectionOptions>>;
   try {
     options = await collectionOptions(uid);
@@ -228,8 +231,18 @@ async function addToCollectionField(root: HTMLElement, uid: string, onAdded: () 
     },
     { disabled: true },
   );
-  select.addEventListener("change", () => (add.disabled = !field.get()));
-  root.replaceChildren(h("div", { class: "rp-inline" }, field.row, add));
+  const warning = h("div", {});
+  const what = getCache()[uid]?.kind === "block" ? "block" : "page";
+  select.addEventListener("change", () => {
+    add.disabled = !field.get();
+    const picked = options.find((o) => o.value === field.get());
+    warning.replaceChildren(
+      ...(picked?.leavesGraph
+        ? [callout(`${picked.name}'s settings take this ${what} out of ${graphName}. Its graph link stops working, and it stays only in its collections.`, "warning")]
+        : []),
+    );
+  });
+  root.replaceChildren(h("div", { class: "rp-inline" }, field.row, add), warning);
 }
 
 /** The page's settings in one of its collections, and taking it out of that collection. */

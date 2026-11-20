@@ -4,6 +4,12 @@ All notable changes to the Roam Publish extension. Each version is dated when it
 What's new shows it once Roam Depot serves it. Every bullet starts with **Breaking:**, **New:**, **Improved:** or
 **Fixed:**; a breaking change comes with a new major version.
 
+## Unreleased
+
+### Settings and dashboard
+- Improved: **Add to collection** lists each collection as its name and how the page starts out there. Choosing one
+  whose settings take the page or block out of your graph shows a warning before you add it.
+
 ## 0.4.0 (2026-11-11)
 
 ### Publishing
