@@ -4,6 +4,12 @@ All notable changes to the Roam Publish extension. Each version is dated when it
 What's new shows it once Roam Depot serves it. Every bullet starts with **Breaking:**, **New:**, **Improved:** or
 **Fixed:**; a breaking change comes with a new major version.
 
+## Unreleased
+
+### Publishing
+- Fixed: The buttons in the **Unpublish** confirmation were blank: their labels were white on white. They now read
+  clearly in light and dark themes, with **Unpublish** outlined. The confirmation is also shorter.
+
 ## 0.4.0 (2026-11-11)
 
 ### Publishing

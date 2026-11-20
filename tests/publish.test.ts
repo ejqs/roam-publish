@@ -765,7 +765,10 @@ describe("unpublish", () => {
     const calls = server({ ...published(), "DELETE /api/ext/publications/page1": () => [200, { deleted: true }] });
     await confirmUnpublish("page1");
     assert.equal(deletes(calls).length, 0);
-    assert.match(toasts.at(-1)!, /Unpublish “Page”\? .*deleted/);
+    assert.match(toasts.at(-1)!, /Unpublish “Page”\? .*deletes/);
+    assert.match(toastClasses.at(-1)!, /bp3-intent-danger/);
+    // Blueprint makes button text white on a colored toast, so default (light) buttons would be blank.
+    for (const label of ["Unpublish", "Cancel", "Close"]) assert.match(String(button(label)!.className), /bp3-minimal/);
     button("Unpublish")!.click!();
     await new Promise((r) => setImmediate(r));
     assert.deepEqual(deletes(calls).map((c) => `${c.method} ${c.path}`), ["DELETE /api/ext/publications/page1"]);
