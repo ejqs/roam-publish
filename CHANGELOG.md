@@ -4,6 +4,13 @@ All notable changes to the Roam Publish extension. Each version is dated when it
 What's new shows it once Roam Depot serves it. Every bullet starts with **Breaking:**, **New:**, **Improved:** or
 **Fixed:**; a breaking change comes with a new major version.
 
+## Unreleased
+
+### Settings and dashboard
+- New: **Search in the dashboard.** Type in the box at the top of the Roam Publish dashboard to find your published
+  pages and blocks by title. Each result shows its visibility and when it was last published; click it to go there
+  in Roam, or **Open** for the published page.
+
 ## 0.4.0 (2026-11-11)
 
 ### Publishing
