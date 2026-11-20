@@ -4,6 +4,12 @@ All notable changes to the Roam Publish extension. Each version is dated when it
 What's new shows it once Roam Depot serves it. Every bullet starts with **Breaking:**, **New:**, **Improved:** or
 **Fixed:**; a breaking change comes with a new major version.
 
+## Unreleased
+
+### Status in Roam
+- Fixed: Clicking a page title to edit it no longer moves the title down. The title icons jumped above it
+  (or, on unpublished pages, left an empty gap there); they now stay hidden until you finish editing.
+
 ## 0.4.0 (2026-11-11)
 
 ### Publishing
